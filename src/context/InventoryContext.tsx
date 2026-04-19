@@ -1,62 +1,73 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import type { Inventory } from '../types';
+import { db } from '../lib/firebase';
+import { collection, doc, onSnapshot, setDoc, deleteDoc } from 'firebase/firestore';
+import { useAuth } from './AuthContext';
 
 interface InventoryContextType {
   inventories: Inventory[];
   currentInventory: Inventory | null;
   setCurrentInventory: (inv: Inventory | null) => void;
-  saveInventory: (inv: Inventory) => void;
-  deleteInventory: (id: number) => void;
+  saveInventory: (inv: Inventory) => Promise<void>;
+  deleteInventory: (id: number) => Promise<void>;
 }
 
 const InventoryContext = createContext<InventoryContextType | undefined>(undefined);
 
-const STORAGE_KEY = 'leaftag_inventarios_v2';
-
 export const InventoryProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const { currentUser } = useAuth();
   const [inventories, setInventories] = useState<Inventory[]>([]);
   const [currentInventory, setCurrentInventory] = useState<Inventory | null>(null);
-  const [isLoaded, setIsLoaded] = useState(false);
 
-  // Load from local storage
+  // Firestore Snapshot (Realtime + Offline IndexedDB)
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        setInventories(JSON.parse(stored));
-      }
-    } catch (e) {
-      console.error('Error loading inventories', e);
+    if (!currentUser) {
+      setInventories([]);
+      return;
     }
-    setIsLoaded(true);
-  }, []);
 
-  // Save to local storage automatically
-  useEffect(() => {
-    if (isLoaded) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(inventories));
-    }
-  }, [inventories, isLoaded]);
-
-  const saveInventory = (newInv: Inventory) => {
-    setInventories((prev) => {
-      const idx = prev.findIndex((i) => i.id === newInv.id);
-      if (idx >= 0) {
-        const next = [...prev];
-        next[idx] = newInv;
-        return next;
-      }
-      return [...prev, newInv];
-    });
+    // Assina a pasta deste usuário especificamente
+    const colRef = collection(db, `users/${currentUser.uid}/inventories`);
     
-    if (currentInventory?.id === newInv.id) {
-      setCurrentInventory(newInv);
+    // onSnapshot funciona perfeitamente offline pegando do cache do IndexedDB!
+    const unsubscribe = onSnapshot(colRef, (snapshot) => {
+      const data: Inventory[] = [];
+      snapshot.forEach(doc => {
+        data.push(doc.data() as Inventory);
+      });
+      // Sort por DATA de início para manter organizaçao
+      data.sort((a,b) => b.id - a.id);
+      setInventories(data);
+    }, (error) => {
+      console.error("Erro no Sync do Inventário Firestore:", error);
+    });
+
+    return () => unsubscribe();
+  }, [currentUser]);
+
+  // Atualizar reativamente a view caso currentInventory seja modificado por outra aba
+  useEffect(() => {
+    if (currentInventory) {
+      const liveInv = inventories.find(i => i.id === currentInventory.id);
+      if (liveInv) setCurrentInventory(liveInv);
     }
+  }, [inventories]);
+
+  const saveInventory = async (newInv: Inventory) => {
+    if (!currentUser) return;
+    
+    // O SDK do Firebase joga pro IndexedDb imediatamente e sobe quando der internet. Reactivity é instantânea.
+    const docRef = doc(db, `users/${currentUser.uid}/inventories`, newInv.id.toString());
+    await setDoc(docRef, newInv);
   };
 
-  const deleteInventory = (id: number) => {
-    setInventories((prev) => prev.filter((i) => i.id !== id));
+  const deleteInventory = async (id: number) => {
+    if (!currentUser) return;
+    
+    const docRef = doc(db, `users/${currentUser.uid}/inventories`, id.toString());
+    await deleteDoc(docRef);
+
     if (currentInventory?.id === id) {
       setCurrentInventory(null);
     }
