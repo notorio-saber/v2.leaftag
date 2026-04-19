@@ -28,7 +28,15 @@ export const CollectData = () => {
       const pos = await getCurrentPosition();
       setFormData((prev: any) => ({ ...prev, coordenadas: `${pos.latitude.toFixed(6)}, ${pos.longitude.toFixed(6)}` }));
     } catch (e: any) {
-      alert(e.message);
+      if (e.message.includes('Permissão')) {
+        alert('Permissão de localização negada. Por favor, permita o acesso ao GPS no navegador para coletar coordenadas.');
+      } else if (e.message.includes('indisponível')) {
+        alert('Localização indisponível. Tente novamente em um local aberto ou verifique o GPS do dispositivo.');
+      } else if (e.message.includes('Tempo limite')) {
+        alert('Tempo limite ao tentar obter localização. Tente novamente.');
+      } else {
+        alert(e.message);
+      }
     }
     setIsGpsLoading(false);
   };
@@ -71,16 +79,21 @@ export const CollectData = () => {
             <div key={col.id} style={{ marginBottom: '16px' }}>
               <label className="input-label">{col.nome}</label>
               {col.id === 'coordenadas' ? (
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <input 
-                    className="input-field" 
-                    readOnly 
-                    value={formData[col.id] || ''} 
-                    style={{ marginBottom: 0, flex: 1 }} 
-                  />
-                  <button className="btn btn-secondary" style={{ width: 'auto' }} onClick={getGps} disabled={isGpsLoading}>
-                    {isGpsLoading ? '...' : 'GPS'}
-                  </button>
+                <div style={{ display: 'flex', gap: '8px', flexDirection: 'column' }}>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <input 
+                      className="input-field" 
+                      readOnly 
+                      value={formData[col.id] || ''} 
+                      style={{ marginBottom: 0, flex: 1 }} 
+                    />
+                    <button className="btn btn-secondary" style={{ width: 'auto' }} onClick={getGps} disabled={isGpsLoading}>
+                      {isGpsLoading ? '...' : 'GPS'}
+                    </button>
+                  </div>
+                  <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                    Para coletar coordenadas, permita o acesso ao GPS quando solicitado pelo navegador.
+                  </span>
                 </div>
               ) : col.tipo === 'textarea' ? (
                 <textarea 
