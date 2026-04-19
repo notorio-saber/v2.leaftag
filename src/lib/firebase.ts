@@ -26,7 +26,7 @@ export const db = getFirestore(app);
 export const storage = getStorage(app);
 
 // Activating local persistence strictly for offline forestry collections
-enableIndexedDbPersistence(db, { cacheSizeBytes: CACHE_SIZE_UNLIMITED })
+enableIndexedDbPersistence(db)
   .catch((err) => {
     if (err.code == 'failed-precondition') {
       console.warn("Múltiplas abas abertas não suportam sincronização offline em paralelo no Firebase.");
