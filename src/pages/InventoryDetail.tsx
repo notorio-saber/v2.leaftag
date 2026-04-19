@@ -11,12 +11,19 @@ export const InventoryDetail = () => {
   
   const inventory = inventories.find(i => i.id.toString() === id);
   const [fatorForma, setFatorForma] = useState('0.7');
+  const [showExportOptions, setShowExportOptions] = useState(false);
+  const [selectedCalcs, setSelectedCalcs] = useState({
+    areaBasal: true,
+    volume: true,
+    dapEquivalente: false,
+    fustes: false
+  });
 
   if (!inventory) {
     return <div style={{ color: 'white', padding: '20px' }}>Inventário não encontrado.</div>;
   }
 
-  const handleExport = (type: 'basico' | 'completo') => {
+  const handleExportCustom = () => {
     const data = inventory.dados.map(ind => {
       let baseData: any = {
         'Número': ind.numeroIndividuo,
@@ -28,37 +35,35 @@ export const InventoryDetail = () => {
       delete baseData.multipleStems;
       delete baseData.id;
 
-      if (type === 'completo') {
-        let maxCap = ind.cap;
-        let maxHt = ind.ht;
-        
-        // Se usar múltiplos fustes, calcular por fuste as áreas
-        if (ind.multipleStems && ind.stems) {
-           baseData['Qtd Fustes'] = ind.stems.length;
-           let areaBasalTotal = 0;
-           ind.stems.forEach((stem: any, i: number) => {
-             baseData[`Fuste_${i+1}_CAP`] = stem.cap;
-             baseData[`Fuste_${i+1}_Altura`] = stem.altura;
-             const g = calculateBasalArea(stem.cap);
-             baseData[`Fuste_${i+1}_AreaBasal`] = g.toFixed(4);
-             areaBasalTotal += g;
-             if(stem.cap > (maxCap||0)) maxCap = stem.cap;
-             if(stem.altura > (maxHt||0)) maxHt = stem.altura;
-           });
-           baseData['Area_Basal_Total (m2)'] = areaBasalTotal.toFixed(4);
-           baseData['Volume_Total (m3)'] = calculateVolume(areaBasalTotal, maxHt, parseFloat(fatorForma)).toFixed(4);
-        } else if (ind.cap) {
-           const g = calculateBasalArea(parseFloat(ind.cap));
-           baseData['Area_Basal (m2)'] = g.toFixed(4);
-           baseData['Volume (m3)'] = calculateVolume(g, parseFloat(ind.ht || 0), parseFloat(fatorForma)).toFixed(4);
-        }
-        
-        // DAP equivalente
-        if (maxCap) {
-           baseData['DAP_Equivalente (cm)'] = (parseFloat(maxCap) / Math.PI).toFixed(2);
+      let maxCap = ind.cap;
+      let maxHt = ind.ht;
+
+      if (selectedCalcs.fustes && ind.multipleStems && ind.stems) {
+        baseData['Qtd Fustes'] = ind.stems.length;
+        let areaBasalTotal = 0;
+        ind.stems.forEach((stem: any, i: number) => {
+          baseData[`Fuste_${i+1}_CAP`] = stem.cap;
+          baseData[`Fuste_${i+1}_Altura`] = stem.altura;
+          if (selectedCalcs.areaBasal) {
+            const g = calculateBasalArea(stem.cap);
+            baseData[`Fuste_${i+1}_AreaBasal`] = g.toFixed(4);
+            areaBasalTotal += g;
+            if(stem.cap > (maxCap||0)) maxCap = stem.cap;
+            if(stem.altura > (maxHt||0)) maxHt = stem.altura;
+          }
+        });
+        if (selectedCalcs.areaBasal) baseData['Area_Basal_Total (m2)'] = areaBasalTotal.toFixed(4);
+        if (selectedCalcs.volume) baseData['Volume_Total (m3)'] = calculateVolume(areaBasalTotal, maxHt, parseFloat(fatorForma)).toFixed(4);
+      } else if (ind.cap) {
+        if (selectedCalcs.areaBasal) {
+          const g = calculateBasalArea(parseFloat(ind.cap));
+          baseData['Area_Basal (m2)'] = g.toFixed(4);
+          if (selectedCalcs.volume) baseData['Volume (m3)'] = calculateVolume(g, parseFloat(ind.ht || 0), parseFloat(fatorForma)).toFixed(4);
         }
       }
-
+      if (selectedCalcs.dapEquivalente && maxCap) {
+        baseData['DAP_Equivalente (cm)'] = (parseFloat(maxCap) / Math.PI).toFixed(2);
+      }
       return baseData;
     });
 
@@ -66,6 +71,7 @@ export const InventoryDetail = () => {
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Dados");
     XLSX.writeFile(workbook, `${inventory.nome.replace(/\s+/g, '_')}_export.xlsx`);
+    setShowExportOptions(false);
   };
 
   return (
@@ -90,9 +96,29 @@ export const InventoryDetail = () => {
         />
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '16px' }}>
-          <button className="btn btn-secondary" onClick={() => handleExport('basico')}>📥 Exportar Dados Brutos</button>
-          <button className="btn btn-primary" onClick={() => handleExport('completo')}>📊 Exportar Analítico</button>
+          <button className="btn btn-primary" onClick={() => setShowExportOptions(true)}>📊 Exportar Personalizado</button>
         </div>
+        {showExportOptions && (
+          <div style={{ marginTop: 16, background: '#f5f5f5', padding: 16, borderRadius: 8 }}>
+            <h4 style={{ marginBottom: 8 }}>Escolha os cálculos para exportar:</h4>
+            <label style={{ display: 'block', marginBottom: 4 }}>
+              <input type="checkbox" checked={selectedCalcs.areaBasal} onChange={e => setSelectedCalcs(c => ({...c, areaBasal: e.target.checked}))} /> Área Basal
+            </label>
+            <label style={{ display: 'block', marginBottom: 4 }}>
+              <input type="checkbox" checked={selectedCalcs.volume} onChange={e => setSelectedCalcs(c => ({...c, volume: e.target.checked}))} /> Volume
+            </label>
+            <label style={{ display: 'block', marginBottom: 4 }}>
+              <input type="checkbox" checked={selectedCalcs.dapEquivalente} onChange={e => setSelectedCalcs(c => ({...c, dapEquivalente: e.target.checked}))} /> DAP Equivalente
+            </label>
+            <label style={{ display: 'block', marginBottom: 4 }}>
+              <input type="checkbox" checked={selectedCalcs.fustes} onChange={e => setSelectedCalcs(c => ({...c, fustes: e.target.checked}))} /> Detalhar Fustes
+            </label>
+            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+              <button className="btn btn-primary" onClick={handleExportCustom}>Exportar</button>
+              <button className="btn btn-secondary" onClick={() => setShowExportOptions(false)}>Cancelar</button>
+            </div>
+          </div>
+        )}
       </div>
 
       <div style={{ display: 'flex', gap: '12px' }}>
