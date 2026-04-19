@@ -5,6 +5,7 @@ import {
   CACHE_SIZE_UNLIMITED 
 } from "firebase/firestore";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
+import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAlyrW_aFVslZVYEQX22ziovuRaMNts7ag",
@@ -22,6 +23,8 @@ export const provider = new GoogleAuthProvider();
 
 export const db = getFirestore(app);
 
+export const storage = getStorage(app);
+
 // Activating local persistence strictly for offline forestry collections
 enableIndexedDbPersistence(db, { cacheSizeBytes: CACHE_SIZE_UNLIMITED })
   .catch((err) => {
@@ -31,3 +34,4 @@ enableIndexedDbPersistence(db, { cacheSizeBytes: CACHE_SIZE_UNLIMITED })
       console.warn("Seu browser não suporta IndexedDB/Offline do Firestore.");
     }
   });
+// ...existing code...
