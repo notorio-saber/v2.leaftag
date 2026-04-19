@@ -15,6 +15,9 @@ const columnsBase = [
   { id: 'observacoes', nome: 'Observações', checked: false },
 ];
 
+// Estado para colunas personalizadas
+const getNewCustomCol = () => ({ id: '', nome: '', tipo: 'text', checked: true });
+
 export const InventorySetup = () => {
   const navigate = useNavigate();
   const { setCurrentInventory, saveInventory } = useInventory();
@@ -24,6 +27,7 @@ export const InventorySetup = () => {
   const [selectedTemplate, setSelectedTemplate] = useState('custom');
 
   const [cols, setCols] = useState(columnsBase);
+  const [customCols, setCustomCols] = useState([getNewCustomCol()]);
 
   const applyTemplate = (tpl: string) => {
     setSelectedTemplate(tpl);
@@ -46,9 +50,12 @@ export const InventorySetup = () => {
       alert('Por favor, preencha Nome, Local e Área.');
       return;
     }
-    const finalCols: InventoryColumn[] = cols
-      .filter(c => c.checked)
-      .map(c => ({ id: c.id, nome: c.nome, tipo: getColType(c.id) }));
+    const finalCols: InventoryColumn[] = [
+      ...cols.filter(c => c.checked).map(c => ({ id: c.id, nome: c.nome, tipo: getColType(c.id) })),
+      ...customCols
+        .filter(c => c.nome && c.id)
+        .map(c => ({ id: c.id, nome: c.nome, tipo: c.tipo }))
+    ];
 
     if (finalCols.length === 0) {
       alert('Selecione pelo menos uma coluna para coleta.');
@@ -118,6 +125,60 @@ export const InventorySetup = () => {
             </label>
           ))}
         </div>
+
+        <h4 style={{ margin: '16px 0 8px', color: 'var(--primary-color)' }}>Colunas Personalizadas</h4>
+        {customCols.map((col, idx) => (
+          <div key={idx} style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: 8 }}>
+            <input
+              className="input-field"
+              style={{ width: 120 }}
+              placeholder="ID"
+              value={col.id}
+              onChange={e => {
+                const newCols = [...customCols];
+                newCols[idx].id = e.target.value;
+                setCustomCols(newCols);
+              }}
+            />
+            <input
+              className="input-field"
+              style={{ width: 180 }}
+              placeholder="Nome da Coluna"
+              value={col.nome}
+              onChange={e => {
+                const newCols = [...customCols];
+                newCols[idx].nome = e.target.value;
+                setCustomCols(newCols);
+              }}
+            />
+            <select
+              className="input-field"
+              style={{ width: 100 }}
+              value={col.tipo}
+              onChange={e => {
+                const newCols = [...customCols];
+                newCols[idx].tipo = e.target.value;
+                setCustomCols(newCols);
+              }}
+            >
+              <option value="text">Texto</option>
+              <option value="number">Número</option>
+              <option value="textarea">Texto Longo</option>
+            </select>
+            <button
+              className="btn btn-danger"
+              style={{ padding: '2px 8px' }}
+              onClick={() => {
+                setCustomCols(cols => cols.filter((_, i) => i !== idx));
+              }}
+            >Remover</button>
+          </div>
+        ))}
+        <button
+          className="btn btn-secondary"
+          style={{ marginTop: 8, marginBottom: 16 }}
+          onClick={() => setCustomCols(cols => [...cols, getNewCustomCol()])}
+        >+ Adicionar Coluna Personalizada</button>
 
         <div style={{ display: 'flex', gap: '12px', marginTop: '32px' }}>
           <button className="btn btn-secondary" onClick={() => navigate('/')}>Cancelar</button>
