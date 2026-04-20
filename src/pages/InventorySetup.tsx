@@ -128,10 +128,9 @@ export const InventorySetup = () => {
 
         <h4 style={{ margin: '16px 0 8px', color: 'var(--primary-color)' }}>Colunas Personalizadas</h4>
         {customCols.map((col, idx) => (
-          <div key={idx} style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: 8 }}>
+          <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'stretch', marginBottom: 12 }}>
             <input
               className="input-field"
-              style={{ width: 120 }}
               placeholder="ID"
               value={col.id}
               onChange={e => {
@@ -142,7 +141,6 @@ export const InventorySetup = () => {
             />
             <input
               className="input-field"
-              style={{ width: 180 }}
               placeholder="Nome da Coluna"
               value={col.nome}
               onChange={e => {
@@ -153,7 +151,6 @@ export const InventorySetup = () => {
             />
             <select
               className="input-field"
-              style={{ width: 100 }}
               value={col.tipo}
               onChange={e => {
                 const newCols = [...customCols];
@@ -167,7 +164,7 @@ export const InventorySetup = () => {
             </select>
             <button
               className="btn btn-danger"
-              style={{ padding: '2px 8px' }}
+              style={{ padding: '6px 0', marginTop: 4, width: '100%' }}
               onClick={() => {
                 setCustomCols(cols => cols.filter((_, i) => i !== idx));
               }}
