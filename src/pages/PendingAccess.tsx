@@ -8,10 +8,6 @@ export const PendingAccess = () => {
     return <Navigate to="/" />;
   }
 
-  const handleWhatsapp = () => {
-    window.open("https://wa.me/5547920022746?text=Ol%C3%A1%2C%20criei%20minha%20conta%20no%20LeafTag%20e%20preciso%20de%20%2Aaprova%C3%A7%C3%A3o%2A%20de%20acesso%21", "_blank");
-  };
-
   return (
     <div className="container" style={{ display: 'flex', flexDirection: 'column', height: '100vh', justifyContent: 'center' }}>
       <div className="glass-card" style={{ textAlign: 'center' }}>
