@@ -3,7 +3,6 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useInventory } from '../context/InventoryContext';
 import * as XLSX from 'xlsx';
 import { calculateBasalArea, calculateVolume } from '../utils/forestryCalculations';
-import type { IndividualData } from '../types';
 
 export const InventoryDetail = () => {
   const navigate = useNavigate();
