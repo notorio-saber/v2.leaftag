@@ -7,12 +7,12 @@ import { getAuth, GoogleAuthProvider } from "firebase/auth";
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyAlyrW_aFVslZVYEQX22ziovuRaMNts7ag",
-  authDomain: "studio-1022270380-4e10a.firebaseapp.com",
-  projectId: "studio-1022270380-4e10a",
-  storageBucket: "studio-1022270380-4e10a.firebasestorage.app",
-  messagingSenderId: "1047475394840",
-  appId: "1:1047475394840:web:304af178949bfaf766a66d"
+  apiKey: "AIzaSyCF_OXPZCMWTcVNtv3ZUzYM5nrf6oWVMi4",
+  authDomain: "leaftag.firebaseapp.com",
+  projectId: "leaftag",
+  storageBucket: "leaftag.firebasestorage.app",
+  messagingSenderId: "788814442608",
+  appId: "1:788814442608:web:0cd8c6972dcf41b49c84b5"
 };
 
 const app = initializeApp(firebaseConfig);
