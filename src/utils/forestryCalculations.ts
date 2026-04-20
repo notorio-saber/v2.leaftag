@@ -62,3 +62,14 @@ export function calculateSimpsonIndex(speciesCounts: Record<string, number>): nu
   }
   return 1 - sumPi2; // Índice de Diversidade de Simpson
 }
+
+/**
+ * Calcula a Equitabilidade de Pielou (J')
+ * @param shannonIndex O valor calculado do índice de Shannon (H')
+ * @param speciesCount Número total de espécies diferentes (S)
+ * @returns O valor da equitabilidade (J') de 0 a 1
+ */
+export function calculatePielouIndex(shannonIndex: number, speciesCount: number): number {
+  if (speciesCount <= 1 || shannonIndex === 0) return 0;
+  return shannonIndex / Math.log(speciesCount);
+}

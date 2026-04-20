@@ -2,7 +2,7 @@ import React, { useState, useMemo, useRef } from 'react';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts';
 import html2canvas from 'html2canvas';
 import type { Inventory, IndividualData } from '../types';
-import { calculateShannonIndex, calculateSimpsonIndex, calculateBasalArea, calculateVolume } from '../utils/forestryCalculations';
+import { calculateShannonIndex, calculateSimpsonIndex, calculatePielouIndex, calculateBasalArea, calculateVolume } from '../utils/forestryCalculations';
 
 interface DashboardProps {
   inventories: Inventory[];
@@ -124,8 +124,10 @@ export const StatisticalDashboard: React.FC<DashboardProps> = ({ inventories, on
       .sort((a,b) => b.count - a.count)
       .slice(0, 10);
 
+    const speciesCount = Object.keys(spCount).length;
     const shannon = calculateShannonIndex(spCount);
     const simpson = calculateSimpsonIndex(spCount);
+    const pielou = calculatePielouIndex(shannon, speciesCount);
 
     return { 
       totalInd: allInd.length, 
@@ -134,7 +136,8 @@ export const StatisticalDashboard: React.FC<DashboardProps> = ({ inventories, on
       totalV,
       shannon,
       simpson,
-      speciesCount: Object.keys(spCount).length,
+      pielou,
+      speciesCount,
       collectorCurveData,
       diametricFinal,
       basalFinal,
@@ -210,6 +213,7 @@ export const StatisticalDashboard: React.FC<DashboardProps> = ({ inventories, on
            <TopStatCard title="Área Basal (M²)" value={stats.totalG.toFixed(4)} sub="Basimetria" />
            <TopStatCard title="Shannon (H')" value={stats.shannon.toFixed(4)} sub="Índice de Diversidade" />
            <TopStatCard title="Simpson (1-D)" value={stats.simpson.toFixed(4)} sub="Riqueza Ecológica" />
+           <TopStatCard title="Pielou (J')" value={stats.pielou.toFixed(4)} sub="Equitabilidade" />
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '32px' }}>
