@@ -42,7 +42,9 @@ export const CollectData = () => {
   };
 
   const saveIndividual = () => {
-    const freshInv = { ...currentInventory };
+    // Para que o React e o Firebase detectem a mudança de fato (sem mutar estado atual diretamente):
+    const freshInv = JSON.parse(JSON.stringify(currentInventory)); // Deep copy para evitar mutação do reference array
+    
     const newIndividual = {
       id: Date.now().toString(),
       numeroIndividuo: currentIdx,
@@ -54,6 +56,7 @@ export const CollectData = () => {
     
     freshInv.dados.push(newIndividual);
     freshInv.ultimaColeta = new Date().toLocaleDateString('pt-BR');
+    
     saveInventory(freshInv);
     
     // reset

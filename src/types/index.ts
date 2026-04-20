@@ -21,10 +21,18 @@ export interface IndividualData {
   [key: string]: any; 
 }
 
-export interface Inventory {
-  id: number;
+export interface FieldWork {
+  id: string;
   nome: string;
   local: string;
+  dataInicio: string;
+  status: string;
+}
+
+export interface Inventory {
+  id: number;
+  fieldWorkId: string;
+  nome: string;
   areaParcela: number;
   fatorExpansao: number;
   dataInicio: string;

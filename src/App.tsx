@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { BrowserRouter, Routes, Route, useNavigate, Navigate } from 'react-router-dom';
 import { InventorySetup } from './pages/InventorySetup';
 import { CollectData } from './pages/CollectData';
 import { InventoryDetail } from './pages/InventoryDetail';
+import { FieldWorkDetail } from './pages/FieldWorkDetail';
 import { Login } from './pages/Login';
 import { PendingAccess } from './pages/PendingAccess';
 import { AdminAccounts } from './pages/AdminAccounts';
@@ -19,16 +21,33 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 const Home = () => {
-  const { inventories, setCurrentInventory } = useInventory();
+  const { fieldWorks, createFieldWork } = useInventory();
   const { signOut, status } = useAuth();
   const navigate = useNavigate();
+  const [showModal, setShowModal] = useState(false);
+  const [newFwName, setNewFwName] = useState('');
+  const [newFwLocal, setNewFwLocal] = useState('');
+
+  const handleCreateFw = () => {
+    if (!newFwName) return alert('Dê um nome ao trabalho.');
+    createFieldWork({
+      id: Date.now().toString(),
+      nome: newFwName,
+      local: newFwLocal || 'Não especificado',
+      dataInicio: new Date().toLocaleDateString('pt-BR'),
+      status: 'Aberto'
+    });
+    setShowModal(false);
+    setNewFwName('');
+    setNewFwLocal('');
+  };
   
   return (
     <div className="container" style={{ marginTop: '20px' }}>
       <div className="app-header">
         <div>
-          <h1 style={{ color: 'var(--primary-color)' }}>Meus Inventários</h1>
-          <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Coleta de dados florestais</p>
+          <h1 style={{ color: 'var(--primary-color)' }}>Trabalhos de Campo</h1>
+          <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Gerenciamento de projetos</p>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
           {status === 'admin' && (
@@ -42,41 +61,42 @@ const Home = () => {
         </div>
       </div>
       
-      {inventories.length === 0 ? (
+      {fieldWorks.length === 0 ? (
         <div className="glass-card" style={{ textAlign: 'center', padding: '40px' }}>
-          <h3 style={{ color: 'var(--text-muted)' }}>Nenhum inventário encontrado</h3>
-          <p style={{ color: '#666', marginTop: '8px' }}>Inicie sua primeira coleta de dados!</p>
+          <h3 style={{ color: 'var(--text-muted)' }}>Nenhum projeto encontrado</h3>
+          <p style={{ color: '#666', marginTop: '8px' }}>Crie seu primeiro trabalho de campo!</p>
         </div>
       ) : (
-        inventories.map(inv => (
+        fieldWorks.map(fw => (
           <div 
-            key={inv.id} 
+            key={fw.id} 
             className="inventory-card" 
-            onClick={() => {
-                setCurrentInventory(inv);
-                navigate(`/detail/${inv.id}`);
-            }}
+            onClick={() => navigate(`/fieldwork/${fw.id}`)}
           >
-            <div className="inventory-card-title">{inv.nome}</div>
-            <div className="inventory-card-info">📍 {inv.local}</div>
-            <div className="inventory-card-info">📅 {inv.dataInicio}</div>
-            <div className="inventory-stats">
-              <div className="stat-item">
-                <span className="stat-value">{inv.dados.length}</span>
-                <span className="stat-label">Indivíduos</span>
-              </div>
-              <div className="stat-item">
-                <span className="stat-value">{inv.colunas.length}</span>
-                <span className="stat-label">Colunas</span>
-              </div>
-            </div>
+            <div className="inventory-card-title">{fw.nome}</div>
+            <div className="inventory-card-info">📍 {fw.local}</div>
+            <div className="inventory-card-info">📅 {fw.dataInicio}</div>
           </div>
         ))
       )}
 
-      <button className="btn btn-primary" style={{ marginTop: '24px' }} onClick={() => navigate('/setup')}>
-        + Nova Coleta
+      <button className="btn btn-primary" style={{ marginTop: '24px' }} onClick={() => setShowModal(true)}>
+        + Novo Trabalho de Campo
       </button>
+
+      {showModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
+           <div className="glass-card" style={{ width: '100%', maxWidth: '400px' }}>
+              <h3>Novo Trabalho</h3>
+              <input className="input-field" placeholder="Nome (Ex: Inventário 2026)" value={newFwName} onChange={e => setNewFwName(e.target.value)} style={{ marginTop: '16px' }} />
+              <input className="input-field" placeholder="Local / Fazenda" value={newFwLocal} onChange={e => setNewFwLocal(e.target.value)} />
+              <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
+                <button className="btn btn-secondary" onClick={() => setShowModal(false)}>Cancelar</button>
+                <button className="btn btn-primary" onClick={handleCreateFw}>Criar</button>
+              </div>
+           </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -90,7 +110,8 @@ function App() {
         
         {/* Rotas Protegidas */}
         <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
-        <Route path="/setup" element={<ProtectedRoute><InventorySetup /></ProtectedRoute>} />
+        <Route path="/fieldwork/:id" element={<ProtectedRoute><FieldWorkDetail /></ProtectedRoute>} />
+        <Route path="/setup/:fieldWorkId" element={<ProtectedRoute><InventorySetup /></ProtectedRoute>} />
         <Route path="/collect" element={<ProtectedRoute><CollectData /></ProtectedRoute>} />
         <Route path="/detail/:id" element={<ProtectedRoute><InventoryDetail /></ProtectedRoute>} />
         <Route path="/admin" element={<ProtectedRoute><AdminAccounts /></ProtectedRoute>} />

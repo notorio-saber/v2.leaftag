@@ -7,9 +7,11 @@ import { calculateBasalArea, calculateVolume } from '../utils/forestryCalculatio
 export const InventoryDetail = () => {
   const navigate = useNavigate();
   const { id } = useParams();
-  const { inventories, deleteInventory, setCurrentInventory } = useInventory();
+  const { inventories, deleteInventory, setCurrentInventory, fieldWorks } = useInventory();
   
   const inventory = inventories.find(i => i.id.toString() === id);
+  const fieldwork = fieldWorks.find(f => f.id === inventory?.fieldWorkId);
+  
   const [fatorForma, setFatorForma] = useState('0.7');
   const [showExportOptions, setShowExportOptions] = useState(false);
   const [selectedCalcs, setSelectedCalcs] = useState({
@@ -79,7 +81,7 @@ export const InventoryDetail = () => {
       <div className="app-header">
         <div>
           <h2 style={{ color: 'var(--primary-color)' }}>{inventory.nome}</h2>
-          <span style={{ fontSize: '14px', color: 'var(--text-muted)' }}>{inventory.local} • {inventory.areaParcela} m²</span>
+          <span style={{ fontSize: '14px', color: 'var(--text-muted)' }}>{fieldwork?.nome || 'Trabalho Desconhecido'} • {inventory.areaParcela} m²</span>
         </div>
       </div>
 
@@ -122,7 +124,7 @@ export const InventoryDetail = () => {
       </div>
 
       <div style={{ display: 'flex', gap: '12px' }}>
-        <button className="btn btn-secondary" onClick={() => navigate('/')}>Voltar</button>
+        <button className="btn btn-secondary" onClick={() => navigate(`/fieldwork/${inventory.fieldWorkId}`)}>Voltar</button>
         <button 
           className="btn btn-primary" 
           style={{ background: '#2196f3' }} 
@@ -138,7 +140,7 @@ export const InventoryDetail = () => {
           onClick={() => {
             if(window.confirm('Tem certeza? Isso apagará todo este inventário.')) {
               deleteInventory(inventory.id);
-              navigate('/');
+              navigate(`/fieldwork/${inventory.fieldWorkId}`);
             }
           }}
         >

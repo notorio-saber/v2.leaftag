@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useInventory } from '../context/InventoryContext';
 import type { InventoryColumn, ColumnType } from '../types';
 
@@ -20,9 +20,9 @@ const getNewCustomCol = () => ({ id: '', nome: '', tipo: 'text', checked: true }
 
 export const InventorySetup = () => {
   const navigate = useNavigate();
+  const { fieldWorkId } = useParams();
   const { setCurrentInventory, saveInventory } = useInventory();
   const [nome, setNome] = useState('');
-  const [local, setLocal] = useState('');
   const [area, setArea] = useState('');
   const [selectedTemplate, setSelectedTemplate] = useState('custom');
 
@@ -46,8 +46,12 @@ export const InventorySetup = () => {
   };
 
   const submitSetup = () => {
-    if (!nome || !local || !area) {
-      alert('Por favor, preencha Nome, Local e Área.');
+    if (!fieldWorkId) {
+      alert('Erro: Trabalho de campo não identificado. Volte para a tela inicial.');
+      return;
+    }
+    if (!nome || !area) {
+      alert('Por favor, preencha Nome e Área.');
       return;
     }
     const finalCols: InventoryColumn[] = [
@@ -64,8 +68,8 @@ export const InventorySetup = () => {
 
     const newInv = {
       id: Date.now(),
+      fieldWorkId,
       nome,
-      local,
       areaParcela: parseFloat(area) || 0,
       fatorExpansao: parseFloat(area) > 0 ? 10000 / parseFloat(area) : 1,
       dataInicio: new Date().toLocaleDateString('pt-BR'),
@@ -83,13 +87,10 @@ export const InventorySetup = () => {
 
   return (
     <div className="container" style={{ marginTop: '20px' }}>
-      <h2 style={{ color: 'var(--primary-color)' }}>Configurar Inventário</h2>
+      <h2 style={{ color: 'var(--primary-color)' }}>Configurar Parcela</h2>
       <div className="glass-card" style={{ marginTop: '16px' }}>
-        <label className="input-label">Nome do Inventário</label>
+        <label className="input-label">Nome/Número da Parcela</label>
         <input className="input-field" value={nome} onChange={e => setNome(e.target.value)} placeholder="Ex: Parcela 01" />
-
-        <label className="input-label">Local / Fazenda</label>
-        <input className="input-field" value={local} onChange={e => setLocal(e.target.value)} placeholder="Local" />
 
         <label className="input-label">Área da Parcela (m²)</label>
         <input type="number" className="input-field" value={area} onChange={e => setArea(e.target.value)} placeholder="0.0" />
@@ -128,10 +129,21 @@ export const InventorySetup = () => {
 
         <h4 style={{ margin: '16px 0 8px', color: 'var(--primary-color)' }}>Colunas Personalizadas</h4>
         {customCols.map((col, idx) => (
-          <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'stretch', marginBottom: 12 }}>
+          <div key={idx} style={{ 
+            display: 'flex', 
+            flexWrap: 'wrap', 
+            gap: '8px', 
+            alignItems: 'center', 
+            marginBottom: '12px',
+            background: 'var(--bg-color)',
+            padding: '12px',
+            borderRadius: '8px',
+            border: '1px solid #333'
+          }}>
             <input
               className="input-field"
-              placeholder="ID"
+              style={{ flex: '1 1 80px', marginBottom: 0, minWidth: '80px' }}
+              placeholder="ID (sem espaços)"
               value={col.id}
               onChange={e => {
                 const newCols = [...customCols];
@@ -141,6 +153,7 @@ export const InventorySetup = () => {
             />
             <input
               className="input-field"
+              style={{ flex: '2 1 120px', marginBottom: 0, minWidth: '120px' }}
               placeholder="Nome da Coluna"
               value={col.nome}
               onChange={e => {
@@ -151,6 +164,7 @@ export const InventorySetup = () => {
             />
             <select
               className="input-field"
+              style={{ flex: '1 1 100px', marginBottom: 0, minWidth: '100px' }}
               value={col.tipo}
               onChange={e => {
                 const newCols = [...customCols];
@@ -160,15 +174,15 @@ export const InventorySetup = () => {
             >
               <option value="text">Texto</option>
               <option value="number">Número</option>
-              <option value="textarea">Texto Longo</option>
+              <option value="textarea">Longo</option>
             </select>
             <button
               className="btn btn-danger"
-              style={{ padding: '6px 0', marginTop: 4, width: '100%' }}
+              style={{ flex: '1 1 100%', padding: '8px', marginTop: '4px' }}
               onClick={() => {
                 setCustomCols(cols => cols.filter((_, i) => i !== idx));
               }}
-            >Remover</button>
+            >Remover Coluna</button>
           </div>
         ))}
         <button
@@ -178,7 +192,7 @@ export const InventorySetup = () => {
         >+ Adicionar Coluna Personalizada</button>
 
         <div style={{ display: 'flex', gap: '12px', marginTop: '32px' }}>
-          <button className="btn btn-secondary" onClick={() => navigate('/')}>Cancelar</button>
+          <button className="btn btn-secondary" onClick={() => navigate(-1)}>Cancelar</button>
           <button className="btn btn-primary" onClick={submitSetup}>Iniciar Coleta</button>
         </div>
       </div>
