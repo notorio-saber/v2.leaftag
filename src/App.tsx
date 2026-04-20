@@ -54,9 +54,12 @@ const Home = () => {
   return (
     <div className="container" style={{ marginTop: '20px' }}>
       <div className="app-header">
-        <div>
-          <h1 style={{ color: 'var(--primary-color)' }}>Trabalhos de Campo</h1>
-          <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Gerenciamento de projetos</p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <img src="/logo.png" alt="Logo" style={{ width: '48px', height: '48px', borderRadius: '8px' }} />
+          <div>
+            <h1 style={{ color: 'var(--primary-color)' }}>Trabalhos de Campo</h1>
+            <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Gerenciamento de projetos</p>
+          </div>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
           {status === 'admin' && (

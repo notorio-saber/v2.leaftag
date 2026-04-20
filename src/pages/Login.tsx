@@ -24,6 +24,7 @@ export const Login = () => {
   return (
     <div className="container" style={{ display: 'flex', flexDirection: 'column', height: '100vh', justifyContent: 'center' }}>
       <div className="glass-card" style={{ textAlign: 'center' }}>
+        <img src="/logo.png" alt="LeafTag Logo" style={{ width: '80px', height: '80px', margin: '0 auto 16px', display: 'block', borderRadius: '12px' }} />
         <h1 style={{ color: 'var(--primary-color)', marginBottom: '8px' }}>LeafTag</h1>
         <p style={{ color: 'var(--text-muted)', marginBottom: '32px' }}>Acesso restrito a engenheiros e coletores autorizados.</p>
         
