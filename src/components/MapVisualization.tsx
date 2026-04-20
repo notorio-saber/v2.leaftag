@@ -128,7 +128,7 @@ export const MapVisualization: React.FC<MapVisProps> = ({ inventories, onClose }
   return (
     <div style={{
       position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-      background: 'var(--bg-color)', zIndex: 9999, display: 'flex', flexDirection: 'column'
+      background: '#0a0d0b', zIndex: 9999, display: 'flex', flexDirection: 'column'
     }}>
       {/* Header */}
       <div style={{ padding: '16px', background: 'var(--card-bg)', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

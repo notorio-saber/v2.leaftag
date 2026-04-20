@@ -57,8 +57,8 @@ const Home = () => {
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
           <img src="/logo.png" alt="Logo" style={{ width: '48px', height: '48px', borderRadius: '8px' }} />
           <div>
-            <h1 style={{ color: 'var(--primary-color)' }}>Trabalhos de Campo</h1>
-            <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Gerenciamento de projetos</p>
+            <h1 style={{ color: 'var(--primary-color)', fontSize: '20px', whiteSpace: 'nowrap', margin: 0 }}>Trabalhos de Campo</h1>
+            <p style={{ color: 'var(--text-muted)', fontSize: '14px', margin: 0 }}>Gerenciamento</p>
           </div>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
