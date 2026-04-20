@@ -136,9 +136,9 @@ export const MapVisualization: React.FC<MapVisProps> = ({ inventories, onClose }
         <button className="btn btn-secondary" style={{ width: 'auto', padding: '6px 12px' }} onClick={onClose}>✕ Fechar Mapa</button>
       </div>
 
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden', flexDirection: 'row' }}>
+      <div className="map-layout-container">
         {/* Sidebar Legend and Filters */}
-        <div style={{ width: '280px', background: '#161a18', borderRight: '1px solid var(--border-color)', padding: '16px', overflowY: 'auto' }}>
+        <div className="map-sidebar">
           <h3 style={{ marginBottom: '16px', fontSize: '14px', textTransform: 'uppercase', letterSpacing: '1px' }}>Filtros de Parcela</h3>
           
           <button className="btn btn-secondary" style={{ padding: '8px', fontSize: '12px', marginBottom: '16px' }} onClick={() => {
@@ -174,7 +174,7 @@ export const MapVisualization: React.FC<MapVisProps> = ({ inventories, onClose }
         </div>
 
         {/* Map Container */}
-        <div style={{ flex: 1, position: 'relative' }}>
+        <div className="map-viewport">
           <MapContainer 
             center={[-15.793889, -47.882778]} 
             zoom={4} 

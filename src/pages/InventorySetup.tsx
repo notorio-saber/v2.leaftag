@@ -13,6 +13,7 @@ const columnsBase = [
   { id: 'ht', nome: 'Altura Total (m)', checked: false },
   { id: 'coordenadas', nome: 'Coordenadas GPS', checked: false },
   { id: 'observacoes', nome: 'Observações', checked: false },
+  { id: 'foto', nome: 'Fotos de Campo (Câmera)', checked: false }
 ];
 
 // Estado para colunas personalizadas
@@ -48,6 +49,7 @@ export const InventorySetup = () => {
   const getColType = (id: string): ColumnType => {
     if (['cap', 'dap', 'hc', 'ht'].includes(id)) return 'number';
     if (id === 'observacoes') return 'textarea';
+    if (id === 'foto') return 'photo';
     return 'text';
   };
 
