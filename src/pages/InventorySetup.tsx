@@ -54,7 +54,7 @@ export const InventorySetup = () => {
       ...cols.filter(c => c.checked).map(c => ({ id: c.id, nome: c.nome, tipo: getColType(c.id) })),
       ...customCols
         .filter(c => c.nome && c.id)
-        .map(c => ({ id: c.id, nome: c.nome, tipo: c.tipo }))
+        .map(c => ({ id: c.id, nome: c.nome, tipo: c.tipo as ColumnType }))
     ];
 
     if (finalCols.length === 0) {
