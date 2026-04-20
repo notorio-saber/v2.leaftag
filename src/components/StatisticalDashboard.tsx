@@ -166,7 +166,7 @@ export const StatisticalDashboard: React.FC<DashboardProps> = ({ inventories, on
   };
 
   const TopStatCard = ({ title, value, sub }: { title: string, value: string, sub: string }) => (
-    <div style={{ flex: '1 1 120px', background: 'rgba(0,0,0,0.5)', padding: '16px', borderRadius: '8px', borderLeft: '4px solid var(--primary-color)' }}>
+    <div style={{ flex: '1 1 45%', minWidth: '130px', background: 'rgba(0,0,0,0.5)', padding: '16px', borderRadius: '8px', borderLeft: '4px solid var(--primary-color)', boxSizing: 'border-box' }}>
       <div style={{ fontSize: '12px', color: 'gray', textTransform: 'uppercase', letterSpacing: 1 }}>{title}</div>
       <div style={{ fontSize: '24px', fontWeight: 'bold', color: 'white', margin: '4px 0' }}>{value}</div>
       <div style={{ fontSize: '12px', color: 'var(--primary-color)' }}>{sub}</div>
@@ -203,10 +203,10 @@ export const StatisticalDashboard: React.FC<DashboardProps> = ({ inventories, on
           </button>
       </div>
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: '24px' }} ref={containerRef}>
+      <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '16px', width: '100%', boxSizing: 'border-box' }} ref={containerRef}>
         
         {/* Top High Level Stats */}
-        <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginBottom: '32px' }}>
+        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '32px' }}>
            <TopStatCard title="Amostragem Base" value={stats.totalFustes.toString()} sub={`${stats.totalInd} Indivíduos`} />
            <TopStatCard title="Especialização" value={stats.speciesCount.toString()} sub="Espécies Mapeadas" />
            <TopStatCard title="Volume Total (M³)" value={stats.totalV.toFixed(2)} sub="Biomassa Estimada" />
@@ -299,11 +299,11 @@ export const StatisticalDashboard: React.FC<DashboardProps> = ({ inventories, on
            </div>
 
            {/* Species Chart */}
-           <div className="glass-card" style={{ padding: '24px', gridColumn: '1 / -1' }}>
+           <div className="glass-card" style={{ padding: '16px', gridColumn: '1 / -1', overflow: 'hidden' }}>
               <h3 style={{ marginBottom: '16px', color: 'var(--primary-color)' }}>Frequência de Espécies (Top 10)</h3>
               <div style={{ height: '400px', width: '100%' }}>
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={stats.speciesFinal} layout="vertical" margin={{ top: 10, right: 30, left: 120, bottom: 0 }}>
+                  <BarChart data={stats.speciesFinal} layout="vertical" margin={{ top: 10, right: 10, left: 90, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#333" horizontal={true} vertical={false} />
                     <XAxis type="number" stroke="#ccc" allowDecimals={false} />
                     <YAxis type="category" dataKey="name" stroke="#ccc" width={110} tick={{ fill: '#aaa', fontSize: 12 }} interval={0} />
