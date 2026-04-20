@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef } from 'react';
-import { BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell, Legend } from 'recharts';
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts';
 import html2canvas from 'html2canvas';
 import type { Inventory, IndividualData } from '../types';
 import { calculateShannonIndex, calculateSimpsonIndex, calculateBasalArea, calculateVolume } from '../utils/forestryCalculations';
