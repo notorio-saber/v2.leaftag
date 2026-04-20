@@ -5,6 +5,7 @@ import * as XLSX from 'xlsx';
 import JSZip from 'jszip';
 import { calculateBasalArea, calculateVolume } from '../utils/forestryCalculations';
 import { getPhotosForInventory, deletePhotosForIndividual } from '../utils/photoStorage';
+import { StatisticalDashboard } from '../components/StatisticalDashboard';
 
 export const InventoryDetail = () => {
   const navigate = useNavigate();
@@ -23,6 +24,7 @@ export const InventoryDetail = () => {
     fustes: false
   });
   const [isZipping, setIsZipping] = useState(false);
+  const [showDashboard, setShowDashboard] = useState(false);
 
   // Estado para edição
   const [editingInd, setEditingInd] = useState<any>(null);
@@ -175,8 +177,11 @@ export const InventoryDetail = () => {
         </div>
         
         <div style={{ marginTop: '16px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+          <button className="btn btn-secondary" style={{ flex: '1 1 200px', borderColor: '#ffb74d', color: '#ffb74d' }} onClick={() => setShowDashboard(true)}>
+            📊 Ver Dashboard da Parcela
+          </button>
           <button className="btn btn-secondary" style={{ flex: '1 1 200px', borderColor: '#4fc3f7', color: '#4fc3f7' }} onClick={handleDownloadPhotos} disabled={isZipping}>
-            {isZipping ? "⏳ Compactando Zíper..." : "🗃️ Baixar Galeria de Fotos (ZIP)"}
+            {isZipping ? "⏳ Compactando Zíper..." : "🗃️ Baixar Galeria (ZIP)"}
           </button>
         </div>
 
@@ -317,6 +322,8 @@ export const InventoryDetail = () => {
            </div>
         </div>
       )}
+
+      {showDashboard && <StatisticalDashboard inventories={[inventory]} onClose={() => setShowDashboard(false)} />}
     </div>
   );
 };
