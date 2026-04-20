@@ -133,14 +133,18 @@
 .map-layout-container {
   display: flex;
   flex: 1;
+  min-height: 0;
+  width: 100%;
+  height: 100%;
   overflow: hidden;
   flex-direction: column-reverse;
 }
 
 .map-sidebar {
   width: 100%;
-  height: 50%;
-  background: #161a18;
+  flex: 0 0 auto;
+  max-height: 40vh;
+  background: #0a0d0b;
   border-top: 2px solid var(--primary-color);
   padding: 16px;
   overflow-y: auto;
@@ -148,7 +152,7 @@
 
 .map-viewport {
   flex: 1;
-  height: 50%;
+  width: 100%;
   position: relative;
 }
 
@@ -158,11 +162,14 @@
   }
   .map-sidebar {
     width: 320px;
+    flex: 0 0 320px;
+    max-height: none;
     height: 100%;
     border-top: none;
     border-right: 2px solid var(--primary-color);
   }
   .map-viewport {
+    flex: 1;
     height: 100%;
   }
 }
