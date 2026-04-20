@@ -27,19 +27,28 @@ const Home = () => {
   const [showModal, setShowModal] = useState(false);
   const [newFwName, setNewFwName] = useState('');
   const [newFwLocal, setNewFwLocal] = useState('');
+  // Utilizando formato YYYY-MM-DD para o input type="date"
+  const [newFwDate, setNewFwDate] = useState(new Date().toISOString().split('T')[0]);
 
   const handleCreateFw = () => {
     if (!newFwName) return alert('Dê um nome ao trabalho.');
+    
+    // Converter YYYY-MM-DD para DD/MM/YYYY antes de salvar
+    const formattedDate = newFwDate 
+      ? new Date(newFwDate + 'T12:00:00').toLocaleDateString('pt-BR')
+      : new Date().toLocaleDateString('pt-BR');
+
     createFieldWork({
       id: Date.now().toString(),
       nome: newFwName,
       local: newFwLocal || 'Não especificado',
-      dataInicio: new Date().toLocaleDateString('pt-BR'),
+      dataInicio: formattedDate,
       status: 'Aberto'
     });
     setShowModal(false);
     setNewFwName('');
     setNewFwLocal('');
+    setNewFwDate(new Date().toISOString().split('T')[0]); 
   };
   
   return (
@@ -90,6 +99,7 @@ const Home = () => {
               <h3>Novo Trabalho</h3>
               <input className="input-field" placeholder="Nome (Ex: Inventário 2026)" value={newFwName} onChange={e => setNewFwName(e.target.value)} style={{ marginTop: '16px' }} />
               <input className="input-field" placeholder="Local / Fazenda" value={newFwLocal} onChange={e => setNewFwLocal(e.target.value)} />
+              <input type="date" className="input-field" value={newFwDate} onChange={e => setNewFwDate(e.target.value)} />
               <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
                 <button className="btn btn-secondary" onClick={() => setShowModal(false)}>Cancelar</button>
                 <button className="btn btn-primary" onClick={handleCreateFw}>Criar</button>
