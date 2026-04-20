@@ -72,6 +72,10 @@ const Home = () => {
           </button>
         </div>
       </div>
+
+      <button className="btn btn-primary" style={{ margin: '0 0 24px', position: 'sticky', top: '16px', zIndex: 100 }} onClick={() => setShowModal(true)}>
+        + Novo Trabalho de Campo
+      </button>
       
       {fieldWorks.length === 0 ? (
         <div className="glass-card" style={{ textAlign: 'center', padding: '40px' }}>
@@ -91,10 +95,6 @@ const Home = () => {
           </div>
         ))
       )}
-
-      <button className="btn btn-primary" style={{ marginTop: '24px' }} onClick={() => setShowModal(true)}>
-        + Novo Trabalho de Campo
-      </button>
 
       {showModal && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>

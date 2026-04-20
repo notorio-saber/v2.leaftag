@@ -1,10 +1,13 @@
+import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useInventory } from '../context/InventoryContext';
+import { MapVisualization } from '../components/MapVisualization';
 
 export const FieldWorkDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { fieldWorks, inventories, setCurrentInventory, deleteFieldWork } = useInventory();
+  const [showMap, setShowMap] = useState(false);
 
   const fw = fieldWorks.find(f => f.id === id);
   if (!fw) {
@@ -43,6 +46,12 @@ export const FieldWorkDetail = () => {
           + Nova Parcela
         </button>
       </div>
+      
+      {parcels.length > 0 && (
+        <button className="btn btn-secondary" style={{ width: '100%', marginBottom: '24px', borderColor: '#4fc3f7', color: '#4fc3f7' }} onClick={() => setShowMap(true)}>
+          🌍 Ver Mapa Interativo GIS
+        </button>
+      )}
 
       {parcels.length === 0 ? (
         <div className="glass-card" style={{ textAlign: 'center', padding: '40px' }}>
@@ -81,6 +90,8 @@ export const FieldWorkDetail = () => {
       <button className="btn btn-danger" style={{ marginTop: '24px', opacity: 0.8 }} onClick={handleDelete}>
         Excluir Trabalho de Campo
       </button>
+
+      {showMap && <MapVisualization inventories={parcels} onClose={() => setShowMap(false)} />}
     </div>
   );
 };
