@@ -23,3 +23,42 @@ export function parseCoordinates(coordsString: string): { latitude: number, long
     longitude: parseFloat(parts[1].trim())
   };
 }
+
+/**
+ * Calcula o Índice de Shannon-Weaver (H')
+ * @param speciesCounts Dicionário com a contagem de indivíduos por espécie
+ * @returns O valor do índice H'
+ */
+export function calculateShannonIndex(speciesCounts: Record<string, number>): number {
+  const total = Object.values(speciesCounts).reduce((acc, count) => acc + count, 0);
+  if (total === 0) return 0;
+
+  let h = 0;
+  for (const count of Object.values(speciesCounts)) {
+    if (count > 0) {
+      const p = count / total;
+      h -= p * Math.log(p);
+    }
+  }
+  return h;
+}
+
+/**
+ * Calcula o Índice de Simpson (D) e sua recíproca (1-D) ou inverso (1/D)
+ * Vamos retornar o "1 - D" sendo o Índice de Diversidade de Simpson (onde 1 é diversidade máxima)
+ * @param speciesCounts Dicionário com a contagem de indivíduos por espécie
+ * @returns O valor do índice 1-D
+ */
+export function calculateSimpsonIndex(speciesCounts: Record<string, number>): number {
+  const total = Object.values(speciesCounts).reduce((acc, count) => acc + count, 0);
+  if (total <= 1) return 0; // cannot calculate properly if N <= 1
+
+  let sumPi2 = 0;
+  for (const count of Object.values(speciesCounts)) {
+    if (count > 0) {
+      const p = count / total;
+      sumPi2 += p * p;
+    }
+  }
+  return 1 - sumPi2; // Índice de Diversidade de Simpson
+}
