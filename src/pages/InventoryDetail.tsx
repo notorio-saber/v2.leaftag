@@ -26,6 +26,36 @@ export const InventoryDetail = () => {
   const [isZipping, setIsZipping] = useState(false);
   const [showDashboard, setShowDashboard] = useState(false);
 
+  // Sampling Sufficiency Logic (Assíntota)
+  const isSufficiencyReached = (() => {
+    if (!inventory || inventory.dados.length < 30) return false;
+    
+    const N = inventory.dados.length;
+    const threshold = Math.max(10, Math.floor(N * 0.2)); // Check at least last 10, or 20% of total
+    const cutoffIndex = N - threshold;
+
+    const oldSpecies = new Set<string>();
+    const newWindowSpecies = new Set<string>();
+
+    inventory.dados.forEach((ind: any, index: number) => {
+      const sp = (ind.nomePopular || ind.nomeCientifico || 'Não Identificada').trim();
+      if (index < cutoffIndex) {
+        oldSpecies.add(sp);
+      } else {
+        newWindowSpecies.add(sp);
+      }
+    });
+
+    // Check if any species in the new window is genuinely new
+    for (const sp of newWindowSpecies) {
+      if (!oldSpecies.has(sp)) {
+        return false; // Found a new species recently, curve not stabilized
+      }
+    }
+    
+    return true; // No new species in the last X% of tree! Asymptote reached.
+  })();
+
   // Estado para edição
   const [editingInd, setEditingInd] = useState<any>(null);
 
@@ -218,8 +248,15 @@ export const InventoryDetail = () => {
       </div>
 
       <div className="glass-card" style={{ marginBottom: '16px', padding: 0, overflow: 'hidden' }}>
-        <div style={{ padding: '16px', borderBottom: '1px solid #333', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h3>📋 Dados Coletados ({inventory.dados.length})</h3>
+        <div style={{ padding: '16px', borderBottom: '1px solid #333', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <h3 style={{ margin: 0 }}>📋 Dados Coletados ({inventory.dados.length})</h3>
+            {isSufficiencyReached && (
+              <span style={{ background: '#2e7d32', color: 'white', padding: '4px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: 'bold' }}>
+                ✅ Suficiência Amostral (Assíntota)
+              </span>
+            )}
+          </div>
           <button className="btn btn-primary" style={{ width: 'auto', padding: '6px 12px', fontSize: 14 }} onClick={() => { setCurrentInventory(inventory); navigate('/collect'); }}>
             + Continuar Coletando
           </button>

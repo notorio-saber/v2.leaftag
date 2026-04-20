@@ -173,7 +173,8 @@ export const StatisticalDashboard: React.FC<DashboardProps> = ({ inventories, on
   return (
     <div style={{
       position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-      background: 'var(--bg-color)', zIndex: 9999, display: 'flex', flexDirection: 'column'
+      background: 'var(--bg-color)', zIndex: 9999, display: 'flex', flexDirection: 'column',
+      overflowX: 'hidden', maxWidth: '100vw'
     }}>
       <div style={{ padding: '16px', background: 'var(--card-bg)', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h2 style={{ color: 'var(--primary-color)' }}>📊 Dashboard Analítico (Fitossociologia)</h2>
@@ -211,7 +212,7 @@ export const StatisticalDashboard: React.FC<DashboardProps> = ({ inventories, on
            <TopStatCard title="Simpson (1-D)" value={stats.simpson.toFixed(4)} sub="Riqueza Ecológica" />
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '32px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '32px' }}>
            
            {/* Collector's Curve */}
            <div className="glass-card" style={{ padding: '24px' }}>
