@@ -33,18 +33,18 @@ export const StatisticalDashboard: React.FC<DashboardProps> = ({ inventories, on
       spCount[spName] = (spCount[spName] || 0) + 1;
 
       // Handle Stems for CAP/DAP logic
-      const processCapDap = (capStr?: string, dapStr?: string) => {
+      const processCapDap = (capVal?: any, dapVal?: any) => {
          let d = 0;
-         if (dapStr) d = parseFloat(dapStr);
-         else if (capStr) d = parseFloat(capStr) / Math.PI;
+         if (dapVal) d = parseFloat(dapVal.toString());
+         else if (capVal) d = parseFloat(capVal.toString()) / Math.PI;
          return isNaN(d) ? 0 : d;
       };
 
       let stemsDaps: number[] = [];
       if (ind.multipleStems && ind.stems) {
-         stemsDaps = ind.stems.map(s => processCapDap(s.cap, ''));
+         stemsDaps = ind.stems.map(s => processCapDap(s.cap, undefined));
       } else {
-         const mainDap = processCapDap(ind.cap as string, ind.dap as string);
+         const mainDap = processCapDap(ind.cap, ind.dap);
          if (mainDap > 0) stemsDaps = [mainDap];
       }
 
@@ -159,7 +159,7 @@ export const StatisticalDashboard: React.FC<DashboardProps> = ({ inventories, on
                       <YAxis type="category" dataKey="name" stroke="#ccc" width={90} tick={{ fill: '#aaa', fontSize: 12 }} interval={0} />
                       <Tooltip contentStyle={{ backgroundColor: '#111', borderColor: '#333' }} />
                       <Bar dataKey="count" name="Indivíduos" radius={[0, 4, 4, 0]}>
-                        {speciesData.map((entry, index) => (
+                        {speciesData.map((_, index) => (
                            <Cell key={`cell-${index}`} fill={index % 2 === 0 ? 'var(--primary-color)' : '#66bb6a'} />
                         ))}
                       </Bar>
