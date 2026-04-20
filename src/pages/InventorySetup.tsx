@@ -24,6 +24,12 @@ export const InventorySetup = () => {
   const { setCurrentInventory, saveInventory } = useInventory();
   const [nome, setNome] = useState('');
   const [area, setArea] = useState('');
+  
+  // Calculadora de área
+  const [comprimento, setComprimento] = useState('');
+  const [largura, setLargura] = useState('');
+  const [showCalc, setShowCalc] = useState(false);
+
   const [selectedTemplate, setSelectedTemplate] = useState('custom');
 
   const [cols, setCols] = useState(columnsBase);
@@ -92,8 +98,40 @@ export const InventorySetup = () => {
         <label className="input-label">Nome/Número da Parcela</label>
         <input className="input-field" value={nome} onChange={e => setNome(e.target.value)} placeholder="Ex: Parcela 01" />
 
-        <label className="input-label">Área da Parcela (m²)</label>
-        <input type="number" className="input-field" value={area} onChange={e => setArea(e.target.value)} placeholder="0.0" />
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <label className="input-label" style={{ marginBottom: 0 }}>Área da Parcela (m²)</label>
+          <button 
+            type="button" 
+            className="btn btn-secondary" 
+            style={{ padding: '2px 8px', fontSize: '12px', width: 'auto' }}
+            onClick={() => setShowCalc(!showCalc)}
+          >
+            {showCalc ? 'Ocultar Calculadora' : '🧮 Calcular L x L'}
+          </button>
+        </div>
+        
+        {showCalc && (
+          <div style={{ display: 'flex', gap: '8px', marginTop: '8px', marginBottom: '8px', background: '#252b28', padding: '12px', borderRadius: '8px' }}>
+            <div style={{ flex: 1 }}>
+              <label style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Comprimento (m)</label>
+              <input type="number" className="input-field" style={{ marginBottom: 0 }} value={comprimento} onChange={e => {
+                setComprimento(e.target.value);
+                const a = parseFloat(e.target.value) * parseFloat(largura || '0');
+                if (a > 0) setArea(a.toString());
+              }} placeholder="0.0" />
+            </div>
+            <div style={{ flex: 1 }}>
+              <label style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Largura (m)</label>
+              <input type="number" className="input-field" style={{ marginBottom: 0 }} value={largura} onChange={e => {
+                setLargura(e.target.value);
+                const a = parseFloat(comprimento || '0') * parseFloat(e.target.value);
+                if (a > 0) setArea(a.toString());
+              }} placeholder="0.0" />
+            </div>
+          </div>
+        )}
+
+        <input type="number" className="input-field" value={area} onChange={e => setArea(e.target.value)} placeholder="0.0" style={{ marginTop: showCalc ? '8px' : '8px' }} />
 
         <h3 style={{ margin: '16px 0 8px', color: 'var(--primary-color)' }}>Modelo Padrão</h3>
         <select 

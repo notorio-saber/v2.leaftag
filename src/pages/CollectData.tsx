@@ -50,13 +50,14 @@ export const CollectData = () => {
       numeroIndividuo: currentIdx,
       timestamp: new Date().toLocaleString('pt-BR'),
       multipleStems: multiStems,
-      stems: multiStems ? stems.map(s => ({id: s.id, cap: parseFloat(s.cap), altura: parseFloat(s.altura)})) : undefined,
+      ...(multiStems && { stems: stems.map(s => ({id: s.id, cap: parseFloat(s.cap), altura: parseFloat(s.altura)})) }),
       ...formData
     };
     
     freshInv.dados.push(newIndividual);
     freshInv.ultimaColeta = new Date().toLocaleDateString('pt-BR');
     
+    setCurrentInventory(freshInv);
     saveInventory(freshInv);
     
     // reset
@@ -148,7 +149,7 @@ export const CollectData = () => {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-        <button className="btn btn-secondary" onClick={() => navigate('/')}>Voltar / Pausar</button>
+        <button className="btn btn-secondary" onClick={() => navigate(`/fieldwork/${currentInventory.fieldWorkId}`)}>Voltar / Pausar</button>
         <button className="btn btn-primary" onClick={saveIndividual}>Salvar {`&`} Próximo</button>
       </div>
     </div>
