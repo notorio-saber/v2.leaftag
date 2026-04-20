@@ -56,7 +56,12 @@ export const AdminAccounts = () => {
             <div>
               <div style={{ fontWeight: 'bold' }}>{u.displayName || 'Usuário Google'}</div>
               <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{u.email}</div>
-              <div style={{ fontSize: '12px', display: 'inline-block', padding: '2px 8px', background: u.status === 'active' ? '#1b5e20' : u.status === 'admin' ? '#0d47a1' : '#ff9800', borderRadius: '4px', marginTop: '4px', color: 'white' }}>
+              {u.createdAt && (
+                <div style={{ fontSize: '11px', color: '#888', marginTop: '4px' }}>
+                  🗓 Início: {new Date(u.createdAt).toLocaleDateString('pt-BR')} às {new Date(u.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                </div>
+              )}
+              <div style={{ fontSize: '12px', display: 'inline-block', padding: '2px 8px', background: u.status === 'active' ? '#1b5e20' : u.status === 'admin' ? '#0d47a1' : '#ff9800', borderRadius: '4px', marginTop: '8px', color: 'white' }}>
                 {u.status?.toUpperCase() || 'DESCONHECIDO'}
               </div>
             </div>

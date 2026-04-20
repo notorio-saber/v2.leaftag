@@ -34,18 +34,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const docRef = doc(db, 'users', user.uid);
         const docSnap = await getDoc(docRef);
         
+        const masterUID = 'GBfcf5uqJNPNgS0FMowUcbPQAkB3';
+        
         if (docSnap.exists()) {
-          setStatus(docSnap.data().status);
+          const dbStatus = docSnap.data().status;
+          if (user.uid === masterUID && dbStatus !== 'admin') {
+            await setDoc(docRef, { status: 'admin' }, { merge: true });
+            setStatus('admin');
+          } else {
+            setStatus(user.uid === masterUID ? 'admin' : dbStatus);
+          }
         } else {
-          // Primeiro login, cria como pendente
+          // Primeiro login, cria como pendente (ou admin se for a master)
+          const newStatus = user.uid === masterUID ? 'admin' : 'pending';
           await setDoc(docRef, {
             displayName: user.displayName,
             email: user.email,
             photoURL: user.photoURL,
-            status: 'pending',
+            status: newStatus,
             createdAt: new Date().toISOString()
           });
-          setStatus('pending');
+          setStatus(newStatus);
         }
       } else {
         setCurrentUser(null);
