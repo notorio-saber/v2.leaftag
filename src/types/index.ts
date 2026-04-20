@@ -1,4 +1,4 @@
-export type ColumnType = 'text' | 'number' | 'textarea';
+export type ColumnType = 'text' | 'number' | 'textarea' | 'photo';
 
 export interface InventoryColumn {
   id: string;

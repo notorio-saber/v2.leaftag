@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useInventory } from '../context/InventoryContext';
 import { getCurrentPosition } from '../utils/gpsOperations';
+import { compressImage, savePhoto } from '../utils/photoStorage';
 
 export const CollectData = () => {
   const navigate = useNavigate();
@@ -102,16 +103,64 @@ export const CollectData = () => {
     }
   };
 
-  const saveIndividual = () => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      // Keep existing files if any, and append new ones up to 3
+      const existing = formData[currentCol.id] || [];
+      const incoming = Array.from(e.target.files);
+      const combined = [...existing, ...incoming].slice(0, 3);
+      setFormData((prev: any) => ({ ...prev, [currentCol.id]: combined }));
+    }
+  };
+
+  const removeFile = (index: number) => {
+    const existing = formData[currentCol.id] || [];
+    const newFiles = existing.filter((_: any, i: number) => i !== index);
+    setFormData((prev: any) => ({ ...prev, [currentCol.id]: newFiles }));
+  };
+
+  const saveIndividual = async () => {
     const freshInv = JSON.parse(JSON.stringify(currentInventory)); 
+    const individualId = Date.now().toString();
+
+    // Process photo fields securely in memory
+    const processedFormData = { ...formData };
+    
+    for (const col of columns) {
+      if (col.tipo === 'photo' && processedFormData[col.id]) {
+        const files: File[] = processedFormData[col.id];
+        const fileNames: string[] = [];
+        
+        for (let i = 0; i < files.length; i++) {
+          const file = files[i];
+          const fileName = `Inv${currentInventory.id}_Ind${currentIdx}_${col.id}_${i+1}.jpg`;
+          
+          try {
+            const base64Data = await compressImage(file, 1200, 0.6);
+            await savePhoto({
+              inventoryId: currentInventory.id,
+              individualId: individualId,
+              fileName,
+              base64Data
+            });
+            fileNames.push(fileName);
+          } catch (err) {
+            console.error("Failed to compress/save photo", err);
+          }
+        }
+        
+        // Replace File array with string representation for DB
+        processedFormData[col.id] = fileNames.join(', ');
+      }
+    }
     
     const newIndividual = {
-      id: Date.now().toString(),
+      id: individualId,
       numeroIndividuo: currentIdx,
       timestamp: new Date().toLocaleString('pt-BR'),
       multipleStems: multiStems,
       ...(multiStems && { stems: stems.map(s => ({id: s.id, cap: parseFloat(s.cap||'0'), altura: parseFloat(s.altura||'0')})) }),
-      ...formData
+      ...processedFormData
     };
     
     freshInv.dados.push(newIndividual);
@@ -175,6 +224,35 @@ export const CollectData = () => {
               style={{ minHeight: '120px', resize: 'vertical' }}
               placeholder={`Digite ${currentCol.nome}...`}
             />
+          ) : currentCol.tipo === 'photo' ? (
+            <div style={{ textAlign: 'center' }}>
+              <label className="btn btn-secondary" style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '32px' }}>
+                <span style={{ fontSize: '24px' }}>📷</span>
+                <span>Tirar Foto (Max 3)</span>
+                <input 
+                  type="file" 
+                  accept="image/*" 
+                  capture="environment" 
+                  multiple 
+                  style={{ display: 'none' }} 
+                  onChange={handleFileChange}
+                />
+              </label>
+              
+              {formData[currentCol.id] && formData[currentCol.id].length > 0 && (
+                <div style={{ marginTop: '16px', display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                  {formData[currentCol.id].map((file: File, idx: number) => (
+                    <div key={idx} style={{ position: 'relative', width: '80px', height: '80px', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--border-color)' }}>
+                      <img src={URL.createObjectURL(file)} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      <button 
+                        onClick={() => removeFile(idx)}
+                        style={{ position: 'absolute', top: 0, right: 0, background: 'var(--danger-color)', color: 'white', border: 'none', width: '24px', height: '24px', cursor: 'pointer' }}
+                      >×</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           ) : (
             <input 
               type={currentCol.tipo === 'number' ? 'number' : 'text'} 

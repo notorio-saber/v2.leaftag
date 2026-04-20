@@ -213,6 +213,7 @@ export const InventorySetup = () => {
               <option value="text">Texto</option>
               <option value="number">Número</option>
               <option value="textarea">Longo</option>
+              <option value="photo">Foto (Câmera)</option>
             </select>
             <button
               className="btn btn-danger"

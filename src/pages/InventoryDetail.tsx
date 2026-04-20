@@ -2,7 +2,9 @@ import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useInventory } from '../context/InventoryContext';
 import * as XLSX from 'xlsx';
+import JSZip from 'jszip';
 import { calculateBasalArea, calculateVolume } from '../utils/forestryCalculations';
+import { getPhotosForInventory, deletePhotosForIndividual } from '../utils/photoStorage';
 
 export const InventoryDetail = () => {
   const navigate = useNavigate();
@@ -20,6 +22,7 @@ export const InventoryDetail = () => {
     dapEquivalente: false,
     fustes: false
   });
+  const [isZipping, setIsZipping] = useState(false);
 
   // Estado para edição
   const [editingInd, setEditingInd] = useState<any>(null);
@@ -116,6 +119,39 @@ export const InventoryDetail = () => {
     }
   };
 
+  const handleDownloadPhotos = async () => {
+    setIsZipping(true);
+    try {
+      const photos = await getPhotosForInventory(inventory.id);
+      if (photos.length === 0) {
+        alert("Nenhuma foto encontrada para este inventário no banco offline.");
+        setIsZipping(false);
+        return;
+      }
+      
+      const zip = new JSZip();
+      photos.forEach(photo => {
+        // extract base64 data without header (e.g. data:image/jpeg;base64,xxxx)
+        const base64Data = photo.base64Data.split(',')[1];
+        zip.file(photo.fileName, base64Data, { base64: true });
+      });
+      
+      const content = await zip.generateAsync({ type: 'blob' });
+      const url = window.URL.createObjectURL(content);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `Fotos_${inventory.nome.replace(/\s+/g, '_')}.zip`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+      alert("Erro ao extrair zip: " + err);
+    }
+    setIsZipping(false);
+  };
+
   return (
     <div className="container" style={{ marginTop: '20px' }}>
       <div className="app-header">
@@ -135,6 +171,12 @@ export const InventoryDetail = () => {
           </button>
           <button className="btn btn-primary" style={{ flex: '1 1 200px' }} onClick={() => setShowExportOptions(!showExportOptions)}>
             ⚙️ Exportar Processados
+          </button>
+        </div>
+        
+        <div style={{ marginTop: '16px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+          <button className="btn btn-secondary" style={{ flex: '1 1 200px', borderColor: '#4fc3f7', color: '#4fc3f7' }} onClick={handleDownloadPhotos} disabled={isZipping}>
+            {isZipping ? "⏳ Compactando Zíper..." : "🗃️ Baixar Galeria de Fotos (ZIP)"}
           </button>
         </div>
 
@@ -217,12 +259,14 @@ export const InventoryDetail = () => {
 
       <div style={{ display: 'flex', justifyContent: 'center' }}>
         <button className="btn btn-danger" style={{ opacity: 0.8 }} onClick={() => {
-          if(window.confirm('Tem certeza em excluir definitivamente?')) {
+          if(window.confirm('Tem certeza em excluir definitivamente a parcela e TODOS OS SEUS DADOS E FOTOS? Essa ação é vitalícia.')) {
+            // Hard cascade deletion 
+            inventory.dados.forEach((d: any) => deletePhotosForIndividual(d.id));
             deleteInventory(inventory.id);
             navigate(`/fieldwork/${inventory.fieldWorkId}`);
           }
         }}>
-          ⚠️ Excluir Parcela
+          ⚠️ Excluir Parcela (Irreversível)
         </button>
       </div>
 
