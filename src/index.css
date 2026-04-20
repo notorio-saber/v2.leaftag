@@ -1,113 +1,208 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap');
 
 :root {
-  --bg-color: #121513; 
-  --card-bg: #1e2421;
+  /* Core Colors from Design System mapped to Forest Green */
+  --bg-color: #000000;
+  --card-bg: rgba(0, 0, 0, 0.9);
   --primary-color: #2e7d32;
-  --primary-hover: #388e3c;
-  --text-main: #f0f0f0;
-  --text-muted: #a1a1a1;
-  --accent-color: #4caf50;
-  --danger-color: #e53935;
-  --danger-hover: #f44336;
-  --border-color: #2b332f;
-  --glass-bg: rgba(30, 36, 33, 0.7);
-  --glass-border: rgba(255, 255, 255, 0.08);
+  --primary-hover: #4caf50;
+  --primary-glow: rgba(46, 125, 50, 0.2);
+  --text-main: #ffffff;
+  --text-muted: #a1a1aa; /* Zinc 400 */
+  --accent-color: #2e7d32;
+  --danger-color: #ef233c; /* Left red for destructive actions only */
+  --danger-hover: #d90429;
+  --border-color: #27272a; /* Zinc 800 */
+  --glass-bg: rgba(0, 0, 0, 0.9);
+}
+
+@keyframes fadeSlideIn {
+  0% {
+    opacity: 0;
+    transform: translateY(30px);
+    filter: blur(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
 }
 
 * {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
 }
 
 body {
   background-color: var(--bg-color);
   color: var(--text-main);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
   min-height: 100vh;
-  margin: 0;
+  /* Radial glow usage from DS */
+  background-image: radial-gradient(50% 50% at 50% 100%, var(--primary-glow) 0%, transparent 100%);
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+  selection-background: rgba(46, 125, 50, 0.3);
+}
+
+/* Typography Overrides */
+h1, h2, h3, h4, h5 {
+  font-family: 'Manrope', sans-serif;
+  letter-spacing: -0.05em; /* tracking-tighter */
+  font-weight: 500;
 }
 
 /* Utilities */
 .container {
-  max-width: 800px;
+  max-width: 900px;
   margin: 0 auto;
-  padding: 16px;
+  padding: 24px;
+  animation: fadeSlideIn 0.8s ease-out 0.1s both;
 }
 
+/* Glass Card DS Standard (Canonical implementation) */
 .glass-card {
   background: var(--glass-bg);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid var(--glass-border);
-  border-radius: 16px;
-  padding: 20px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-left: 4px solid var(--primary-color);
+  border-top: 1px solid var(--border-color);
+  border-right: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--border-color);
+  border-radius: 0px;
+  padding: 32px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  margin-bottom: 24px;
+  transition: all 0.4s ease;
 }
 
+.glass-card:hover {
+  border-color: rgba(46, 125, 50, 0.5);
+  border-left-color: var(--primary-hover);
+}
+
+/* Buttons (Strict uppercase tracking DS style) */
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: 14px 24px;
-  border-radius: 12px;
-  font-weight: 600;
-  font-size: 16px;
-  border: none;
+  gap: 12px;
+  padding: 16px 24px;
+  border-radius: 0px;
+  font-family: 'Inter', sans-serif;
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.1em; /* tracking-widest */
+  text-transform: uppercase;
+  border: 1px solid transparent;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.3s ease;
   width: 100%;
+}
+
+.btn:active {
+  transform: scale(0.95);
 }
 
 .btn-primary {
   background-color: var(--primary-color);
   color: white;
+  border: 1px solid var(--primary-color);
 }
 
-.btn-primary:active {
+.btn-primary:hover {
   background-color: var(--primary-hover);
-  transform: scale(0.98);
+  border-color: var(--primary-hover);
+  box-shadow: 0 0 15px var(--primary-glow);
 }
 
 .btn-secondary {
-  background-color: var(--card-bg);
-  color: var(--text-main);
-  border: 1px solid var(--border-color);
+  background-color: transparent;
+  color: var(--primary-color);
+  border: 1px solid var(--primary-color);
 }
 
-.btn-secondary:active {
-  background-color: #2a332f;
-  transform: scale(0.98);
+.btn-secondary:hover {
+  background-color: var(--primary-color);
+  color: white;
 }
 
 .btn-danger {
+  background-color: transparent;
+  color: var(--danger-color);
+  border: 1px solid var(--danger-color);
+}
+
+.btn-danger:hover {
   background-color: var(--danger-color);
   color: white;
 }
 
+/* DS Input Fields (Float border style) */
 .input-field {
   width: 100%;
-  padding: 16px;
-  border-radius: 12px;
-  background-color: #161a18;
-  border: 1px solid var(--border-color);
+  padding: 12px 0px;
+  background-color: transparent;
+  border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0px;
   color: var(--text-main);
-  font-size: 16px;
-  margin-bottom: 12px;
-  transition: border-color 0.2s;
+  font-size: 18px;
+  font-family: 'Inter', sans-serif;
+  margin-bottom: 24px;
+  transition: border-color 0.3s ease, background 0.3s ease;
 }
 
 .input-field:focus {
   outline: none;
-  border-color: var(--primary-color);
+  border-bottom-color: var(--primary-color);
+  background-color: rgba(255,255,255,0.02);
 }
 
 .input-label {
   display: block;
-  margin-bottom: 8px;
-  font-weight: 500;
+  margin-bottom: -4px;
+  font-weight: 600;
   color: var(--text-muted);
+  font-size: 10px;
+  font-family: 'Inter', sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  transition: color 0.3s;
+}
+
+.input-field:focus + .input-label,
+.input-field:not(:placeholder-shown) + .input-label {
+  color: var(--primary-color);
+}
+
+/* Dashed borders used extensively in DS */
+.divider-dashed {
+  border-bottom: 1px dashed var(--border-color);
+  margin: 16px 0;
+}
+
+/* Data Tables inside DS */
+table {
+  border-collapse: collapse;
+}
+
+th {
+  font-family: 'Inter', sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px dashed var(--border-color) !important;
+}
+
+td {
+  border-bottom: 1px solid rgba(255,255,255,0.05) !important;
   font-size: 14px;
+  font-weight: 400;
+  color: var(--text-main);
 }
