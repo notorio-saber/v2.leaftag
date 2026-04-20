@@ -5,7 +5,7 @@ import { getCurrentPosition } from '../utils/gpsOperations';
 
 export const CollectData = () => {
   const navigate = useNavigate();
-  const { currentInventory, saveInventory } = useInventory();
+  const { currentInventory, saveInventory, setCurrentInventory } = useInventory();
   
   if (!currentInventory) {
     navigate('/');
