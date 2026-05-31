@@ -66,37 +66,22 @@ export const TextKeyboardModal: React.FC<TextKeyboardModalProps> = ({
 
   return (
     <div style={{
-      position: 'fixed',
-      bottom: 0,
-      left: '50%',
-      transform: 'translate(-50%, 0)',
       width: '100%',
       maxWidth: '520px',
-      background: 'rgba(10, 13, 11, 0.96)',
-      backdropFilter: 'blur(16px)',
-      WebkitBackdropFilter: 'blur(16px)',
-      borderTop: '2px solid var(--primary-color)',
-      borderLeft: '1px solid var(--border-color)',
-      borderRight: '1px solid var(--border-color)',
-      borderRadius: '24px 24px 0 0',
-      padding: '16px 16px max(12px, env(safe-area-inset-bottom)) 16px',
-      boxShadow: '0 -10px 40px rgba(0, 0, 0, 0.5)',
+      margin: '0 auto',
+      background: 'rgba(20, 25, 22, 0.65)',
+      backdropFilter: 'blur(12px)',
+      WebkitBackdropFilter: 'blur(12px)',
+      border: '1px solid rgba(255, 255, 255, 0.08)',
+      padding: '12px',
+      boxShadow: '0 4px 30px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
       display: 'flex',
       flexDirection: 'column',
-      gap: '10px',
-      boxSizing: 'border-box',
-      zIndex: 10000,
-      animation: 'slideUpText 0.3s cubic-bezier(0.16, 1, 0.3, 1) both'
+      gap: '6px',
+      boxSizing: 'border-box'
     }}>
-      <style>{`
-        @keyframes slideUpText {
-          from { transform: translate(-50%, 100%); }
-          to { transform: translate(-50%, 0); }
-        }
-      `}</style>
-
       {/* Keyboard Keypad Layout */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', width: '100%' }}>
         {/* Row 1 */}
         <div style={rowStyle}>
           {row1.map(char => (
@@ -120,7 +105,7 @@ export const TextKeyboardModal: React.FC<TextKeyboardModalProps> = ({
         {/* Row 3 */}
         <div style={rowStyle}>
           <button type="button" style={shiftKeyStyle(isUppercase)} onClick={() => setIsUppercase(!isUppercase)}>
-            ⇧
+            Caps
           </button>
           {row3.map(char => (
             <button key={char} type="button" style={keyStyle} onClick={() => handleKeyPress(char)}>
@@ -128,7 +113,7 @@ export const TextKeyboardModal: React.FC<TextKeyboardModalProps> = ({
             </button>
           ))}
           <button type="button" style={actionKeyStyle('#ef233c')} onClick={handleBackspace}>
-            ⌫
+            Apagar
           </button>
         </div>
 
@@ -137,30 +122,11 @@ export const TextKeyboardModal: React.FC<TextKeyboardModalProps> = ({
           <button type="button" style={shortcutStyle} onClick={handleSpShort}>sp.</button>
           <button type="button" style={shortcutStyle} onClick={handleCfShort}>cf.</button>
           <button type="button" style={shortcutStyle} onClick={handleNiShort}>NI</button>
-          <button type="button" style={{ ...keyStyle, flex: 2, background: 'rgba(255,255,255,0.06)' }} onClick={handleSpace}>Espaço</button>
-          <button type="button" style={shortcutStyle} onClick={handleClear}>Limpar</button>
-          <button type="button" style={confirmStyle} onClick={onConfirm}>OK</button>
+          <button type="button" style={{ ...keyStyle, flex: 2, background: 'rgba(255,255,255,0.06)' }} onClick={handleSpace}>Espaco</button>
+          <button type="button" style={clearStyle} onClick={handleClear}>Limpar</button>
+          <button type="button" style={confirmStyle} onClick={onConfirm}>Confirmar</button>
         </div>
       </div>
-
-      {/* Footer Cancel Action */}
-      <button 
-        type="button"
-        className="btn btn-secondary" 
-        onClick={onClose}
-        style={{ 
-          marginTop: '4px', 
-          padding: '8px', 
-          borderColor: 'transparent',
-          color: 'var(--text-muted)',
-          fontSize: '10px',
-          letterSpacing: '2px',
-          textTransform: 'uppercase',
-          cursor: 'pointer'
-        }}
-      >
-        Fechar Teclado
-      </button>
     </div>
   );
 };
@@ -174,19 +140,21 @@ const rowStyle: React.CSSProperties = {
 
 const keyStyle: React.CSSProperties = {
   flex: 1,
-  height: '42px',
-  fontSize: '16px',
+  height: '38px',
+  fontSize: '15px',
   fontWeight: '600',
-  borderRadius: '8px',
+  borderRadius: '0px',
   background: 'rgba(255,255,255,0.03)',
-  border: '1px solid var(--border-color)',
+  border: '1px solid rgba(255, 255, 255, 0.08)',
   color: 'white',
   padding: 0,
   cursor: 'pointer',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  userSelect: 'none'
+  userSelect: 'none',
+  outline: 'none',
+  transition: 'background 0.2s ease'
 };
 
 const shiftKeyStyle = (active: boolean): React.CSSProperties => ({
@@ -194,14 +162,16 @@ const shiftKeyStyle = (active: boolean): React.CSSProperties => ({
   background: active ? 'var(--primary-color)' : 'rgba(255,255,255,0.06)',
   color: 'white',
   fontWeight: 'bold',
-  fontSize: '18px'
+  fontSize: '12px',
+  flex: '1.2'
 });
 
 const actionKeyStyle = (color: string): React.CSSProperties => ({
   ...keyStyle,
   color,
   background: 'rgba(255,255,255,0.01)',
-  fontSize: '16px'
+  fontSize: '12px',
+  flex: '1.5'
 });
 
 const shortcutStyle: React.CSSProperties = {
@@ -213,11 +183,17 @@ const shortcutStyle: React.CSSProperties = {
   fontWeight: 'bold'
 };
 
+const clearStyle: React.CSSProperties = {
+  ...keyStyle,
+  fontSize: '12px',
+  color: 'var(--text-muted)'
+};
+
 const confirmStyle: React.CSSProperties = {
   ...keyStyle,
   background: 'var(--primary-color)',
   border: '1px solid var(--primary-color)',
   color: 'white',
   fontWeight: 'bold',
-  fontSize: '14px'
+  fontSize: '12px'
 };

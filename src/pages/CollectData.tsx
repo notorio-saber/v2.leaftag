@@ -220,30 +220,51 @@ export const CollectData = () => {
       <div 
         className="container" 
         style={{ 
-          marginTop: '20px', 
-          paddingBottom: (activeNumField || activeTextField) ? '380px' : '20px',
-          transition: 'padding-bottom 0.3s ease'
+          marginTop: '10px', 
+          paddingBottom: '16px',
+          display: 'flex',
+          flexDirection: 'column',
+          minHeight: '94vh',
+          justifyContent: 'space-between',
+          gap: '12px',
+          boxSizing: 'border-box',
+          maxWidth: '480px',
+          margin: '0 auto',
+          width: '100%'
         }}
       >
-        {/* Wizard Header */}
-        <div className="app-header" style={{ marginBottom: '16px' }}>
-          <div>
-            <h2 style={{ color: 'var(--primary-color)' }}>{currentInventory.nome}</h2>
-            <span style={{ fontSize: '14px', color: 'var(--text-muted)' }}>Coleta em Andamento • Indivíduo #{currentIdx}</span>
+        {/* Wizard Header & Progress */}
+        <div>
+          <div className="app-header" style={{ marginBottom: '10px' }}>
+            <div>
+              <h2 style={{ color: 'var(--primary-color)' }}>{currentInventory.nome}</h2>
+              <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Coleta em Andamento • Individuo #{currentIdx}</span>
+            </div>
+            <button className="btn btn-secondary" style={{ width: 'auto', padding: '6px 12px', fontSize: '9px', borderRadius: '0px' }} onClick={() => navigate(`/fieldwork/${currentInventory.fieldWorkId}`)}>Pausar</button>
           </div>
-          <button className="btn btn-secondary" style={{ width: 'auto', padding: '8px 16px', fontSize: '10px' }} onClick={() => navigate(`/fieldwork/${currentInventory.fieldWorkId}`)}>Pausar</button>
-        </div>
 
-        {/* Progress Bar */}
-        <div style={{ width: '100%', height: '4px', background: 'var(--border-color)', marginBottom: '32px' }}>
-          <div style={{ width: `${((stepIndex + 1) / columns.length) * 100}%`, height: '100%', background: 'var(--primary-color)', transition: 'width 0.3s ease' }}></div>
+          <div style={{ width: '100%', height: '3px', background: 'var(--border-color)', marginBottom: '12px' }}>
+            <div style={{ width: `${((stepIndex + 1) / columns.length) * 100}%`, height: '100%', background: 'var(--primary-color)', transition: 'width 0.3s ease' }}></div>
+          </div>
         </div>
 
         {/* Wizard Step Card */}
-        <div className="glass-card" style={{ marginBottom: '24px', minHeight: '300px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-          <div style={{ marginBottom: '32px', textAlign: 'center' }}>
-            <span style={{ fontSize: '10px', color: 'var(--primary-color)', textTransform: 'uppercase', letterSpacing: '2px', fontWeight: 'bold' }}>Passo {stepIndex + 1} de {columns.length}</span>
-            <h1 style={{ fontSize: '32px', margin: '8px 0', color: 'white' }}>{currentCol.nome}</h1>
+        <div 
+          className="glass-card" 
+          style={{ 
+            flex: 1, 
+            margin: '0 0 8px 0', 
+            padding: '20px 16px', 
+            display: 'flex', 
+            flexDirection: 'column', 
+            justifyContent: 'center', 
+            minHeight: '160px',
+            borderRadius: '0px'
+          }}
+        >
+          <div style={{ marginBottom: '20px', textAlign: 'center' }}>
+            <span style={{ fontSize: '10px', color: 'var(--primary-color)', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 'bold' }}>Passo {stepIndex + 1} de {columns.length}</span>
+            <h1 style={{ fontSize: '24px', margin: '4px 0', color: 'white' }}>{currentCol.nome}</h1>
           </div>
 
           <div style={{ maxWidth: '400px', margin: '0 auto', width: '100%' }}>
@@ -253,11 +274,11 @@ export const CollectData = () => {
                   className="input-field" 
                   readOnly 
                   value={formData[currentCol.id] || ''} 
-                  style={{ textAlign: 'center', fontSize: '20px' }}
+                  style={{ textAlign: 'center', fontSize: '18px', borderRadius: '0px' }}
                   placeholder="Ex: -23.456, -49.321"
                 />
-                <button className="btn btn-secondary" style={{ marginTop: '16px' }} onClick={getGps} disabled={isGpsLoading}>
-                  {isGpsLoading ? 'OBTENDO SINAL GPS...' : '📍 CAPTURAR COORDENADAS'}
+                <button className="btn btn-secondary" style={{ marginTop: '12px', borderRadius: '0px' }} onClick={getGps} disabled={isGpsLoading}>
+                  {isGpsLoading ? 'OBTENDO SINAL GPS...' : 'CAPTURAR COORDENADAS'}
                 </button>
               </div>
             ) : currentCol.tipo === 'textarea' ? (
@@ -271,13 +292,13 @@ export const CollectData = () => {
                   background: isTextActive ? 'rgba(46, 125, 50, 0.05)' : 'rgba(255,255,255,0.02)',
                   border: isTextActive ? '1px solid var(--primary-hover)' : '1px dashed var(--border-color)',
                   boxShadow: isTextActive ? '0 0 12px rgba(76, 175, 80, 0.25)' : 'none',
-                  padding: '24px',
-                  fontSize: '18px',
+                  padding: '20px',
+                  fontSize: '16px',
                   color: formData[currentCol.id] ? 'white' : 'rgba(255,255,255,0.15)',
                   textAlign: 'left',
                   cursor: 'pointer',
-                  borderRadius: '8px',
-                  minHeight: '120px',
+                  borderRadius: '0px',
+                  minHeight: '100px',
                   display: 'flex',
                   alignItems: 'flex-start',
                   justifyContent: 'flex-start',
@@ -295,13 +316,12 @@ export const CollectData = () => {
                     <span className="blinking-cursor" />
                   )
                 ) : (
-                  formData[currentCol.id] || `Toque para digitar as observações...`
+                  formData[currentCol.id] || 'Toque para digitar as observações...'
                 )}
               </div>
             ) : currentCol.tipo === 'photo' ? (
               <div style={{ textAlign: 'center' }}>
-                <label className="btn btn-secondary" style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '32px' }}>
-                  <span style={{ fontSize: '24px' }}>📷</span>
+                <label className="btn btn-secondary" style={{ display: 'flex', flexDirection: 'column', gap: '6px', padding: '24px', borderRadius: '0px' }}>
                   <span>Tirar Foto (Max 3)</span>
                   <input 
                     type="file" 
@@ -314,14 +334,14 @@ export const CollectData = () => {
                 </label>
                 
                 {formData[currentCol.id] && formData[currentCol.id].length > 0 && (
-                  <div style={{ marginTop: '16px', display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                  <div style={{ marginTop: '12px', display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center' }}>
                     {formData[currentCol.id].map((file: File, idx: number) => (
-                      <div key={idx} style={{ position: 'relative', width: '80px', height: '80px', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--border-color)' }}>
+                      <div key={idx} style={{ position: 'relative', width: '70px', height: '70px', borderRadius: '0px', overflow: 'hidden', border: '1px solid var(--border-color)' }}>
                         <img src={URL.createObjectURL(file)} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                         <button 
                           onClick={() => removeFile(idx)}
-                          style={{ position: 'absolute', top: 0, right: 0, background: 'var(--danger-color)', color: 'white', border: 'none', width: '24px', height: '24px', cursor: 'pointer' }}
-                        >×</button>
+                          style={{ position: 'absolute', top: 0, right: 0, background: 'var(--danger-color)', color: 'white', border: 'none', width: '20px', height: '20px', cursor: 'pointer' }}
+                        >X</button>
                       </div>
                     ))}
                   </div>
@@ -338,14 +358,14 @@ export const CollectData = () => {
                   background: isNumActive ? 'rgba(46, 125, 50, 0.05)' : 'rgba(255,255,255,0.02)',
                   borderBottom: isNumActive ? '2px solid var(--primary-hover)' : '2px solid var(--primary-color)',
                   boxShadow: isNumActive ? '0 4px 12px rgba(76, 175, 80, 0.15)' : 'none',
-                  padding: '16px 0',
-                  fontSize: '36px',
+                  padding: '12px 0',
+                  fontSize: '32px',
                   fontWeight: 'bold',
                   color: formData[currentCol.id] ? 'var(--primary-hover)' : 'rgba(255,255,255,0.15)',
                   textAlign: 'center',
                   cursor: 'pointer',
-                  borderRadius: '8px',
-                  minHeight: '64px',
+                  borderRadius: '0px',
+                  minHeight: '56px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -377,14 +397,14 @@ export const CollectData = () => {
                   background: isTextActive ? 'rgba(46, 125, 50, 0.05)' : 'rgba(255,255,255,0.02)',
                   borderBottom: isTextActive ? '2px solid var(--primary-hover)' : '2px solid var(--primary-color)',
                   boxShadow: isTextActive ? '0 4px 12px rgba(76, 175, 80, 0.15)' : 'none',
-                  padding: '16px 0',
-                  fontSize: '28px',
+                  padding: '12px 0',
+                  fontSize: '24px',
                   fontWeight: '600',
                   color: formData[currentCol.id] ? 'var(--primary-hover)' : 'rgba(255,255,255,0.15)',
                   textAlign: 'center',
                   cursor: 'pointer',
-                  borderRadius: '8px',
-                  minHeight: '64px',
+                  borderRadius: '0px',
+                  minHeight: '56px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -409,24 +429,24 @@ export const CollectData = () => {
 
             {/* Árvore Bifurcada Intercept (Aparece junto com o CAP ou DAP principal) */}
             {(currentCol.id === 'cap' || currentCol.id === 'dap') && (
-              <div style={{ marginTop: '24px' }}>
+              <div style={{ marginTop: '20px' }}>
                 <button 
                   className="btn btn-secondary" 
                   onClick={() => setMultiStems(!multiStems)}
-                  style={{ background: multiStems ? 'var(--primary-glow)' : 'transparent', borderStyle: 'dashed' }}
+                  style={{ background: multiStems ? 'var(--primary-glow)' : 'transparent', borderStyle: 'dashed', borderRadius: '0px', padding: '12px' }}
                 >
-                  {multiStems ? '✔️ Bifurcada Ativa (Múltiplos fustes)' : '🌳 Árvore é Bifurcada?'}
+                  {multiStems ? 'Bifurcada Ativa (Múltiplos fustes)' : 'Árvore é Bifurcada?'}
                 </button>
                 
                 {multiStems && (
-                  <div style={{ marginTop: '24px', background: 'rgba(0,0,0,0.5)', padding: '16px', borderLeft: '2px solid var(--primary-color)' }}>
-                    <h4 style={{ marginBottom: '16px', color: 'var(--primary-color)', fontSize: '14px' }}>RAMIFICAÇÕES</h4>
+                  <div style={{ marginTop: '16px', background: 'rgba(0,0,0,0.5)', padding: '12px', borderLeft: '2px solid var(--primary-color)' }}>
+                    <h4 style={{ marginBottom: '10px', color: 'var(--primary-color)', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '1px' }}>Ramificações</h4>
                     {stems.map((stem, i) => {
                       const isCapActive = activeNumField !== null && activeNumField.title === `CAP do Fuste #${i+1}`;
                       const isAltActive = activeNumField !== null && activeNumField.title === `Altura do Fuste #${i+1}`;
                       
                       return (
-                        <div key={stem.id} style={{ display: 'flex', gap: '8px', marginBottom: '12px', alignItems: 'center' }}>
+                        <div key={stem.id} style={{ display: 'flex', gap: '8px', marginBottom: '10px', alignItems: 'center' }}>
                           <div 
                             onClick={() => setActiveNumField({
                               title: `CAP do Fuste #${i+1}`,
@@ -439,19 +459,20 @@ export const CollectData = () => {
                             })}
                             style={{
                               flex: 1,
-                              padding: '12px 0px',
+                              padding: '10px 0px',
                               background: isCapActive ? 'rgba(46, 125, 50, 0.05)' : 'transparent',
                               borderBottom: isCapActive ? '1px solid var(--primary-hover)' : '1px solid rgba(255, 255, 255, 0.1)',
                               color: 'var(--text-main)',
-                              fontSize: '16px',
+                              fontSize: '15px',
                               fontFamily: "'Inter', sans-serif",
                               textAlign: 'center',
                               cursor: 'pointer',
-                              minHeight: '45px',
+                              minHeight: '40px',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
                               userSelect: 'none',
+                              borderRadius: '0px',
                               transition: 'all 0.3s ease'
                             }}
                           >
@@ -481,19 +502,20 @@ export const CollectData = () => {
                             })}
                             style={{
                               flex: 1,
-                              padding: '12px 0px',
+                              padding: '10px 0px',
                               background: isAltActive ? 'rgba(46, 125, 50, 0.05)' : 'transparent',
                               borderBottom: isAltActive ? '1px solid var(--primary-hover)' : '1px solid rgba(255, 255, 255, 0.1)',
                               color: 'var(--text-main)',
-                              fontSize: '16px',
+                              fontSize: '15px',
                               fontFamily: "'Inter', sans-serif",
                               textAlign: 'center',
                               cursor: 'pointer',
-                              minHeight: '45px',
+                              minHeight: '40px',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
                               userSelect: 'none',
+                              borderRadius: '0px',
                               transition: 'all 0.3s ease'
                             }}
                           >
@@ -514,16 +536,16 @@ export const CollectData = () => {
                           {stems.length > 1 && (
                             <button 
                               className="btn btn-secondary" 
-                              style={{ width: '48px', padding: 0, height: '42px', minHeight: '42px', flexShrink: 0 }} 
+                              style={{ width: '40px', padding: 0, height: '36px', minHeight: '36px', flexShrink: 0, borderRadius: '0px' }} 
                               onClick={() => setStems(stems.filter(x => x.id !== stem.id))}
                             >
-                              ✕
+                              X
                             </button>
                           )}
                         </div>
                       );
                     })}
-                    <button className="btn btn-secondary" style={{ marginTop: '8px', borderStyle: 'dashed' }} onClick={() => setStems([...stems, { id: Date.now().toString(), cap: '', altura: '' }])}>
+                    <button className="btn btn-secondary" style={{ marginTop: '8px', borderStyle: 'dashed', borderRadius: '0px', padding: '8px 12px' }} onClick={() => setStems([...stems, { id: Date.now().toString(), cap: '', altura: '' }])}>
                       + Adicionar Fuste
                     </button>
                   </div>
@@ -533,49 +555,54 @@ export const CollectData = () => {
           </div>
         </div>
 
-        {/* Navigation Controls */}
-        <div style={{ display: 'flex', gap: '16px' }}>
-          <button 
-            className="btn btn-secondary" 
-            style={{ width: '30%' }} 
-            disabled={stepIndex === 0} 
-            onClick={handlePrev}
-          >
-            Anterior
-          </button>
-          <button 
-            className="btn btn-primary" 
-            style={{ width: '70%', fontSize: '14px' }} 
-            onClick={handleNext}
-          >
-            {isLastStep ? '💾 Salvar Indivíduo' : 'Próximo >>'}
-          </button>
+        {/* Bottom Keyboard & Navigation Controls Stacked Inline */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {/* Inline Numeric Keyboard */}
+          {activeNumField && (
+            <NumericKeyboardModal
+              value={activeNumField.value}
+              onChange={(val) => {
+                activeNumField.onSave(val);
+                setActiveNumField(prev => prev ? { ...prev, value: val } : null);
+              }}
+              onConfirm={handleNext}
+              onClose={() => {}}
+            />
+          )}
+
+          {/* Inline Text Keyboard */}
+          {activeTextField && (
+            <TextKeyboardModal
+              value={activeTextField.value}
+              onChange={(val) => {
+                activeTextField.onSave(val);
+                setActiveTextField(prev => prev ? { ...prev, value: val } : null);
+              }}
+              onConfirm={handleNext}
+              onClose={() => {}}
+            />
+          )}
+
+          {/* Navigation Controls */}
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button 
+              className="btn btn-secondary" 
+              style={{ width: '30%', padding: '12px 0', borderRadius: '0px' }} 
+              disabled={stepIndex === 0} 
+              onClick={handlePrev}
+            >
+              Anterior
+            </button>
+            <button 
+              className="btn btn-primary" 
+              style={{ width: '70%', padding: '12px 0', fontSize: '13px', borderRadius: '0px' }} 
+              onClick={handleNext}
+            >
+              {isLastStep ? 'Salvar Individuo' : 'Proximo'}
+            </button>
+          </div>
         </div>
       </div>
-
-      {activeNumField && (
-        <NumericKeyboardModal
-          value={activeNumField.value}
-          onChange={(val) => {
-            activeNumField.onSave(val);
-            setActiveNumField(prev => prev ? { ...prev, value: val } : null);
-          }}
-          onConfirm={() => setActiveNumField(null)}
-          onClose={() => setActiveNumField(null)}
-        />
-      )}
-
-      {activeTextField && (
-        <TextKeyboardModal
-          value={activeTextField.value}
-          onChange={(val) => {
-            activeTextField.onSave(val);
-            setActiveTextField(prev => prev ? { ...prev, value: val } : null);
-          }}
-          onConfirm={() => setActiveTextField(null)}
-          onClose={() => setActiveTextField(null)}
-        />
-      )}
     </>
   );
 };
