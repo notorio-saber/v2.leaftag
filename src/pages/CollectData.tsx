@@ -4,6 +4,7 @@ import { useInventory } from '../context/InventoryContext';
 import { getCurrentPosition } from '../utils/gpsOperations';
 import { compressImage, savePhoto } from '../utils/photoStorage';
 import { NumericKeyboardModal } from '../components/NumericKeyboardModal';
+import { TextKeyboardModal } from '../components/TextKeyboardModal';
 
 export const CollectData = () => {
   const navigate = useNavigate();
@@ -21,6 +22,12 @@ export const CollectData = () => {
     onSave: (val: string) => void;
   } | null>(null);
 
+  const [activeTextField, setActiveTextField] = useState<{
+    title: string;
+    value: string;
+    onSave: (val: string) => void;
+  } | null>(null);
+
   const inputRef = useRef<HTMLInputElement>(null);
 
   if (!currentInventory) {
@@ -32,25 +39,34 @@ export const CollectData = () => {
   const currentIdx = currentInventory.dados.length + 1;
   const currentCol = columns[stepIndex];
 
-  // Auto-focus on step change, or open custom numeric keyboard if step is numeric
+  // Auto-focus on step change, or open custom virtual keyboards based on type
   useEffect(() => {
-    if (currentCol && currentCol.tipo === 'number') {
-      setActiveNumField({
-        title: currentCol.nome,
-        value: formData[currentCol.id] || '',
-        onSave: (val) => setFormData((prev: any) => ({ ...prev, [currentCol.id]: val }))
-      });
-    } else {
-      setActiveNumField(null);
-      if (inputRef.current && !isGpsLoading) {
-        setTimeout(() => inputRef.current?.focus(), 100);
+    if (currentCol) {
+      if (currentCol.tipo === 'number') {
+        setActiveTextField(null);
+        setActiveNumField({
+          title: currentCol.nome,
+          value: formData[currentCol.id] || '',
+          onSave: (val) => setFormData((prev: any) => ({ ...prev, [currentCol.id]: val }))
+        });
+      } else if (currentCol.tipo === 'text' || currentCol.tipo === 'textarea') {
+        setActiveNumField(null);
+        setActiveTextField({
+          title: currentCol.nome,
+          value: formData[currentCol.id] || '',
+          onSave: (val) => setFormData((prev: any) => ({ ...prev, [currentCol.id]: val }))
+        });
+      } else {
+        setActiveNumField(null);
+        setActiveTextField(null);
+        if (inputRef.current && !isGpsLoading) {
+          setTimeout(() => inputRef.current?.focus(), 100);
+        }
       }
     }
   }, [stepIndex, isGpsLoading]);
 
-  const handleInputChange = (val: string) => {
-    setFormData((prev: any) => ({ ...prev, [currentCol.id]: val }));
-  };
+
 
   const getGps = async () => {
     setIsGpsLoading(true);
@@ -112,11 +128,7 @@ export const CollectData = () => {
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleNext();
-    }
-  };
+
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -194,7 +206,14 @@ export const CollectData = () => {
   const isLastStep = getNextStepIndex(stepIndex) >= columns.length;
 
   return (
-    <div className="container" style={{ marginTop: '20px' }}>
+    <div 
+      className="container" 
+      style={{ 
+        marginTop: '20px', 
+        paddingBottom: activeNumField ? '380px' : '20px',
+        transition: 'padding-bottom 0.3s ease'
+      }}
+    >
       {/* Wizard Header */}
       <div className="app-header" style={{ marginBottom: '16px' }}>
         <div>
@@ -231,14 +250,30 @@ export const CollectData = () => {
               </button>
             </div>
           ) : currentCol.tipo === 'textarea' ? (
-            <textarea 
-              className="input-field"
-              autoFocus
-              value={formData[currentCol.id] || ''} 
-              onChange={e => handleInputChange(e.target.value)} 
-              style={{ minHeight: '120px', resize: 'vertical' }}
-              placeholder={`Digite ${currentCol.nome}...`}
-            />
+            <div 
+              onClick={() => setActiveTextField({
+                title: currentCol.nome,
+                value: formData[currentCol.id] || '',
+                onSave: (val) => setFormData((prev: any) => ({ ...prev, [currentCol.id]: val }))
+              })}
+              style={{
+                background: 'rgba(255,255,255,0.02)',
+                border: '1px dashed var(--border-color)',
+                padding: '24px',
+                fontSize: '18px',
+                color: formData[currentCol.id] ? 'white' : 'rgba(255,255,255,0.15)',
+                textAlign: 'left',
+                cursor: 'pointer',
+                borderRadius: '8px',
+                minHeight: '120px',
+                display: 'flex',
+                alignItems: 'flex-start',
+                justifyContent: 'flex-start',
+                userSelect: 'none'
+              }}
+            >
+              {formData[currentCol.id] || `Toque para digitar as observações...`}
+            </div>
           ) : currentCol.tipo === 'photo' ? (
             <div style={{ textAlign: 'center' }}>
               <label className="btn btn-secondary" style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '32px' }}>
@@ -295,16 +330,31 @@ export const CollectData = () => {
               {formData[currentCol.id]?.toString().replace('.', ',') || 'Tocar para digitar...'}
             </div>
           ) : (
-            <input 
-              type="text" 
-              className="input-field" 
-              ref={inputRef}
-              value={formData[currentCol.id] || ''} 
-              onChange={e => handleInputChange(e.target.value)} 
-              onKeyDown={handleKeyDown}
-              style={{ textAlign: 'center', fontSize: '32px', padding: '16px 0', borderBottomWidth: '2px' }}
-              placeholder={`Digitar...`}
-            />
+            <div 
+              onClick={() => setActiveTextField({
+                title: currentCol.nome,
+                value: formData[currentCol.id] || '',
+                onSave: (val) => setFormData((prev: any) => ({ ...prev, [currentCol.id]: val }))
+              })}
+              style={{
+                background: 'rgba(255,255,255,0.02)',
+                borderBottom: '2px solid var(--primary-color)',
+                padding: '16px 0',
+                fontSize: '28px',
+                fontWeight: '600',
+                color: formData[currentCol.id] ? 'var(--primary-hover)' : 'rgba(255,255,255,0.15)',
+                textAlign: 'center',
+                cursor: 'pointer',
+                borderRadius: '8px',
+                minHeight: '64px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                userSelect: 'none'
+              }}
+            >
+              {formData[currentCol.id] || 'Tocar para digitar...'}
+            </div>
           )}
 
           {/* Árvore Bifurcada Intercept (Aparece junto com o CAP ou DAP principal) */}
@@ -401,6 +451,18 @@ export const CollectData = () => {
             setActiveNumField(null);
           }}
           onClose={() => setActiveNumField(null)}
+        />
+      )}
+
+      {activeTextField && (
+        <TextKeyboardModal
+          title={activeTextField.title}
+          initialValue={activeTextField.value}
+          onConfirm={(val) => {
+            activeTextField.onSave(val);
+            setActiveTextField(null);
+          }}
+          onClose={() => setActiveTextField(null)}
         />
       )}
     </div>
