@@ -92,10 +92,9 @@ export const NumericKeyboardModal: React.FC<NumericKeyboardModalProps> = ({
         <button type="button" className="keyboard-key" style={keyStyle} onClick={() => handleKeyPress('0')}>0</button>
         <button type="button" className="keyboard-key" style={specialKeyStyle} onClick={() => handleKeyPress('.')}>.</button>
 
-        {/* Row 5 */}
-        <button type="button" className="keyboard-key" style={dangerKeyStyle} onClick={() => handleKeyPress('Apagar')}>Apagar</button>
-        <button type="button" className="keyboard-key" style={clearKeyStyle} onClick={() => handleKeyPress('C')}>Limpar</button>
-        <button type="button" className="keyboard-key" style={confirmKeyStyle} onClick={onConfirm}>Confirmar</button>
+        {/* Row 5: Clean bottom actions (Apagar, Limpar) */}
+        <button type="button" className="keyboard-key" style={{ ...dangerKeyStyle, gridColumn: 'span 2' }} onClick={() => handleKeyPress('Apagar')}>Apagar</button>
+        <button type="button" className="keyboard-key" style={{ ...clearKeyStyle, gridColumn: 'span 1' }} onClick={() => handleKeyPress('C')}>Limpar</button>
       </div>
     </div>
   );
@@ -137,14 +136,4 @@ const clearKeyStyle: React.CSSProperties = {
   background: 'rgba(255, 255, 255, 0.02)',
   border: '1px solid rgba(255, 255, 255, 0.06)',
   color: 'var(--text-muted)'
-};
-
-const confirmKeyStyle: React.CSSProperties = {
-  ...keyStyle,
-  fontSize: '14.5px',
-  fontWeight: 'bold',
-  background: 'rgba(46, 125, 50, 0.25)',
-  color: '#ffffff',
-  border: '1px solid rgba(46, 125, 50, 0.45)',
-  boxShadow: '0 4px 10px rgba(46, 125, 50, 0.15)'
 };

@@ -133,11 +133,10 @@ export const TextKeyboardModal: React.FC<TextKeyboardModalProps> = ({
           </button>
         </div>
 
-        {/* Row 4: Clean Bottom Navigation (Limpar, Espaço, Confirmar) */}
+        {/* Row 4: Clean Bottom Navigation (Limpar, Espaço) */}
         <div style={rowStyle}>
           <button type="button" className="keyboard-key" style={clearStyle} onClick={handleClear}>Limpar</button>
-          <button type="button" className="keyboard-key" style={{ ...keyStyle, flex: 3, background: 'rgba(255, 255, 255, 0.08)' }} onClick={handleSpace}>Espaço</button>
-          <button type="button" className="keyboard-key" style={confirmStyle} onClick={onConfirm}>Confirmar</button>
+          <button type="button" className="keyboard-key" style={{ ...keyStyle, flex: 4, background: 'rgba(255, 255, 255, 0.08)' }} onClick={handleSpace}>Espaço</button>
         </div>
       </div>
     </div>
@@ -207,14 +206,4 @@ const clearStyle: React.CSSProperties = {
   background: 'rgba(255, 255, 255, 0.01)',
   border: '1px solid rgba(255, 255, 255, 0.05)',
   color: 'var(--text-muted)'
-};
-
-const confirmStyle: React.CSSProperties = {
-  ...keyStyle,
-  background: 'rgba(46, 125, 50, 0.25)',
-  border: '1px solid rgba(46, 125, 50, 0.45)',
-  color: 'white',
-  fontWeight: 'bold',
-  fontSize: '12.5px',
-  boxShadow: '0 4px 10px rgba(46, 125, 50, 0.15)'
 };
