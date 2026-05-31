@@ -1,9 +1,10 @@
-export type ColumnType = 'text' | 'number' | 'textarea' | 'photo';
+export type ColumnType = 'text' | 'number' | 'textarea' | 'photo' | 'select';
 
 export interface InventoryColumn {
   id: string;
   nome: string;
   tipo: ColumnType;
+  opcoes?: string[]; // Opções pré-configuradas para colunas do tipo 'select'
 }
 
 export interface StemData {

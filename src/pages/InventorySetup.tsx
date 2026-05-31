@@ -17,7 +17,7 @@ const columnsBase = [
 ];
 
 // Estado para colunas personalizadas
-const getNewCustomCol = () => ({ id: '', nome: '', tipo: 'text', checked: true });
+const getNewCustomCol = () => ({ id: '', nome: '', tipo: 'text', checked: true, opcoes: '' });
 
 export const InventorySetup = () => {
   const navigate = useNavigate();
@@ -68,7 +68,12 @@ export const InventorySetup = () => {
       ...cols.filter(c => c.checked).map(c => ({ id: c.id, nome: c.nome, tipo: getColType(c.id) })),
       ...customCols
         .filter(c => c.nome && c.id)
-        .map(c => ({ id: c.id, nome: c.nome, tipo: c.tipo as ColumnType }))
+        .map(c => ({ 
+          id: c.id, 
+          nome: c.nome, 
+          tipo: c.tipo as ColumnType,
+          ...(c.tipo === 'select' && { opcoes: c.opcoes ? c.opcoes.split(',').map(o => o.trim()).filter(Boolean) : [] })
+        }))
     ];
 
     if (finalCols.length === 0) {
@@ -310,8 +315,26 @@ export const InventorySetup = () => {
                 <option value="number" style={{ background: '#0a0f0d', color: '#fff' }}>Número</option>
                 <option value="textarea" style={{ background: '#0a0f0d', color: '#fff' }}>Longo</option>
                 <option value="photo" style={{ background: '#0a0f0d', color: '#fff' }}>Foto (Câmera)</option>
+                <option value="select" style={{ background: '#0a0f0d', color: '#fff' }}>Múltipla Escolha</option>
               </select>
             </div>
+
+            {col.tipo === 'select' && (
+              <div style={{ flex: '1 1 100%', marginTop: '8px' }}>
+                <label style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Opções de Escolha (Separadas por vírgula)</label>
+                <input
+                  className="input-field"
+                  style={{ marginBottom: 0, marginTop: '4px', fontSize: '13px' }}
+                  placeholder="Ex: Quebrada, Inclinada, Torta, Morta, Bifurcada"
+                  value={col.opcoes || ''}
+                  onChange={e => {
+                    const newCols = [...customCols];
+                    newCols[idx].opcoes = e.target.value;
+                    setCustomCols(newCols);
+                  }}
+                />
+              </div>
+            )}
             
             <button
               className="btn btn-danger"

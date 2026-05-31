@@ -143,6 +143,14 @@ export const CollectData = () => {
     }
   };
 
+  // Função para salvar seleção de múltipla escolha e avançar suavemente no campo
+  const selectOptionValue = (val: string) => {
+    setFormData((prev: any) => ({ ...prev, [currentCol.id]: val }));
+    setTimeout(() => {
+      handleNext();
+    }, 120);
+  };
+
   const getPrevStepIndex = (currentIndex: number): number => {
     let prevIdx = currentIndex - 1;
     while (prevIdx >= 0) {
@@ -524,6 +532,64 @@ export const CollectData = () => {
                   formData[currentCol.id]?.toString().replace('.', ',') || 'Tocar para digitar...'
                 )}
               </div>
+            ) : currentCol.tipo === 'select' ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%', alignItems: 'center' }}>
+                <div style={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', 
+                  gap: '12px', 
+                  width: '100%' 
+                }}>
+                  {(currentCol.opcoes || []).map((opt: string) => {
+                    const isSelected = formData[currentCol.id] === opt;
+                    return (
+                      <button
+                        key={opt}
+                        onClick={() => selectOptionValue(opt)}
+                        style={{
+                          background: isSelected ? 'rgba(46, 125, 50, 0.18)' : 'rgba(255, 255, 255, 0.03)',
+                          border: isSelected ? '1px solid var(--primary-hover)' : '1px solid rgba(255, 255, 255, 0.06)',
+                          borderRadius: '16px',
+                          color: isSelected ? '#ffffff' : 'var(--text-muted)',
+                          padding: '16px 12px',
+                          fontSize: '14px',
+                          fontWeight: '800',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                          boxShadow: isSelected ? '0 0 15px rgba(76, 175, 80, 0.15)' : 'none',
+                          textAlign: 'center',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.5px'
+                        }}
+                      >
+                        {opt}
+                      </button>
+                    );
+                  })}
+                </div>
+                
+                {formData[currentCol.id] && (
+                  <button
+                    onClick={() => setFormData((prev: any) => ({ ...prev, [currentCol.id]: '' }))}
+                    style={{
+                      background: 'rgba(239, 35, 60, 0.08)',
+                      border: '1px solid rgba(239, 35, 60, 0.3)',
+                      borderRadius: '12px',
+                      color: '#ff8a80',
+                      padding: '8px 16px',
+                      fontSize: '11px',
+                      fontWeight: 'bold',
+                      cursor: 'pointer',
+                      marginTop: '12px',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px',
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    Limpar Seleção
+                  </button>
+                )}
+              </div>
             ) : (
               <div 
                 onClick={() => setActiveTextField({
@@ -858,6 +924,24 @@ export const CollectData = () => {
                         <div style={{ padding: '12px 16px', background: 'rgba(0,0,0,0.2)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.06)', fontSize: '14px', color: 'var(--text-muted)' }}>
                           {value || 'Sem fotos'}
                         </div>
+                      ) : col.tipo === 'select' ? (
+                        <select
+                          className="input-field"
+                          style={{ 
+                            marginBottom: 0, 
+                            marginTop: '4px',
+                            appearance: 'none',
+                            background: 'rgba(0,0,0,0.25) url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'white\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'%3e%3cpolyline points=\'6 9 12 15 18 9\'%3e%3c/polyline%3e%3c/svg%3e") no-repeat right 12px center',
+                            backgroundSize: '16px'
+                          }}
+                          value={value || ''}
+                          onChange={e => setTempPrevIndData({ ...tempPrevIndData, [col.id]: e.target.value })}
+                        >
+                          <option value="" style={{ background: '#0a0f0d', color: 'var(--text-muted)' }}>-- Selecione --</option>
+                          {(col.opcoes || []).map((o: string) => (
+                            <option key={o} value={o} style={{ background: '#0a0f0d', color: '#fff' }}>{o}</option>
+                          ))}
+                        </select>
                       ) : (
                         <input 
                           type={col.tipo === 'number' ? 'number' : 'text'} 
