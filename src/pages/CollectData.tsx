@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useInventory } from '../context/InventoryContext';
 import { getCurrentPosition } from '../utils/gpsOperations';
-import { compressImage, savePhoto, getPhotosForInventory } from '../utils/photoStorage';
+import { compressImage, savePhoto, getPhotosForInventory, deletePhotosForIndividual } from '../utils/photoStorage';
 import { NumericKeyboardModal } from '../components/NumericKeyboardModal';
 import { TextKeyboardModal } from '../components/TextKeyboardModal';
 
@@ -55,6 +55,7 @@ export const CollectData = () => {
   const [showPrevIndModal, setShowPrevIndModal] = useState(false);
   const [editingPrevInd, setEditingPrevInd] = useState(false);
   const [tempPrevIndData, setTempPrevIndData] = useState<any>(null);
+  const [reviewIndIndex, setReviewIndIndex] = useState<number | null>(null);
 
   const [activeNumField, setActiveNumField] = useState<{
     title: string;
@@ -163,8 +164,10 @@ export const CollectData = () => {
         setStepIndex(prevIdx);
       } else if (stepIndex === 0) {
         if (currentInventory?.dados && currentInventory.dados.length > 0) {
-          const prevInd = currentInventory.dados[currentInventory.dados.length - 1];
+          const targetIdx = currentInventory.dados.length - 1;
+          const prevInd = currentInventory.dados[targetIdx];
           if (prevInd) {
+            setReviewIndIndex(targetIdx);
             setTempPrevIndData(JSON.parse(JSON.stringify(prevInd)));
             setEditingPrevInd(false);
             setShowPrevIndModal(true);
@@ -180,23 +183,50 @@ export const CollectData = () => {
 
   const handleSavePrevInd = async () => {
     try {
-      if (!tempPrevIndData) return;
+      if (!tempPrevIndData || reviewIndIndex === null) return;
       const freshInv = JSON.parse(JSON.stringify(currentInventory));
       if (freshInv?.dados) {
-        const targetIdx = freshInv.dados.findIndex((d: any) => d.id === tempPrevIndData.id);
-        if (targetIdx >= 0) {
-          freshInv.dados[targetIdx] = tempPrevIndData;
-          setCurrentInventory(freshInv);
-          await saveInventory(freshInv);
-        }
+        freshInv.dados[reviewIndIndex] = tempPrevIndData;
+        setCurrentInventory(freshInv);
+        await saveInventory(freshInv);
       }
-      setShowPrevIndModal(false);
       setEditingPrevInd(false);
-      setTempPrevIndData(null);
+      alert("Alterações salvas com sucesso!");
     } catch (err) {
       console.error("Erro no handleSavePrevInd:", err);
     }
   };
+
+  const handleDeletePrevInd = async () => {
+    if (!tempPrevIndData || reviewIndIndex === null) return;
+    
+    const confirmDelete = window.confirm(
+      `Tem certeza de que deseja excluir permanentemente a Árvore #${tempPrevIndData.numeroIndividuo} e todas as suas fotos?`
+    );
+    if (!confirmDelete) return;
+
+    try {
+      await deletePhotosForIndividual(tempPrevIndData.id);
+      const freshInv = JSON.parse(JSON.stringify(currentInventory));
+      if (freshInv?.dados) {
+        freshInv.dados.splice(reviewIndIndex, 1);
+        freshInv.dados.forEach((d: any, idx: number) => {
+          d.numeroIndividuo = idx + 1;
+        });
+        setCurrentInventory(freshInv);
+        await saveInventory(freshInv);
+      }
+      setShowPrevIndModal(false);
+      setEditingPrevInd(false);
+      setTempPrevIndData(null);
+      setReviewIndIndex(null);
+      alert("Árvore excluída com sucesso!");
+    } catch (err) {
+      console.error("Erro ao excluir árvore:", err);
+      alert("Erro ao excluir árvore: " + err);
+    }
+  };
+
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -761,10 +791,37 @@ export const CollectData = () => {
                   </svg>
                 </button>
                 <button 
+                  onClick={handleDeletePrevInd}
+                  style={{
+                    background: 'rgba(239, 35, 60, 0.15)',
+                    border: '1px solid rgba(239, 35, 60, 0.4)',
+                    color: '#ff4d6d',
+                    borderRadius: '8px',
+                    width: '36px',
+                    height: '36px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    padding: 0,
+                    outline: 'none'
+                  }}
+                  title="Excluir árvore"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="3 6 5 6 21 6"></polyline>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                    <line x1="10" y1="11" x2="10" y2="17"></line>
+                    <line x1="14" y1="11" x2="14" y2="17"></line>
+                  </svg>
+                </button>
+                <button 
                   onClick={() => {
                     setShowPrevIndModal(false);
                     setEditingPrevInd(false);
                     setTempPrevIndData(null);
+                    setReviewIndIndex(null);
                   }} 
                   style={{ 
                     background: 'transparent', 
@@ -783,6 +840,7 @@ export const CollectData = () => {
                 >
                   ×
                 </button>
+
               </div>
             </div>
 
@@ -897,6 +955,52 @@ export const CollectData = () => {
               )}
             </div>
 
+            {/* Navegação entre indivíduos anteriores */}
+            {reviewIndIndex !== null && currentInventory?.dados && currentInventory.dados.length > 1 && (
+              <div style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center', 
+                marginTop: '20px',
+                padding: '12px 16px',
+                background: 'rgba(255, 255, 255, 0.02)',
+                border: '1px solid rgba(255, 255, 255, 0.05)',
+                borderRadius: '12px'
+              }}>
+                <button
+                  className="btn btn-secondary"
+                  style={{ width: 'auto', padding: '8px 12px', fontSize: '10.5px', height: '32px' }}
+                  disabled={reviewIndIndex === 0}
+                  onClick={() => {
+                    const newIdx = reviewIndIndex - 1;
+                    setReviewIndIndex(newIdx);
+                    setTempPrevIndData(JSON.parse(JSON.stringify(currentInventory.dados[newIdx])));
+                    setEditingPrevInd(false);
+                  }}
+                >
+                  &larr; Anterior
+                </button>
+                
+                <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 'bold' }}>
+                  {reviewIndIndex + 1} de {currentInventory.dados.length}
+                </span>
+
+                <button
+                  className="btn btn-secondary"
+                  style={{ width: 'auto', padding: '8px 12px', fontSize: '10.5px', height: '32px' }}
+                  disabled={reviewIndIndex === currentInventory.dados.length - 1}
+                  onClick={() => {
+                    const newIdx = reviewIndIndex + 1;
+                    setReviewIndIndex(newIdx);
+                    setTempPrevIndData(JSON.parse(JSON.stringify(currentInventory.dados[newIdx])));
+                    setEditingPrevInd(false);
+                  }}
+                >
+                  Próximo &rarr;
+                </button>
+              </div>
+            )}
+
             <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
               <button 
                 className="btn btn-secondary" 
@@ -904,6 +1008,7 @@ export const CollectData = () => {
                   setShowPrevIndModal(false);
                   setEditingPrevInd(false);
                   setTempPrevIndData(null);
+                  setReviewIndIndex(null);
                 }}
               >
                 Fechar
@@ -914,6 +1019,7 @@ export const CollectData = () => {
                 </button>
               )}
             </div>
+
           </div>
         </div>
       )}
