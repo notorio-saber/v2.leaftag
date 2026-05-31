@@ -91,6 +91,13 @@ export const TextKeyboardModal: React.FC<TextKeyboardModalProps> = ({
     }}>
       {/* Keyboard Keypad Layout */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '100%' }}>
+        {/* Row 0: Scientific Suffixes / Shortcuts */}
+        <div style={rowStyle}>
+          <button type="button" className="keyboard-key" style={shortcutStyle} onClick={handleSpShort}>sp.</button>
+          <button type="button" className="keyboard-key" style={shortcutStyle} onClick={handleCfShort}>cf.</button>
+          <button type="button" className="keyboard-key" style={shortcutStyle} onClick={handleNiShort}>NI</button>
+        </div>
+
         {/* Row 1 */}
         <div style={rowStyle}>
           {row1.map(char => (
@@ -126,13 +133,10 @@ export const TextKeyboardModal: React.FC<TextKeyboardModalProps> = ({
           </button>
         </div>
 
-        {/* Row 4: Shortcuts and Space */}
+        {/* Row 4: Clean Bottom Navigation (Limpar, Espaço, Confirmar) */}
         <div style={rowStyle}>
-          <button type="button" className="keyboard-key" style={shortcutStyle} onClick={handleSpShort}>sp.</button>
-          <button type="button" className="keyboard-key" style={shortcutStyle} onClick={handleCfShort}>cf.</button>
-          <button type="button" className="keyboard-key" style={shortcutStyle} onClick={handleNiShort}>NI</button>
-          <button type="button" className="keyboard-key" style={{ ...keyStyle, flex: 2, background: 'rgba(255, 255, 255, 0.08)' }} onClick={handleSpace}>Espaço</button>
           <button type="button" className="keyboard-key" style={clearStyle} onClick={handleClear}>Limpar</button>
+          <button type="button" className="keyboard-key" style={{ ...keyStyle, flex: 3, background: 'rgba(255, 255, 255, 0.08)' }} onClick={handleSpace}>Espaço</button>
           <button type="button" className="keyboard-key" style={confirmStyle} onClick={onConfirm}>Confirmar</button>
         </div>
       </div>
@@ -189,10 +193,11 @@ const actionKeyStyle = (color: string, bg: string, border: string): React.CSSPro
 
 const shortcutStyle: React.CSSProperties = {
   ...keyStyle,
+  height: '42px', /* More compact for suffixes */
   background: 'rgba(46, 125, 50, 0.12)',
   border: '1px solid rgba(46, 125, 50, 0.35)',
   color: '#a5d6a7',
-  fontSize: '13px',
+  fontSize: '14.5px',
   fontWeight: 'bold'
 };
 
