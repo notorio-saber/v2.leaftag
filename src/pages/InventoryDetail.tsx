@@ -59,6 +59,56 @@ export const InventoryDetail = () => {
 
   // Estado para edição
   const [editingInd, setEditingInd] = useState<any>(null);
+  
+  // Tipo de ordenação da visualização local
+  const [sortType, setSortType] = useState<'original' | 'height' | 'thickness'>('original');
+
+  // Auxiliar para obter a altura máxima do indivíduo (considera fustes se bifurcado)
+  const getTreeMaxHeight = (ind: any) => {
+    let maxHt = parseFloat(ind.ht || '0');
+    if (isNaN(maxHt)) maxHt = 0;
+    if (ind.multipleStems && ind.stems) {
+      ind.stems.forEach((s: any) => {
+        const h = parseFloat(s.altura || '0');
+        if (!isNaN(h) && h > maxHt) maxHt = h;
+      });
+    }
+    return maxHt;
+  };
+
+  // Auxiliar para obter o diâmetro/circunferência máxima do indivíduo (considera fustes se bifurcado)
+  const getTreeMaxThickness = (ind: any) => {
+    let maxCap = parseFloat(ind.cap || '0');
+    if (isNaN(maxCap)) maxCap = 0;
+    
+    let maxDap = parseFloat(ind.dap || '0');
+    if (isNaN(maxDap)) maxDap = 0;
+    
+    let thickness = Math.max(maxCap, maxDap * Math.PI);
+
+    if (ind.multipleStems && ind.stems) {
+      ind.stems.forEach((s: any) => {
+        const c = parseFloat(s.cap || '0');
+        if (!isNaN(c) && c > maxCap) maxCap = c;
+      });
+      thickness = maxCap;
+    }
+    return thickness;
+  };
+
+  // Retorna os dados ordenados para exibição sem alterar a ordem real do banco de dados
+  const sortedDados = (() => {
+    if (!inventory || !inventory.dados) return [];
+    const dadosCopy = [...inventory.dados];
+    if (sortType === 'height') {
+      return dadosCopy.sort((a, b) => getTreeMaxHeight(b) - getTreeMaxHeight(a));
+    }
+    if (sortType === 'thickness') {
+      return dadosCopy.sort((a, b) => getTreeMaxThickness(b) - getTreeMaxThickness(a));
+    }
+    return dadosCopy; // ordem original
+  })();
+
 
   if (!inventory) {
     return (
@@ -290,21 +340,91 @@ export const InventoryDetail = () => {
           flexWrap: 'wrap', 
           gap: '12px' 
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-            <h3 style={{ margin: 0, fontSize: '17px', fontWeight: '800' }}>Dados Coletados ({inventory.dados.length})</h3>
-            {isSufficiencyReached && (
-              <span style={{ 
-                background: 'rgba(46, 125, 50, 0.15)', 
-                border: '1px solid rgba(46, 125, 50, 0.45)', 
-                color: '#a5d6a7', 
-                padding: '4px 12px', 
-                borderRadius: '100px', 
-                fontSize: '11px', 
-                fontWeight: 'bold',
-                letterSpacing: '0.5px'
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <h3 style={{ margin: 0, fontSize: '17px', fontWeight: '800' }}>Dados Coletados ({inventory.dados.length})</h3>
+              {isSufficiencyReached && (
+                <span style={{ 
+                  background: 'rgba(46, 125, 50, 0.15)', 
+                  border: '1px solid rgba(46, 125, 50, 0.45)', 
+                  color: '#a5d6a7', 
+                  padding: '4px 12px', 
+                  borderRadius: '100px', 
+                  fontSize: '11px', 
+                  fontWeight: 'bold',
+                  letterSpacing: '0.5px'
+                }}>
+                  Suficiência Atingida
+                </span>
+              )}
+            </div>
+
+            {/* Seletor de Ordenação Glassmórfico */}
+            {inventory.dados.length > 0 && (
+              <div style={{ 
+                display: 'flex', 
+                background: 'rgba(255, 255, 255, 0.03)', 
+                border: '1px solid rgba(255, 255, 255, 0.06)',
+                borderRadius: '10px', 
+                padding: '3px',
+                gap: '4px',
+                alignItems: 'center'
               }}>
-                Suficiência Atingida
-              </span>
+                <button 
+                  onClick={() => setSortType('original')} 
+                  style={{
+                    background: sortType === 'original' ? 'rgba(46, 125, 50, 0.18)' : 'transparent',
+                    border: sortType === 'original' ? '1px solid rgba(46, 125, 50, 0.45)' : '1px solid transparent',
+                    color: sortType === 'original' ? 'var(--primary-hover)' : 'var(--text-muted)',
+                    fontSize: '10.5px',
+                    fontWeight: 'bold',
+                    padding: '5px 12px',
+                    borderRadius: '7px',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}
+                >
+                  Original
+                </button>
+                <button 
+                  onClick={() => setSortType('height')} 
+                  style={{
+                    background: sortType === 'height' ? 'rgba(46, 125, 50, 0.18)' : 'transparent',
+                    border: sortType === 'height' ? '1px solid rgba(46, 125, 50, 0.45)' : '1px solid transparent',
+                    color: sortType === 'height' ? 'var(--primary-hover)' : 'var(--text-muted)',
+                    fontSize: '10.5px',
+                    fontWeight: 'bold',
+                    padding: '5px 12px',
+                    borderRadius: '7px',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}
+                >
+                  Mais Altas ↓
+                </button>
+                <button 
+                  onClick={() => setSortType('thickness')} 
+                  style={{
+                    background: sortType === 'thickness' ? 'rgba(46, 125, 50, 0.18)' : 'transparent',
+                    border: sortType === 'thickness' ? '1px solid rgba(46, 125, 50, 0.45)' : '1px solid transparent',
+                    color: sortType === 'thickness' ? 'var(--primary-hover)' : 'var(--text-muted)',
+                    fontSize: '10.5px',
+                    fontWeight: 'bold',
+                    padding: '5px 12px',
+                    borderRadius: '7px',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}
+                >
+                  Mais Grossas ↓
+                </button>
+              </div>
             )}
           </div>
           <button className="btn btn-primary" style={{ width: 'auto', padding: '8px 16px' }} onClick={() => { setCurrentInventory(inventory); navigate('/collect'); }}>
@@ -327,7 +447,7 @@ export const InventoryDetail = () => {
                 </tr>
               </thead>
               <tbody>
-                {inventory.dados.map((ind: any) => (
+                {sortedDados.map((ind: any) => (
                   <tr key={ind.id}>
                     <td style={{ fontWeight: 'bold' }}>{ind.numeroIndividuo}</td>
                     {inventory.colunas.map(col => (
