@@ -254,6 +254,7 @@ th {
   letter-spacing: 0.06em;
   padding: 10px 8px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.12) !important;
+  text-align: left;
 }
 
 td {
@@ -261,6 +262,7 @@ td {
   font-size: 14px;
   color: var(--text-main);
   padding: 12px 8px;
+  text-align: left;
 }
 
 /* Custom interactive virtual keys active states */
