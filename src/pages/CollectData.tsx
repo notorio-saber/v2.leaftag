@@ -3,18 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { useInventory } from '../context/InventoryContext';
 import { getCurrentPosition } from '../utils/gpsOperations';
 import { compressImage, savePhoto } from '../utils/photoStorage';
+import { NumericKeyboardModal } from '../components/NumericKeyboardModal';
 
 export const CollectData = () => {
   const navigate = useNavigate();
   const { currentInventory, saveInventory, setCurrentInventory } = useInventory();
-  
-  if (!currentInventory) {
-    navigate('/');
-    return null;
-  }
-
-  const columns = currentInventory.colunas;
-  const currentIdx = currentInventory.dados.length + 1;
   
   const [stepIndex, setStepIndex] = useState(0);
   const [formData, setFormData] = useState<any>({});
@@ -22,16 +15,38 @@ export const CollectData = () => {
   const [multiStems, setMultiStems] = useState(false);
   const [stems, setStems] = useState([{ id: Date.now().toString(), cap: '', altura: '' }]);
 
+  const [activeNumField, setActiveNumField] = useState<{
+    title: string;
+    value: string;
+    onSave: (val: string) => void;
+  } | null>(null);
+
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Auto-focus on step change
+  if (!currentInventory) {
+    navigate('/');
+    return null;
+  }
+
+  const columns = currentInventory.colunas;
+  const currentIdx = currentInventory.dados.length + 1;
+  const currentCol = columns[stepIndex];
+
+  // Auto-focus on step change, or open custom numeric keyboard if step is numeric
   useEffect(() => {
-    if (inputRef.current && !isGpsLoading) {
-      setTimeout(() => inputRef.current?.focus(), 100);
+    if (currentCol && currentCol.tipo === 'number') {
+      setActiveNumField({
+        title: currentCol.nome,
+        value: formData[currentCol.id] || '',
+        onSave: (val) => setFormData((prev: any) => ({ ...prev, [currentCol.id]: val }))
+      });
+    } else {
+      setActiveNumField(null);
+      if (inputRef.current && !isGpsLoading) {
+        setTimeout(() => inputRef.current?.focus(), 100);
+      }
     }
   }, [stepIndex, isGpsLoading]);
-
-  const currentCol = columns[stepIndex];
 
   const handleInputChange = (val: string) => {
     setFormData((prev: any) => ({ ...prev, [currentCol.id]: val }));
@@ -253,16 +268,42 @@ export const CollectData = () => {
                 </div>
               )}
             </div>
+          ) : currentCol.tipo === 'number' ? (
+            <div 
+              onClick={() => setActiveNumField({
+                title: currentCol.nome,
+                value: formData[currentCol.id] || '',
+                onSave: (val) => setFormData((prev: any) => ({ ...prev, [currentCol.id]: val }))
+              })}
+              style={{
+                background: 'rgba(255,255,255,0.02)',
+                borderBottom: '2px solid var(--primary-color)',
+                padding: '16px 0',
+                fontSize: '36px',
+                fontWeight: 'bold',
+                color: formData[currentCol.id] ? 'var(--primary-hover)' : 'rgba(255,255,255,0.15)',
+                textAlign: 'center',
+                cursor: 'pointer',
+                borderRadius: '8px',
+                minHeight: '64px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                userSelect: 'none'
+              }}
+            >
+              {formData[currentCol.id]?.toString().replace('.', ',') || 'Tocar para digitar...'}
+            </div>
           ) : (
             <input 
-              type={currentCol.tipo === 'number' ? 'number' : 'text'} 
+              type="text" 
               className="input-field" 
               ref={inputRef}
               value={formData[currentCol.id] || ''} 
               onChange={e => handleInputChange(e.target.value)} 
               onKeyDown={handleKeyDown}
               style={{ textAlign: 'center', fontSize: '32px', padding: '16px 0', borderBottomWidth: '2px' }}
-              placeholder={currentCol.tipo === 'number' ? '0.0' : `Digitar...`}
+              placeholder={`Digitar...`}
             />
           )}
 
@@ -282,12 +323,40 @@ export const CollectData = () => {
                   <h4 style={{ marginBottom: '16px', color: 'var(--primary-color)', fontSize: '14px' }}>RAMIFICAÇÕES</h4>
                   {stems.map((stem, i) => (
                     <div key={stem.id} style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-                      <input type="number" className="input-field" placeholder="CAP" value={stem.cap} onChange={e => {
-                        const s = [...stems]; s[i].cap = e.target.value; setStems(s);
-                      }} style={{ marginBottom: 0, fontSize: '16px', padding: '8px 0', textAlign: 'center' }} />
-                      <input type="number" className="input-field" placeholder="Alt(m)" value={stem.altura} onChange={e => {
-                        const s = [...stems]; s[i].altura = e.target.value; setStems(s);
-                      }} style={{ marginBottom: 0, fontSize: '16px', padding: '8px 0', textAlign: 'center' }} />
+                      <input 
+                        type="text" 
+                        readOnly
+                        className="input-field" 
+                        placeholder="CAP" 
+                        value={stem.cap ? stem.cap.toString().replace('.', ',') : ''} 
+                        onClick={() => setActiveNumField({
+                          title: `CAP do Fuste #${i+1}`,
+                          value: stem.cap.toString(),
+                          onSave: (val) => {
+                            const s = [...stems];
+                            s[i].cap = val;
+                            setStems(s);
+                          }
+                        })}
+                        style={{ marginBottom: 0, fontSize: '16px', padding: '8px 0', textAlign: 'center', cursor: 'pointer' }} 
+                      />
+                      <input 
+                        type="text" 
+                        readOnly
+                        className="input-field" 
+                        placeholder="Alt(m)" 
+                        value={stem.altura ? stem.altura.toString().replace('.', ',') : ''} 
+                        onClick={() => setActiveNumField({
+                          title: `Altura do Fuste #${i+1}`,
+                          value: stem.altura.toString(),
+                          onSave: (val) => {
+                            const s = [...stems];
+                            s[i].altura = val;
+                            setStems(s);
+                          }
+                        })}
+                        style={{ marginBottom: 0, fontSize: '16px', padding: '8px 0', textAlign: 'center', cursor: 'pointer' }} 
+                      />
                       
                       {stems.length > 1 && (
                         <button className="btn btn-secondary" style={{ width: '48px', padding: 0 }} onClick={() => setStems(stems.filter(x => x.id !== stem.id))}>✕</button>
@@ -322,6 +391,18 @@ export const CollectData = () => {
           {isLastStep ? '💾 Salvar Indivíduo' : 'Próximo >>'}
         </button>
       </div>
+
+      {activeNumField && (
+        <NumericKeyboardModal
+          title={activeNumField.title}
+          initialValue={activeNumField.value}
+          onConfirm={(val) => {
+            activeNumField.onSave(val);
+            setActiveNumField(null);
+          }}
+          onClose={() => setActiveNumField(null)}
+        />
+      )}
     </div>
   );
 };
