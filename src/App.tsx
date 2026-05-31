@@ -21,7 +21,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 const Home = () => {
-  const { fieldWorks, createFieldWork } = useInventory();
+  const { fieldWorks, createFieldWork, talhoes, inventories } = useInventory();
   const { signOut, status } = useAuth();
   const navigate = useNavigate();
   const [showModal, setShowModal] = useState(false);
@@ -29,6 +29,7 @@ const Home = () => {
   const [newFwLocal, setNewFwLocal] = useState('');
   // Utilizando formato YYYY-MM-DD para o input type="date"
   const [newFwDate, setNewFwDate] = useState(new Date().toISOString().split('T')[0]);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const handleCreateFw = () => {
     if (!newFwName) return alert('Dê um nome ao trabalho.');
@@ -50,6 +51,24 @@ const Home = () => {
     setNewFwLocal('');
     setNewFwDate(new Date().toISOString().split('T')[0]); 
   };
+
+  // Lógica de busca global unificada
+  const filteredFieldWorks = searchQuery 
+    ? fieldWorks.filter(fw => 
+        fw.nome.toLowerCase().includes(searchQuery.toLowerCase()) || 
+        (fw.local && fw.local.toLowerCase().includes(searchQuery.toLowerCase()))
+      )
+    : [];
+
+  const filteredTalhoes = searchQuery 
+    ? talhoes.filter(t => t.nome.toLowerCase().includes(searchQuery.toLowerCase()))
+    : [];
+
+  const filteredInventories = searchQuery 
+    ? inventories.filter(inv => inv.nome.toLowerCase().includes(searchQuery.toLowerCase()))
+    : [];
+
+  const hasSearchResults = filteredFieldWorks.length > 0 || filteredTalhoes.length > 0 || filteredInventories.length > 0;
   
   return (
     <div className="container" style={{ marginTop: '20px' }}>
@@ -73,29 +92,201 @@ const Home = () => {
         </div>
       </div>
 
-      <button className="btn btn-primary" style={{ margin: '0 0 24px', position: 'sticky', top: '16px', zIndex: 100 }} onClick={() => setShowModal(true)}>
-        + Novo Trabalho de Campo
-      </button>
-      
-      {fieldWorks.length === 0 ? (
-        <div className="glass-card" style={{ textAlign: 'center', padding: '40px' }}>
-          <h3 style={{ color: 'var(--text-muted)' }}>Nenhum projeto encontrado</h3>
-          <p style={{ color: '#666', marginTop: '8px' }}>Crie seu primeiro trabalho de campo!</p>
+      {/* Barra de Pesquisa Global */}
+      <div style={{ position: 'relative', marginBottom: '24px' }}>
+        <input
+          type="text"
+          className="input-field"
+          style={{ 
+            marginBottom: 0, 
+            paddingLeft: '44px', 
+            borderRadius: '12px',
+            fontSize: '15px'
+          }}
+          placeholder="Pesquisar trabalhos, talões ou parcelas..."
+          value={searchQuery}
+          onChange={e => setSearchQuery(e.target.value)}
+        />
+        <svg 
+          xmlns="http://www.w3.org/2000/svg" 
+          width="18" 
+          height="18" 
+          viewBox="0 0 24 24" 
+          fill="none" 
+          stroke="var(--text-muted)" 
+          strokeWidth="2.5" 
+          strokeLinecap="round" 
+          strokeLinejoin="round"
+          style={{
+            position: 'absolute',
+            left: '16px',
+            top: '50%',
+            transform: 'translateY(-50%)',
+            pointerEvents: 'none'
+          }}
+        >
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+      </div>
+
+      {searchQuery ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '24px' }}>
+          <h3 style={{ fontSize: '13px', color: 'var(--primary-hover)', fontWeight: '800', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '1px' }}>
+            Resultados da Pesquisa
+          </h3>
+
+          {!hasSearchResults ? (
+            <div className="glass-card" style={{ textAlign: 'center', padding: '30px' }}>
+              <span style={{ fontSize: '14.5px', color: 'var(--text-muted)' }}>Nenhum resultado encontrado para "{searchQuery}"</span>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {/* Resultados de Projetos/Trabalhos */}
+              {filteredFieldWorks.map(fw => (
+                <div 
+                  key={`fw-${fw.id}`} 
+                  className="glass-card" 
+                  style={{ 
+                    padding: '18px 20px', 
+                    marginBottom: 0, 
+                    cursor: 'pointer',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}
+                  onClick={() => navigate(`/fieldwork/${fw.id}`)}
+                >
+                  <div>
+                    <h4 style={{ fontSize: '15px', margin: 0, fontWeight: '800', color: '#ffffff' }}>{fw.nome}</h4>
+                    <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Local: {fw.local}</span>
+                  </div>
+                  <span style={{ 
+                    background: 'rgba(46, 125, 50, 0.15)', 
+                    border: '1px solid rgba(46, 125, 50, 0.45)', 
+                    borderRadius: '8px', 
+                    padding: '5px 10px', 
+                    fontSize: '9.5px', 
+                    fontWeight: '800',
+                    color: 'var(--primary-hover)',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}>
+                    Trabalho
+                  </span>
+                </div>
+              ))}
+
+              {/* Resultados de Talhões */}
+              {filteredTalhoes.map(t => {
+                const parentFw = fieldWorks.find(f => f.id === t.fieldWorkId);
+                return (
+                  <div 
+                    key={`t-${t.id}`} 
+                    className="glass-card" 
+                    style={{ 
+                      padding: '18px 20px', 
+                      marginBottom: 0, 
+                      cursor: 'pointer',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center'
+                    }}
+                    onClick={() => navigate(`/fieldwork/${t.fieldWorkId}`)}
+                  >
+                    <div>
+                      <h4 style={{ fontSize: '15px', margin: 0, fontWeight: '800', color: '#ffffff' }}>{t.nome}</h4>
+                      <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                        Trabalho: {parentFw?.nome || 'Desconhecido'}
+                      </span>
+                    </div>
+                    <span style={{ 
+                      background: 'rgba(0, 188, 212, 0.15)', 
+                      border: '1px solid rgba(0, 188, 212, 0.45)', 
+                      borderRadius: '8px', 
+                      padding: '5px 10px', 
+                      fontSize: '9.5px', 
+                      fontWeight: '800',
+                      color: '#00bcd4',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px'
+                    }}>
+                      Talhão
+                    </span>
+                  </div>
+                );
+              })}
+
+              {/* Resultados de Parcelas */}
+              {filteredInventories.map(inv => {
+                const parentFw = fieldWorks.find(f => f.id === inv.fieldWorkId);
+                const parentTalhao = talhoes.find(st => st.id === inv.talhaoId);
+                return (
+                  <div 
+                    key={`inv-${inv.id}`} 
+                    className="glass-card" 
+                    style={{ 
+                      padding: '18px 20px', 
+                      marginBottom: 0, 
+                      cursor: 'pointer',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center'
+                    }}
+                    onClick={() => navigate(`/detail/${inv.id}`)}
+                  >
+                    <div>
+                      <h4 style={{ fontSize: '15px', margin: 0, fontWeight: '800', color: '#ffffff' }}>{inv.nome}</h4>
+                      <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                        {parentFw?.nome || 'Trabalho'} {parentTalhao ? ` / ${parentTalhao.nome}` : ''}
+                      </span>
+                    </div>
+                    <span style={{ 
+                      background: 'rgba(255, 152, 0, 0.15)', 
+                      border: '1px solid rgba(255, 152, 0, 0.45)', 
+                      borderRadius: '8px', 
+                      padding: '5px 10px', 
+                      fontSize: '9.5px', 
+                      fontWeight: '800',
+                      color: '#ff9800',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px'
+                    }}>
+                      Parcela
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       ) : (
-        <div className="inventory-list">
-          {fieldWorks.map(fw => (
-            <div 
-              key={fw.id} 
-              className="inventory-card" 
-              onClick={() => navigate(`/fieldwork/${fw.id}`)}
-            >
-              <div className="inventory-card-title">{fw.nome}</div>
-              <div className="inventory-card-info">Local: {fw.local}</div>
-              <div className="inventory-card-info">Data: {fw.dataInicio}</div>
+        <>
+          <button className="btn btn-primary" style={{ margin: '0 0 24px', position: 'sticky', top: '16px', zIndex: 100 }} onClick={() => setShowModal(true)}>
+            + Novo Trabalho de Campo
+          </button>
+          
+          {fieldWorks.length === 0 ? (
+            <div className="glass-card" style={{ textAlign: 'center', padding: '40px' }}>
+              <h3 style={{ color: 'var(--text-muted)' }}>Nenhum projeto encontrado</h3>
+              <p style={{ color: '#666', marginTop: '8px' }}>Crie seu primeiro trabalho de campo!</p>
             </div>
-          ))}
-        </div>
+          ) : (
+            <div className="inventory-list">
+              {fieldWorks.map(fw => (
+                <div 
+                  key={fw.id} 
+                  className="inventory-card" 
+                  onClick={() => navigate(`/fieldwork/${fw.id}`)}
+                >
+                  <div className="inventory-card-title">{fw.nome}</div>
+                  <div className="inventory-card-info">Local: {fw.local}</div>
+                  <div className="inventory-card-info">Data: {fw.dataInicio}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       {showModal && (
