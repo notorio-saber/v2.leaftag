@@ -27,8 +27,10 @@ export const InventorySetup = () => {
   const [area, setArea] = useState('');
   
   // Calculadora de área
+  const [formatoParcela, setFormatoParcela] = useState<'retangular' | 'circular'>('retangular');
   const [comprimento, setComprimento] = useState('');
   const [largura, setLargura] = useState('');
+  const [raio, setRaio] = useState('');
   const [showCalc, setShowCalc] = useState(false);
 
   const [selectedTemplate, setSelectedTemplate] = useState('custom');
@@ -79,6 +81,7 @@ export const InventorySetup = () => {
       fieldWorkId,
       talhaoId,
       nome,
+      formatoParcela,
       areaParcela: parseFloat(area) || 0,
       fatorExpansao: parseFloat(area) > 0 ? 10000 / parseFloat(area) : 1,
       dataInicio: new Date().toLocaleDateString('pt-BR'),
@@ -108,6 +111,40 @@ export const InventorySetup = () => {
         <label className="input-label">Nome ou Número da Parcela</label>
         <input className="input-field" value={nome} onChange={e => setNome(e.target.value)} placeholder="Ex: Parcela 01, P-04" />
 
+        <label className="input-label" style={{ marginTop: '12px' }}>Formato da Parcela</label>
+        <div style={{ display: 'flex', gap: '12px', marginBottom: '20px' }}>
+          <button
+            type="button"
+            className="btn"
+            onClick={() => {
+              setFormatoParcela('retangular');
+            }}
+            style={{
+              flex: 1,
+              background: formatoParcela === 'retangular' ? 'rgba(46, 125, 50, 0.2)' : 'rgba(255,255,255,0.02)',
+              border: formatoParcela === 'retangular' ? '1px solid var(--primary-hover)' : '1px solid rgba(255,255,255,0.1)',
+              color: formatoParcela === 'retangular' ? 'var(--primary-hover)' : 'white'
+            }}
+          >
+            Retangular
+          </button>
+          <button
+            type="button"
+            className="btn"
+            onClick={() => {
+              setFormatoParcela('circular');
+            }}
+            style={{
+              flex: 1,
+              background: formatoParcela === 'circular' ? 'rgba(46, 125, 50, 0.2)' : 'rgba(255,255,255,0.02)',
+              border: formatoParcela === 'circular' ? '1px solid var(--primary-hover)' : '1px solid rgba(255,255,255,0.1)',
+              color: formatoParcela === 'circular' ? 'var(--primary-hover)' : 'white'
+            }}
+          >
+            Circular
+          </button>
+        </div>
+
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
           <label className="input-label" style={{ marginBottom: 0 }}>Área da Parcela (m²)</label>
           <button 
@@ -116,14 +153,12 @@ export const InventorySetup = () => {
             style={{ padding: '4px 12px', fontSize: '10px', width: 'auto' }}
             onClick={() => setShowCalc(!showCalc)}
           >
-            {showCalc ? 'Ocultar Calculadora' : 'Calcular por Comprimento x Largura'}
+            {showCalc ? 'Ocultar Calculadora' : 'Calcular Área'}
           </button>
         </div>
         
         {showCalc && (
           <div style={{ 
-            display: 'flex', 
-            gap: '12px', 
             marginTop: '8px', 
             marginBottom: '16px', 
             background: 'rgba(0,0,0,0.25)', 
@@ -131,22 +166,38 @@ export const InventorySetup = () => {
             borderRadius: '12px',
             border: '1px solid rgba(255,255,255,0.06)'
           }}>
-            <div style={{ flex: 1 }}>
-              <label style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Comprimento (m)</label>
-              <input type="number" className="input-field" style={{ marginBottom: 0, marginTop: '4px' }} value={comprimento} onChange={e => {
-                setComprimento(e.target.value);
-                const a = parseFloat(e.target.value) * parseFloat(largura || '0');
-                if (a > 0) setArea(a.toString());
-              }} placeholder="0.0" />
-            </div>
-            <div style={{ flex: 1 }}>
-              <label style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Largura (m)</label>
-              <input type="number" className="input-field" style={{ marginBottom: 0, marginTop: '4px' }} value={largura} onChange={e => {
-                setLargura(e.target.value);
-                const a = parseFloat(comprimento || '0') * parseFloat(e.target.value);
-                if (a > 0) setArea(a.toString());
-              }} placeholder="0.0" />
-            </div>
+            {formatoParcela === 'retangular' ? (
+              <div style={{ display: 'flex', gap: '12px', width: '100%' }}>
+                <div style={{ flex: 1 }}>
+                  <label style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Comprimento (m)</label>
+                  <input type="number" className="input-field" style={{ marginBottom: 0, marginTop: '4px' }} value={comprimento} onChange={e => {
+                    setComprimento(e.target.value);
+                    const a = parseFloat(e.target.value) * parseFloat(largura || '0');
+                    if (a > 0) setArea(a.toFixed(2));
+                  }} placeholder="0.0" />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Largura (m)</label>
+                  <input type="number" className="input-field" style={{ marginBottom: 0, marginTop: '4px' }} value={largura} onChange={e => {
+                    setLargura(e.target.value);
+                    const a = parseFloat(comprimento || '0') * parseFloat(e.target.value);
+                    if (a > 0) setArea(a.toFixed(2));
+                  }} placeholder="0.0" />
+                </div>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
+                <label style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Raio (m)</label>
+                <input type="number" className="input-field" style={{ marginBottom: 0, marginTop: '4px' }} value={raio} onChange={e => {
+                  setRaio(e.target.value);
+                  const r = parseFloat(e.target.value);
+                  if (r > 0) {
+                    const a = Math.PI * Math.pow(r, 2);
+                    setArea(a.toFixed(2));
+                  }
+                }} placeholder="0.0" />
+              </div>
+            )}
           </div>
         )}
 

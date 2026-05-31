@@ -48,4 +48,5 @@ export interface Inventory {
   colunas: InventoryColumn[];
   dados: IndividualData[];
   template: string;
+  formatoParcela?: string;
 }
