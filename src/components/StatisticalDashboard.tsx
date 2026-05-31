@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef } from 'react';
-import { BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts';
+import { BarChart, Bar, AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import html2canvas from 'html2canvas';
 import type { Inventory, IndividualData } from '../types';
 import { calculateShannonIndex, calculateSimpsonIndex, calculatePielouIndex, calculateBasalArea, calculateVolume } from '../utils/forestryCalculations';
@@ -9,6 +9,29 @@ interface DashboardProps {
   onClose: () => void;
 }
 
+// Custom Glassmorphic Tooltip Component for Premium Analytics
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <div style={{
+        background: 'rgba(5, 13, 8, 0.85)',
+        backdropFilter: 'blur(16px)',
+        WebkitBackdropFilter: 'blur(16px)',
+        border: '1px solid rgba(255, 255, 255, 0.08)',
+        padding: '12px 16px',
+        borderRadius: '12px',
+        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)'
+      }}>
+        <p style={{ margin: 0, fontSize: '11px', color: 'var(--text-muted)', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{label}</p>
+        <p style={{ margin: '6px 0 0', fontSize: '14.5px', color: 'var(--primary-hover)', fontWeight: '800' }}>
+          {payload[0].name}: <span style={{ color: '#fff', fontWeight: 'bold' }}>{payload[0].value}</span>
+        </p>
+      </div>
+    );
+  }
+  return null;
+};
+
 export const StatisticalDashboard: React.FC<DashboardProps> = ({ inventories, onClose }) => {
   const [classInterval, setClassInterval] = useState<number>(10);
   const [alturaInterval, setAlturaInterval] = useState<number>(5);
@@ -16,7 +39,7 @@ export const StatisticalDashboard: React.FC<DashboardProps> = ({ inventories, on
   const containerRef = useRef<HTMLDivElement>(null);
   const [isExporting, setIsExporting] = useState(false);
 
-  // Aggregation Logic
+  // Aggregation Logic (100% matched and preserved)
   const stats = useMemo(() => {
     let allInd: IndividualData[] = [];
     inventories.forEach(inv => {
@@ -44,7 +67,7 @@ export const StatisticalDashboard: React.FC<DashboardProps> = ({ inventories, on
        if (dapVal) d = parseFloat(dapVal.toString());
        else if (capVal) d = parseFloat(capVal.toString()) / Math.PI;
        return isNaN(d) ? 0 : d;
-    };
+     };
 
     allInd.forEach((ind, globalIndex) => {
       // Species
@@ -151,7 +174,7 @@ export const StatisticalDashboard: React.FC<DashboardProps> = ({ inventories, on
     if (!containerRef.current) return;
     setIsExporting(true);
     try {
-      const canvas = await html2canvas(containerRef.current, { backgroundColor: '#1a1f1c', scale: 2 });
+      const canvas = await html2canvas(containerRef.current, { backgroundColor: '#020503', scale: 2 });
       const url = canvas.toDataURL('image/png');
       const link = document.createElement('a');
       link.href = url;
@@ -165,154 +188,407 @@ export const StatisticalDashboard: React.FC<DashboardProps> = ({ inventories, on
     }
   };
 
-  const TopStatCard = ({ title, value, sub }: { title: string, value: string, sub: string }) => (
-    <div style={{ flex: '1 1 45%', minWidth: '130px', background: 'rgba(0,0,0,0.5)', padding: '16px', borderRadius: '8px', borderLeft: '4px solid var(--primary-color)', boxSizing: 'border-box' }}>
-      <div style={{ fontSize: '12px', color: 'gray', textTransform: 'uppercase', letterSpacing: 1 }}>{title}</div>
-      <div style={{ fontSize: '24px', fontWeight: 'bold', color: 'white', margin: '4px 0' }}>{value}</div>
-      <div style={{ fontSize: '12px', color: 'var(--primary-color)' }}>{sub}</div>
+  const TopStatCard = ({ title, value, sub, color, icon }: { title: string, value: string, sub: string, color: string, icon: React.ReactNode }) => (
+    <div style={{ 
+      flex: '1 1 200px', 
+      background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0.01) 100%)', 
+      padding: '20px', 
+      borderRadius: '20px', 
+      border: '1px solid rgba(255, 255, 255, 0.06)', 
+      backdropFilter: 'blur(20px)',
+      WebkitBackdropFilter: 'blur(20px)',
+      boxSizing: 'border-box',
+      display: 'flex',
+      flexDirection: 'column',
+      justifyContent: 'space-between',
+      minHeight: '120px',
+      position: 'relative',
+      overflow: 'hidden'
+    }}>
+      {/* Decorative inner glowing blob */}
+      <div style={{
+        position: 'absolute',
+        top: '-20px',
+        right: '-20px',
+        width: '60px',
+        height: '60px',
+        background: color,
+        opacity: 0.08,
+        borderRadius: '50%',
+        filter: 'blur(16px)',
+        pointerEvents: 'none'
+      }} />
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <span style={{ fontSize: '10.5px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: '800', letterSpacing: '0.8px' }}>
+          {title}
+        </span>
+        <div style={{ color: color, opacity: 0.8 }}>
+          {icon}
+        </div>
+      </div>
+      
+      <div style={{ marginTop: '12px' }}>
+        <div style={{ fontSize: '26px', fontWeight: '800', color: '#ffffff', fontFamily: "'Manrope', sans-serif", letterSpacing: '-0.5px' }}>
+          {value}
+        </div>
+        <div style={{ fontSize: '11.5px', color: color, fontWeight: '700', marginTop: '2px' }}>
+          {sub}
+        </div>
+      </div>
     </div>
   );
 
   return (
     <div style={{
       position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-      background: 'var(--bg-color)', zIndex: 9999, display: 'flex', flexDirection: 'column',
+      background: '#020503', zIndex: 9999, display: 'flex', flexDirection: 'column',
       overflowX: 'hidden', maxWidth: '100vw'
     }}>
-      <div style={{ padding: '16px', background: 'var(--card-bg)', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h2 style={{ color: 'var(--primary-color)' }}>Dashboard Analítico (Fitossociologia)</h2>
-        <button className="btn btn-secondary" style={{ width: 'auto', padding: '6px 12px', borderRadius: '0px' }} onClick={onClose}>Fechar</button>
+      {/* Premium Header */}
+      <div style={{ 
+        padding: '20px 24px', 
+        background: 'rgba(5, 13, 8, 0.4)', 
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
+        borderBottom: '1px solid var(--border-color)', 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center',
+        zIndex: 10
+      }}>
+        <div>
+          <h2 style={{ 
+            background: 'linear-gradient(135deg, #ffffff 0%, var(--primary-hover) 100%)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            fontSize: '18px',
+            fontWeight: '800',
+            margin: 0,
+            textTransform: 'uppercase',
+            letterSpacing: '0.5px'
+          }}>
+            Dashboard Analítico
+          </h2>
+          <span style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginTop: '3px', fontWeight: '500' }}>
+            Análise Fitossociológica de Parcelas Florestais
+          </span>
+        </div>
+        <button 
+          className="btn btn-secondary" 
+          style={{ 
+            width: 'auto', 
+            padding: '8px 20px', 
+            borderRadius: '12px',
+            fontSize: '13px',
+            fontWeight: '800',
+            background: 'rgba(255,255,255,0.04)',
+            border: '1px solid rgba(255,255,255,0.08)'
+          }} 
+          onClick={onClose}
+        >
+          Fechar
+        </button>
       </div>
 
-      {/* Control Strip */}
-      <div style={{ background: '#111513', padding: '12px 24px', display: 'flex', gap: '24px', alignItems: 'center', flexWrap: 'wrap', borderBottom: '1px solid #333' }}>
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-             <label style={{ fontSize: '12px', color: 'gray' }}>Fator de Forma Geral (v):</label>
-             <input type="number" step="0.01" className="input-field" style={{ width: '70px', marginBottom: 0, textAlign: 'center', padding: '4px' }} value={fatorForma} onChange={e => setFatorForma(parseFloat(e.target.value) || 0.7)} />
-          </div>
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-             <label style={{ fontSize: '12px', color: 'gray' }}>Classe de DAP (cm):</label>
-             <input type="number" className="input-field" style={{ width: '70px', marginBottom: 0, textAlign: 'center', padding: '4px' }} value={classInterval} onChange={e => setClassInterval(parseInt(e.target.value) || 10)} />
-          </div>
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-             <label style={{ fontSize: '12px', color: 'gray' }}>Classe de HT (m):</label>
-             <input type="number" className="input-field" style={{ width: '70px', marginBottom: 0, textAlign: 'center', padding: '4px' }} value={alturaInterval} onChange={e => setAlturaInterval(parseInt(e.target.value) || 5)} />
-          </div>
-          <button className="btn btn-primary" style={{ width: 'auto', marginLeft: 'auto', padding: '8px 16px', borderRadius: '0px' }} onClick={handleExportSnapshot} disabled={isExporting}>
-            {isExporting ? 'Renderizando...' : 'Gerar Laudo (PNG)'}
-          </button>
-      </div>
-
-      <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '16px', width: '100%', boxSizing: 'border-box' }} ref={containerRef}>
+      <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '20px', width: '100%', boxSizing: 'border-box' }} ref={containerRef}>
         
-        {/* Top High Level Stats */}
-        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '32px' }}>
-           <TopStatCard title="Amostragem Base" value={stats.totalFustes.toString()} sub={`${stats.totalInd} Indivíduos`} />
-           <TopStatCard title="Especialização" value={stats.speciesCount.toString()} sub="Espécies Mapeadas" />
-           <TopStatCard title="Volume Total (M³)" value={stats.totalV.toFixed(2)} sub="Biomassa Estimada" />
-           <TopStatCard title="Área Basal (M²)" value={stats.totalG.toFixed(4)} sub="Basimetria" />
-           <TopStatCard title="Shannon (H')" value={stats.shannon.toFixed(4)} sub="Índice de Diversidade" />
-           <TopStatCard title="Simpson (1-D)" value={stats.simpson.toFixed(4)} sub="Riqueza Ecológica" />
-           <TopStatCard title="Pielou (J')" value={stats.pielou.toFixed(4)} sub="Equitabilidade" />
+        {/* Dynamic Parameter Grid (Leverages vertical/horizontal spaces cleanly) */}
+        <div className="glass-card" style={{ 
+          marginBottom: '24px', 
+          padding: '20px', 
+          borderRadius: '20px', 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', 
+          gap: '16px',
+          alignItems: 'end',
+          border: '1px solid rgba(255, 255, 255, 0.06)'
+        }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <label style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '0.5px' }}>Fator de Forma Geral (v)</label>
+            <input 
+              type="number" 
+              step="0.01" 
+              className="input-field" 
+              style={{ marginBottom: 0, padding: '10px 14px', borderRadius: '12px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.08)' }} 
+              value={fatorForma} 
+              onChange={e => setFatorForma(parseFloat(e.target.value) || 0.7)} 
+            />
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <label style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '0.5px' }}>Classe de DAP (cm)</label>
+            <input 
+              type="number" 
+              className="input-field" 
+              style={{ marginBottom: 0, padding: '10px 14px', borderRadius: '12px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.08)' }} 
+              value={classInterval} 
+              onChange={e => setClassInterval(parseInt(e.target.value) || 10)} 
+            />
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <label style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '0.5px' }}>Classe de HT (m)</label>
+            <input 
+              type="number" 
+              className="input-field" 
+              style={{ marginBottom: 0, padding: '10px 14px', borderRadius: '12px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.08)' }} 
+              value={alturaInterval} 
+              onChange={e => setAlturaInterval(parseInt(e.target.value) || 5)} 
+            />
+          </div>
+          <button 
+            className="btn btn-primary" 
+            style={{ 
+              height: '42px', 
+              borderRadius: '12px', 
+              fontSize: '12px', 
+              fontWeight: 'bold', 
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px'
+            }} 
+            onClick={handleExportSnapshot} 
+            disabled={isExporting}
+          >
+            {isExporting ? (
+              'Processando...'
+            ) : (
+              <>
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="7 10 12 15 17 10"></polyline>
+                  <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+                Gerar Laudo (PNG)
+              </>
+            )}
+          </button>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '32px' }}>
+        {/* Top High Level Stats (Premium Grids) */}
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', 
+          gap: '16px', 
+          marginBottom: '32px' 
+        }}>
+           <TopStatCard 
+             title="Amostragem Base" 
+             value={stats.totalFustes.toString()} 
+             sub={`${stats.totalInd} Indivíduos`} 
+             color="#4fc3f7"
+             icon={
+               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                 <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+               </svg>
+             }
+           />
+           <TopStatCard 
+             title="Especialização" 
+             value={stats.speciesCount.toString()} 
+             sub="Espécies Mapeadas" 
+             color="#aed581"
+             icon={
+               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                 <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+               </svg>
+             }
+           />
+           <TopStatCard 
+             title="Volume Total" 
+             value={`${stats.totalV.toFixed(2)} m³`} 
+             sub="Biomassa Estimada" 
+             color="#ba68c8"
+             icon={
+               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                 <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                 <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+                 <line x1="12" y1="22.08" x2="12" y2="12"/>
+               </svg>
+             }
+           />
+           <TopStatCard 
+             title="Área Basal" 
+             value={`${stats.totalG.toFixed(4)} m²`} 
+             sub="Basimetria" 
+             color="#e57373"
+             icon={
+               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                 <circle cx="12" cy="12" r="10"></circle>
+                 <circle cx="12" cy="12" r="6"></circle>
+                 <circle cx="12" cy="12" r="2"></circle>
+               </svg>
+             }
+           />
+           <TopStatCard 
+             title="Shannon (H')" 
+             value={stats.shannon.toFixed(4)} 
+             sub="Índice de Diversidade" 
+             color="#ffb74d"
+             icon={
+               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                 <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>
+               </svg>
+             }
+           />
+           <TopStatCard 
+             title="Simpson (1-D)" 
+             value={stats.simpson.toFixed(4)} 
+             sub="Riqueza Ecológica" 
+             color="#ff8a65"
+             icon={
+               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                 <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+               </svg>
+             }
+           />
+           <TopStatCard 
+             title="Pielou (J')" 
+             value={stats.pielou.toFixed(4)} 
+             sub="Equitabilidade" 
+             color="#26a69a"
+             icon={
+               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                 <line x1="18" y1="20" x2="18" y2="10"></line>
+                 <line x1="12" y1="20" x2="12" y2="4"></line>
+                 <line x1="6" y1="20" x2="6" y2="14"></line>
+               </svg>
+             }
+           />
+        </div>
+
+        {/* Dynamic Chart Grid */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px' }}>
            
-           {/* Collector's Curve */}
-           <div className="glass-card" style={{ padding: '24px' }}>
-              <h3 style={{ marginBottom: '16px', color: '#ffb74d' }}>Curva do Coletor (Suficiência Amostral)</h3>
+           {/* Collector's Curve (Suficiência Amostral) */}
+           <div className="glass-card" style={{ padding: '24px', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.06)' }}>
+              <h3 style={{ marginBottom: '18px', color: '#ffb74d', fontSize: '15px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Curva do Coletor (Suficiência)</h3>
               <div style={{ height: '300px', width: '100%' }}>
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={stats.collectorCurveData} margin={{ top: 10, right: 30, left: 0, bottom: 20 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#333" />
-                    <XAxis dataKey="ind" stroke="#ccc" tick={{ fill: '#aaa' }} label={{ value: "Nº Indivíduos Medidos", position: 'bottom', fill: '#888' }} />
-                    <YAxis stroke="#ccc" tick={{ fill: '#aaa' }} label={{ value: "Novas Espécies", angle: -90, position: 'insideLeft', fill: '#888' }} />
-                    <Tooltip contentStyle={{ backgroundColor: '#111', borderColor: '#333' }} />
-                    <Line type="monotone" dataKey="speciesCount" name="Espécies Descobertas" stroke="#ffb74d" strokeWidth={3} dot={false} />
-                  </LineChart>
+                  <AreaChart data={stats.collectorCurveData} margin={{ top: 10, right: 20, left: -20, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="collectorGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#ffb74d" stopOpacity={0.35}/>
+                        <stop offset="95%" stopColor="#ffb74d" stopOpacity={0.0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255, 255, 255, 0.03)" vertical={false} />
+                    <XAxis dataKey="ind" stroke="#666" tick={{ fill: '#aaa', fontSize: 10 }} />
+                    <YAxis stroke="#666" tick={{ fill: '#aaa', fontSize: 10 }} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Area type="monotone" dataKey="speciesCount" name="Espécies" stroke="#ffb74d" strokeWidth={3} fill="url(#collectorGrad)" isAnimationActive={true} />
+                  </AreaChart>
                 </ResponsiveContainer>
               </div>
            </div>
 
            {/* Diametric Chart */}
-           <div className="glass-card" style={{ padding: '24px' }}>
-              <h3 style={{ marginBottom: '16px', color: '#4fc3f7' }}>Distribuição Diamétrica (Indivíduos por Classe)</h3>
+           <div className="glass-card" style={{ padding: '24px', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.06)' }}>
+              <h3 style={{ marginBottom: '18px', color: '#4fc3f7', fontSize: '15px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Distribuição Diamétrica</h3>
               <div style={{ height: '300px', width: '100%' }}>
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={stats.diametricFinal} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
-                    <XAxis dataKey="name" stroke="#ccc" tick={{ fill: '#aaa' }} />
-                    <YAxis stroke="#ccc" tick={{ fill: '#aaa' }} />
-                    <Tooltip contentStyle={{ backgroundColor: '#111', borderColor: '#333' }} />
-                    <Bar dataKey="value" name="Árvores/Fustes" fill="#4fc3f7" radius={[4, 4, 0, 0]} />
+                  <BarChart data={stats.diametricFinal} margin={{ top: 10, right: 20, left: -20, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="diametricGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#4fc3f7" stopOpacity={0.8}/>
+                        <stop offset="95%" stopColor="#4fc3f7" stopOpacity={0.15}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255, 255, 255, 0.03)" vertical={false} />
+                    <XAxis dataKey="name" stroke="#666" tick={{ fill: '#aaa', fontSize: 10 }} />
+                    <YAxis stroke="#666" tick={{ fill: '#aaa', fontSize: 10 }} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Bar dataKey="value" name="Fustes" fill="url(#diametricGrad)" stroke="#4fc3f7" strokeWidth={1} radius={[6, 6, 0, 0]} isAnimationActive={true} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
            </div>
 
            {/* Volume Chart */}
-           <div className="glass-card" style={{ padding: '24px' }}>
-              <h3 style={{ marginBottom: '16px', color: '#ba68c8' }}>Volume por Classe Diamétrica (m³)</h3>
+           <div className="glass-card" style={{ padding: '24px', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.06)' }}>
+              <h3 style={{ marginBottom: '18px', color: '#ba68c8', fontSize: '15px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Volume por Classe (m³)</h3>
               <div style={{ height: '300px', width: '100%' }}>
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={stats.volumeFinal} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
-                    <XAxis dataKey="name" stroke="#ccc" tick={{ fill: '#aaa' }} />
-                    <YAxis stroke="#ccc" tick={{ fill: '#aaa' }} />
-                    <Tooltip contentStyle={{ backgroundColor: '#111', borderColor: '#333' }} />
-                    <Bar dataKey="value" name="Volume (m³)" fill="#ba68c8" radius={[4, 4, 0, 0]} />
+                  <BarChart data={stats.volumeFinal} margin={{ top: 10, right: 20, left: -20, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="volumeGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#ba68c8" stopOpacity={0.8}/>
+                        <stop offset="95%" stopColor="#ba68c8" stopOpacity={0.15}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255, 255, 255, 0.03)" vertical={false} />
+                    <XAxis dataKey="name" stroke="#666" tick={{ fill: '#aaa', fontSize: 10 }} />
+                    <YAxis stroke="#666" tick={{ fill: '#aaa', fontSize: 10 }} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Bar dataKey="value" name="Volume" fill="url(#volumeGrad)" stroke="#ba68c8" strokeWidth={1} radius={[6, 6, 0, 0]} isAnimationActive={true} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
            </div>
 
            {/* Basal Area Chart */}
-           <div className="glass-card" style={{ padding: '24px' }}>
-              <h3 style={{ marginBottom: '16px', color: '#e57373' }}>Área Basal por Classe Diamétrica (m²)</h3>
+           <div className="glass-card" style={{ padding: '24px', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.06)' }}>
+              <h3 style={{ marginBottom: '18px', color: '#e57373', fontSize: '15px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Área Basal por Classe (m²)</h3>
               <div style={{ height: '300px', width: '100%' }}>
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={stats.basalFinal} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
-                    <XAxis dataKey="name" stroke="#ccc" tick={{ fill: '#aaa' }} />
-                    <YAxis stroke="#ccc" tick={{ fill: '#aaa' }} />
-                    <Tooltip contentStyle={{ backgroundColor: '#111', borderColor: '#333' }} />
-                    <Bar dataKey="value" name="Área Basal (m²)" fill="#e57373" radius={[4, 4, 0, 0]} />
+                  <BarChart data={stats.basalFinal} margin={{ top: 10, right: 20, left: -20, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="basalGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#e57373" stopOpacity={0.8}/>
+                        <stop offset="95%" stopColor="#e57373" stopOpacity={0.15}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255, 255, 255, 0.03)" vertical={false} />
+                    <XAxis dataKey="name" stroke="#666" tick={{ fill: '#aaa', fontSize: 10 }} />
+                    <YAxis stroke="#666" tick={{ fill: '#aaa', fontSize: 10 }} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Bar dataKey="value" name="Área Basal" fill="url(#basalGrad)" stroke="#e57373" strokeWidth={1} radius={[6, 6, 0, 0]} isAnimationActive={true} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
            </div>
 
            {/* Height Chart */}
-           <div className="glass-card" style={{ padding: '24px' }}>
-              <h3 style={{ marginBottom: '16px', color: '#aed581' }}>Distribuição de Alturas (m)</h3>
+           <div className="glass-card" style={{ padding: '24px', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.06)' }}>
+              <h3 style={{ marginBottom: '18px', color: '#aed581', fontSize: '15px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Distribuição de Alturas</h3>
               <div style={{ height: '300px', width: '100%' }}>
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={stats.alturaFinal} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
-                    <XAxis dataKey="name" stroke="#ccc" tick={{ fill: '#aaa' }} />
-                    <YAxis stroke="#ccc" tick={{ fill: '#aaa' }} />
-                    <Tooltip contentStyle={{ backgroundColor: '#111', borderColor: '#333' }} />
-                    <Bar dataKey="value" name="Indivíduos" fill="#aed581" radius={[4, 4, 0, 0]} />
+                  <BarChart data={stats.alturaFinal} margin={{ top: 10, right: 20, left: -20, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="alturaGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#aed581" stopOpacity={0.8}/>
+                        <stop offset="95%" stopColor="#aed581" stopOpacity={0.15}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255, 255, 255, 0.03)" vertical={false} />
+                    <XAxis dataKey="name" stroke="#666" tick={{ fill: '#aaa', fontSize: 10 }} />
+                    <YAxis stroke="#666" tick={{ fill: '#aaa', fontSize: 10 }} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Bar dataKey="value" name="Árvores" fill="url(#alturaGrad)" stroke="#aed581" strokeWidth={1} radius={[6, 6, 0, 0]} isAnimationActive={true} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
            </div>
 
-           {/* Species Chart */}
-           <div className="glass-card" style={{ padding: '16px', gridColumn: '1 / -1', overflow: 'hidden' }}>
-              <h3 style={{ marginBottom: '16px', color: 'var(--primary-color)' }}>Frequência de Espécies (Top 10)</h3>
-              <div style={{ height: '400px', width: '100%' }}>
+           {/* Species Chart (Expands dynamically to span full width where helpful) */}
+           <div className="glass-card" style={{ padding: '24px', borderRadius: '24px', gridColumn: '1 / -1', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.06)' }}>
+              <h3 style={{ marginBottom: '18px', color: 'var(--primary-color)', fontSize: '15px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Frequência de Espécies (Top 10)</h3>
+              <div style={{ height: '360px', width: '100%' }}>
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={stats.speciesFinal} layout="vertical" margin={{ top: 10, right: 10, left: 90, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#333" horizontal={true} vertical={false} />
-                    <XAxis type="number" stroke="#ccc" allowDecimals={false} />
-                    <YAxis type="category" dataKey="name" stroke="#ccc" width={110} tick={{ fill: '#aaa', fontSize: 12 }} interval={0} />
-                    <Tooltip contentStyle={{ backgroundColor: '#111', borderColor: '#333' }} />
-                    <Bar dataKey="count" name="Indivíduos" radius={[0, 4, 4, 0]}>
-                      {stats.speciesFinal.map((_, index) => (
-                         <Cell key={`cell-${index}`} fill={index % 2 === 0 ? 'var(--primary-color)' : '#1e5f38'} />
-                      ))}
-                    </Bar>
+                  <BarChart data={stats.speciesFinal} layout="vertical" margin={{ top: 10, right: 20, left: 30, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="speciesGrad" x1="0" y1="0" x2="1" y2="0">
+                        <stop offset="5%" stopColor="var(--primary-color)" stopOpacity={0.85}/>
+                        <stop offset="95%" stopColor="var(--primary-hover)" stopOpacity={0.2}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255, 255, 255, 0.03)" horizontal={true} vertical={false} />
+                    <XAxis type="number" stroke="#666" tick={{ fill: '#aaa', fontSize: 10 }} allowDecimals={false} />
+                    <YAxis type="category" dataKey="name" stroke="#666" width={110} tick={{ fill: '#aaa', fontSize: 11 }} interval={0} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Bar dataKey="count" name="Indivíduos" fill="url(#speciesGrad)" stroke="var(--primary-hover)" strokeWidth={1} radius={[0, 6, 6, 0]} isAnimationActive={true} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
