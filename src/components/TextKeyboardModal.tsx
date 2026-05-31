@@ -86,15 +86,15 @@ export const TextKeyboardModal: React.FC<TextKeyboardModalProps> = ({
       boxShadow: 'none',
       display: 'flex',
       flexDirection: 'column',
-      gap: '6px',
+      gap: '4px',
       boxSizing: 'border-box'
     }}>
       {/* Keyboard Keypad Layout */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', width: '100%' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '100%' }}>
         {/* Row 1 */}
         <div style={rowStyle}>
           {row1.map(char => (
-            <button key={char} type="button" style={keyStyle} onClick={() => handleKeyPress(char)}>
+            <button key={char} type="button" className="keyboard-key" style={keyStyle} onClick={() => handleKeyPress(char)}>
               {isUppercase ? char.toUpperCase() : char.toLowerCase()}
             </button>
           ))}
@@ -102,38 +102,38 @@ export const TextKeyboardModal: React.FC<TextKeyboardModalProps> = ({
 
         {/* Row 2 */}
         <div style={rowStyle}>
-          <div style={{ width: '2%' }} />
+          <div style={{ width: '1.5%' }} />
           {row2.map(char => (
-            <button key={char} type="button" style={keyStyle} onClick={() => handleKeyPress(char)}>
+            <button key={char} type="button" className="keyboard-key" style={keyStyle} onClick={() => handleKeyPress(char)}>
               {isUppercase ? char.toUpperCase() : char.toLowerCase()}
             </button>
           ))}
-          <div style={{ width: '2%' }} />
+          <div style={{ width: '1.5%' }} />
         </div>
 
         {/* Row 3 */}
         <div style={rowStyle}>
-          <button type="button" style={shiftKeyStyle(isUppercase)} onClick={() => setIsUppercase(!isUppercase)}>
+          <button type="button" className="keyboard-key" style={shiftKeyStyle(isUppercase)} onClick={() => setIsUppercase(!isUppercase)}>
             Caps
           </button>
           {row3.map(char => (
-            <button key={char} type="button" style={keyStyle} onClick={() => handleKeyPress(char)}>
+            <button key={char} type="button" className="keyboard-key" style={keyStyle} onClick={() => handleKeyPress(char)}>
               {isUppercase ? char.toUpperCase() : char.toLowerCase()}
             </button>
           ))}
-          <button type="button" style={actionKeyStyle('#ff4d6d', 'rgba(239, 35, 60, 0.1)', 'rgba(239, 35, 60, 0.35)')} onClick={handleBackspace}>
+          <button type="button" className="keyboard-key" style={actionKeyStyle('#ff4d6d', 'rgba(239, 35, 60, 0.1)', 'rgba(239, 35, 60, 0.35)')} onClick={handleBackspace}>
             Apagar
           </button>
         </div>
 
         {/* Row 4: Shortcuts and Space */}
         <div style={rowStyle}>
-          <button type="button" style={shortcutStyle} onClick={handleSpShort}>sp.</button>
-          <button type="button" style={shortcutStyle} onClick={handleCfShort}>cf.</button>
-          <button type="button" style={shortcutStyle} onClick={handleNiShort}>NI</button>
-          <button type="button" style={{ ...keyStyle, flex: 2, background: 'rgba(255, 255, 255, 0.08)' }} onClick={handleSpace}>Espaço</button>
-          <button type="button" style={clearStyle} onClick={handleClear}>Limpar</button>
-          <button type="button" style={confirmStyle} onClick={onConfirm}>Confirmar</button>
+          <button type="button" className="keyboard-key" style={shortcutStyle} onClick={handleSpShort}>sp.</button>
+          <button type="button" className="keyboard-key" style={shortcutStyle} onClick={handleCfShort}>cf.</button>
+          <button type="button" className="keyboard-key" style={shortcutStyle} onClick={handleNiShort}>NI</button>
+          <button type="button" className="keyboard-key" style={{ ...keyStyle, flex: 2, background: 'rgba(255, 255, 255, 0.08)' }} onClick={handleSpace}>Espaço</button>
+          <button type="button" className="keyboard-key" style={clearStyle} onClick={handleClear}>Limpar</button>
+          <button type="button" className="keyboard-key" style={confirmStyle} onClick={onConfirm}>Confirmar</button>
         </div>
       </div>
     </div>
@@ -143,16 +143,16 @@ export const TextKeyboardModal: React.FC<TextKeyboardModalProps> = ({
 const rowStyle: React.CSSProperties = {
   display: 'flex',
   justifyContent: 'center',
-  gap: '4px',
+  gap: '2px', /* Narrower gaps between letters to maximize size */
   width: '100%'
 };
 
 const keyStyle: React.CSSProperties = {
   flex: 1,
-  height: '48px', /* Taller keys */
+  height: '52px', /* Even taller keys */
   fontSize: '18px', /* Larger font */
   fontWeight: '700',
-  borderRadius: '12px', /* Arredondado 12px */
+  borderRadius: '12px',
   background: 'rgba(255, 255, 255, 0.04)',
   border: '1px solid rgba(255, 255, 255, 0.08)',
   color: 'white',

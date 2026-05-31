@@ -62,47 +62,47 @@ export const NumericKeyboardModal: React.FC<NumericKeyboardModalProps> = ({
       boxShadow: 'none',
       display: 'flex',
       flexDirection: 'column',
-      gap: '6px',
+      gap: '4px',
       boxSizing: 'border-box'
     }}>
       {/* Grid Keypad */}
       <div style={{ 
         display: 'grid', 
         gridTemplateColumns: 'repeat(3, 1fr)', 
-        gap: '6px',
+        gap: '4px',
         width: '100%'
       }}>
         {/* Row 1 */}
-        <button type="button" style={keyStyle} onClick={() => handleKeyPress('1')}>1</button>
-        <button type="button" style={keyStyle} onClick={() => handleKeyPress('2')}>2</button>
-        <button type="button" style={keyStyle} onClick={() => handleKeyPress('3')}>3</button>
+        <button type="button" className="keyboard-key" style={keyStyle} onClick={() => handleKeyPress('1')}>1</button>
+        <button type="button" className="keyboard-key" style={keyStyle} onClick={() => handleKeyPress('2')}>2</button>
+        <button type="button" className="keyboard-key" style={keyStyle} onClick={() => handleKeyPress('3')}>3</button>
 
         {/* Row 2 */}
-        <button type="button" style={keyStyle} onClick={() => handleKeyPress('4')}>4</button>
-        <button type="button" style={keyStyle} onClick={() => handleKeyPress('5')}>5</button>
-        <button type="button" style={keyStyle} onClick={() => handleKeyPress('6')}>6</button>
+        <button type="button" className="keyboard-key" style={keyStyle} onClick={() => handleKeyPress('4')}>4</button>
+        <button type="button" className="keyboard-key" style={keyStyle} onClick={() => handleKeyPress('5')}>5</button>
+        <button type="button" className="keyboard-key" style={keyStyle} onClick={() => handleKeyPress('6')}>6</button>
 
         {/* Row 3 */}
-        <button type="button" style={keyStyle} onClick={() => handleKeyPress('7')}>7</button>
-        <button type="button" style={keyStyle} onClick={() => handleKeyPress('8')}>8</button>
-        <button type="button" style={keyStyle} onClick={() => handleKeyPress('9')}>9</button>
+        <button type="button" className="keyboard-key" style={keyStyle} onClick={() => handleKeyPress('7')}>7</button>
+        <button type="button" className="keyboard-key" style={keyStyle} onClick={() => handleKeyPress('8')}>8</button>
+        <button type="button" className="keyboard-key" style={keyStyle} onClick={() => handleKeyPress('9')}>9</button>
 
         {/* Row 4 */}
-        <button type="button" style={specialKeyStyle} onClick={() => handleKeyPress(',')}>,</button>
-        <button type="button" style={keyStyle} onClick={() => handleKeyPress('0')}>0</button>
-        <button type="button" style={specialKeyStyle} onClick={() => handleKeyPress('.')}>.</button>
+        <button type="button" className="keyboard-key" style={specialKeyStyle} onClick={() => handleKeyPress(',')}>,</button>
+        <button type="button" className="keyboard-key" style={keyStyle} onClick={() => handleKeyPress('0')}>0</button>
+        <button type="button" className="keyboard-key" style={specialKeyStyle} onClick={() => handleKeyPress('.')}>.</button>
 
         {/* Row 5 */}
-        <button type="button" style={dangerKeyStyle} onClick={() => handleKeyPress('Apagar')}>Apagar</button>
-        <button type="button" style={clearKeyStyle} onClick={() => handleKeyPress('C')}>Limpar</button>
-        <button type="button" style={confirmKeyStyle} onClick={onConfirm}>Confirmar</button>
+        <button type="button" className="keyboard-key" style={dangerKeyStyle} onClick={() => handleKeyPress('Apagar')}>Apagar</button>
+        <button type="button" className="keyboard-key" style={clearKeyStyle} onClick={() => handleKeyPress('C')}>Limpar</button>
+        <button type="button" className="keyboard-key" style={confirmKeyStyle} onClick={onConfirm}>Confirmar</button>
       </div>
     </div>
   );
 };
 
 const keyStyle: React.CSSProperties = {
-  height: '58px', /* Taller keys */
+  height: '62px', /* Taller keys */
   fontSize: '22px', /* Larger font */
   fontWeight: '700',
   borderRadius: '12px',

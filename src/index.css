@@ -262,3 +262,15 @@ td {
   color: var(--text-main);
   padding: 12px 8px;
 }
+
+/* Custom interactive virtual keys active states */
+.keyboard-key {
+  transition: background 0.1s ease, border-color 0.1s ease, transform 0.08s ease !important;
+}
+
+.keyboard-key:active {
+  background: var(--primary-hover) !important;
+  border-color: var(--primary-hover) !important;
+  color: #ffffff !important;
+  transform: scale(0.92) !important;
+}

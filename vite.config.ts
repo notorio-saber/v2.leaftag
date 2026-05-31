@@ -12,8 +12,8 @@ export default defineConfig({
         name: 'LeafTag',
         short_name: 'LeafTag',
         description: 'Coleta rápida e eficiente de dados florestais',
-        theme_color: '#1a1f1c',
-        background_color: '#1a1f1c',
+        theme_color: '#020503',
+        background_color: '#020503',
         display: 'standalone',
         icons: [
           {

@@ -233,14 +233,30 @@ export const CollectData = () => {
       >
         {/* Wizard Header & Progress */}
         <div>
-          <div className="app-header" style={{ marginBottom: '12px' }}>
-            <div>
-              <h2 style={{ color: 'var(--primary-hover)', fontSize: '20px', fontWeight: '800' }}>{currentInventory.nome}</h2>
-              <span style={{ fontSize: '12.5px', color: 'var(--text-muted)' }}>Coleta em Andamento • Árvore #{currentIdx}</span>
+          <div className="app-header" style={{ marginBottom: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'nowrap' }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <h2 style={{ color: '#ffffff', fontSize: '17px', fontWeight: '800', margin: 0, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{currentInventory.nome}</h2>
+              <span style={{ fontSize: '12.5px', color: 'var(--text-muted)' }}>Coleta em Andamento</span>
             </div>
-            <button className="btn btn-secondary" style={{ width: 'auto', padding: '6px 12px', fontSize: '10px' }} onClick={() => navigate(`/fieldwork/${currentInventory.fieldWorkId}`)}>
-              Pausar
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+              <div style={{
+                background: 'rgba(46, 125, 50, 0.15)',
+                border: '1px solid rgba(46, 125, 50, 0.45)',
+                borderRadius: '8px',
+                padding: '5px 10px',
+                color: 'var(--primary-hover)',
+                fontWeight: '800',
+                fontSize: '14.5px',
+                fontFamily: "'Plus Jakarta Sans', sans-serif",
+                boxShadow: '0 0 10px rgba(46, 125, 50, 0.2)',
+                whiteSpace: 'nowrap'
+              }}>
+                Árvore #{currentIdx}
+              </div>
+              <button className="btn btn-secondary" style={{ width: 'auto', padding: '6px 10px', fontSize: '10px', height: '30px' }} onClick={() => navigate(`/fieldwork/${currentInventory.fieldWorkId}`)}>
+                Pausar
+              </button>
+            </div>
           </div>
 
           <div style={{ width: '100%', height: '4px', background: 'rgba(255,255,255,0.06)', borderRadius: '100px', overflow: 'hidden', marginBottom: '16px' }}>
