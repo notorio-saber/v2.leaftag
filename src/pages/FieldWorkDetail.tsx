@@ -20,8 +20,10 @@ export const FieldWorkDetail = () => {
   if (!fw) {
     return (
       <div className="container" style={{ marginTop: '20px', textAlign: 'center' }}>
-        <h2>Trabalho de Campo não encontrado</h2>
-        <button className="btn btn-primary" onClick={() => navigate('/')}>Voltar</button>
+        <div className="glass-card">
+          <h2>Trabalho de Campo não encontrado</h2>
+          <button className="btn btn-primary" style={{ marginTop: '16px' }} onClick={() => navigate('/')}>Voltar</button>
+        </div>
       </div>
     );
   }
@@ -100,21 +102,21 @@ export const FieldWorkDetail = () => {
           setCurrentInventory(inv);
           navigate(`/detail/${inv.id}`);
       }}
-      style={{ cursor: 'pointer', flex: '1 1 280px', minWidth: '260px' }}
+      style={{ cursor: 'pointer', flex: '1 1 240px' }}
     >
-      <div className="inventory-card-title">{inv.nome}</div>
-      <div className="inventory-stats" style={{ marginTop: '12px' }}>
+      <div className="inventory-card-title" style={{ fontSize: '17px' }}>{inv.nome}</div>
+      <div className="inventory-stats" style={{ marginTop: '10px', paddingTop: '10px' }}>
         <div className="stat-item">
-          <span className="stat-value">{inv.dados.length}</span>
-          <span className="stat-label">Indivíduos</span>
+          <span className="stat-value" style={{ fontSize: '18px' }}>{inv.dados.length}</span>
+          <span className="stat-label" style={{ fontSize: '8px' }}>Árvores</span>
         </div>
         <div className="stat-item">
-          <span className="stat-value">{inv.colunas.length}</span>
-          <span className="stat-label">Colunas</span>
+          <span className="stat-value" style={{ fontSize: '18px' }}>{inv.colunas.length}</span>
+          <span className="stat-label" style={{ fontSize: '8px' }}>Campos</span>
         </div>
         <div className="stat-item">
-          <span className="stat-value">{inv.areaParcela}</span>
-          <span className="stat-label">Área (m²)</span>
+          <span className="stat-value" style={{ fontSize: '18px' }}>{inv.areaParcela}</span>
+          <span className="stat-label" style={{ fontSize: '8px' }}>Área (m²)</span>
         </div>
       </div>
     </div>
@@ -125,24 +127,24 @@ export const FieldWorkDetail = () => {
       {/* Header */}
       <div className="app-header">
         <div>
-          <h1 style={{ color: 'var(--primary-color)' }}>{fw.nome}</h1>
-          <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Local: {fw.local} | Data: {fw.dataInicio}</p>
+          <h1 style={{ color: 'var(--primary-hover)', fontSize: '24px', fontWeight: '800' }}>{fw.nome}</h1>
+          <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginTop: '4px' }}>Local: {fw.local} | Data: {fw.dataInicio}</p>
         </div>
-        <button className="btn btn-secondary" style={{ width: 'auto', padding: '8px 16px', borderRadius: '0px' }} onClick={() => navigate('/')}>
+        <button className="btn btn-secondary" style={{ width: 'auto', padding: '10px 20px' }} onClick={() => navigate('/')}>
           Voltar
         </button>
       </div>
 
       {/* Action bar and summary */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '24px 0 16px', flexWrap: 'wrap', gap: '16px' }}>
-        <h2 style={{ fontSize: '18px' }}>Talhões ({fwTalhoes.length}) • Parcelas ({parcels.length})</h2>
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '28px 0 16px', flexWrap: 'wrap', gap: '16px' }}>
+        <h2 style={{ fontSize: '16px', fontWeight: '700', letterSpacing: '-0.02em' }}>Talhões ({fwTalhoes.length}) • Parcelas ({parcels.length})</h2>
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
           {parcels.length > 0 && (
-            <button className="btn btn-secondary" style={{ width: 'auto', padding: '8px 16px', borderRadius: '0px' }} onClick={handleExportAll}>
-               Baixar Todo Projeto
+            <button className="btn btn-secondary" style={{ width: 'auto', padding: '10px 18px' }} onClick={handleExportAll}>
+               Baixar Projeto
             </button>
           )}
-          <button className="btn btn-primary" style={{ width: 'auto', padding: '8px 16px', borderRadius: '0px' }} onClick={() => setShowTalhaoModal(true)}>
+          <button className="btn btn-primary" style={{ width: 'auto', padding: '10px 18px' }} onClick={() => setShowTalhaoModal(true)}>
             + Novo Talhão
           </button>
         </div>
@@ -150,11 +152,11 @@ export const FieldWorkDetail = () => {
       
       {/* GIS and Dashboard shortcuts */}
       {parcels.length > 0 && (
-        <div style={{ display: 'flex', gap: '8px', marginBottom: '32px' }}>
-          <button className="btn btn-secondary" style={{ flex: 1, borderColor: '#4fc3f7', color: '#4fc3f7', borderRadius: '0px' }} onClick={() => setShowMap(true)}>
+        <div style={{ display: 'flex', gap: '12px', marginBottom: '32px' }}>
+          <button className="btn btn-secondary" style={{ flex: 1, borderColor: '#009688', color: '#80cbc4', background: 'rgba(0, 150, 136, 0.08)' }} onClick={() => setShowMap(true)}>
             Ver Mapa GIS
           </button>
-          <button className="btn btn-secondary" style={{ flex: 1, borderColor: '#ffb74d', color: '#ffb74d', borderRadius: '0px' }} onClick={() => setShowDashboard(true)}>
+          <button className="btn btn-secondary" style={{ flex: 1, borderColor: '#2e7d32', color: '#a5d6a7', background: 'rgba(46, 125, 50, 0.08)' }} onClick={() => setShowDashboard(true)}>
             Ver Dashboard
           </button>
         </div>
@@ -162,48 +164,48 @@ export const FieldWorkDetail = () => {
 
       {/* Main Talhões hierarchical layout */}
       {fwTalhoes.length === 0 && legacyParcels.length === 0 ? (
-        <div className="glass-card" style={{ textAlign: 'center', padding: '40px' }}>
-          <h3 style={{ color: 'var(--text-muted)' }}>Nenhum talhão criado</h3>
-          <p style={{ color: '#666', marginTop: '8px' }}>Comece adicionando seu primeiro talhão de manejo!</p>
-          <button className="btn btn-primary" style={{ maxWidth: '240px', margin: '20px auto 0' }} onClick={() => setShowTalhaoModal(true)}>
-            + Criar Primeiro Talhão
+        <div className="glass-card" style={{ textAlign: 'center', padding: '48px 32px' }}>
+          <h3 style={{ color: 'var(--text-muted)', marginBottom: '8px' }}>Nenhum talhão criado</h3>
+          <p style={{ color: '#888', fontSize: '14px', marginBottom: '24px' }}>Comece adicionando seu primeiro talhão de manejo!</p>
+          <button className="btn btn-primary" style={{ maxWidth: '240px', margin: '0 auto' }} onClick={() => setShowTalhaoModal(true)}>
+            Criar Primeiro Talhão
           </button>
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
           {/* List all talhões */}
           {fwTalhoes.map(talhao => {
             const talhaoParcels = parcelsByTalhao.filter(p => p.talhaoId === talhao.id);
             return (
               <div 
                 key={talhao.id} 
+                className="glass-card"
                 style={{ 
-                  background: 'rgba(255,255,255,0.01)', 
-                  border: '1px solid var(--border-color)', 
-                  borderLeft: '4px solid var(--primary-color)',
+                  borderLeft: '4px solid var(--primary-color) !important',
                   padding: '24px',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '16px'
+                  gap: '16px',
+                  marginBottom: 0
                 }}
               >
                 {/* Talhao Header Block */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
                   <div>
-                    <h3 style={{ color: 'white', fontSize: '20px', fontWeight: 'bold' }}>{talhao.nome}</h3>
-                    <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{talhaoParcels.length} parcelas registradas</span>
+                    <h3 style={{ color: '#ffffff', fontSize: '18px', fontWeight: '800' }}>{talhao.nome}</h3>
+                    <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{talhaoParcels.length} parcelas cadastradas</span>
                   </div>
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <button 
                       className="btn btn-secondary" 
-                      style={{ width: 'auto', padding: '6px 12px', fontSize: '10px', borderRadius: '0px' }}
+                      style={{ width: 'auto', padding: '6px 12px', fontSize: '10px' }}
                       onClick={() => navigate(`/setup/${fw.id}/${talhao.id}`)}
                     >
                       + Nova Parcela
                     </button>
                     <button 
                       className="btn btn-danger" 
-                      style={{ width: 'auto', padding: '6px 12px', fontSize: '10px', borderRadius: '0px' }}
+                      style={{ width: 'auto', padding: '6px 12px', fontSize: '10px' }}
                       onClick={() => handleDeleteTalhao(talhao.id, talhao.nome)}
                     >
                       Excluir
@@ -211,15 +213,15 @@ export const FieldWorkDetail = () => {
                   </div>
                 </div>
 
-                <div className="divider-dashed" style={{ margin: '8px 0 16px' }}></div>
+                <div className="divider-dashed" style={{ margin: '6px 0 12px' }}></div>
 
                 {/* Talhao parcels grid */}
                 {talhaoParcels.length === 0 ? (
-                  <p style={{ color: 'var(--text-muted)', fontSize: '14px', fontStyle: 'italic', margin: '8px 0' }}>
+                  <p style={{ color: 'var(--text-muted)', fontSize: '13.5px', fontStyle: 'italic', margin: '4px 0' }}>
                     Nenhuma parcela cadastrada neste talhão. Clique em "+ Nova Parcela" acima.
                   </p>
                 ) : (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '16px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '16px' }}>
                     {talhaoParcels.map(renderParcelCard)}
                   </div>
                 )}
@@ -230,24 +232,24 @@ export const FieldWorkDetail = () => {
           {/* Legacy unassigned parcels block */}
           {legacyParcels.length > 0 && (
             <div 
+              className="glass-card"
               style={{ 
-                background: 'rgba(255,255,255,0.01)', 
-                border: '1px solid var(--border-color)', 
-                borderLeft: '4px solid #fbc02d', // Yellow indicator for legacy
+                borderLeft: '4px solid #fbc02d !important',
                 padding: '24px',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: '16px'
+                gap: '16px',
+                marginBottom: 0
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                  <h3 style={{ color: '#fbc02d', fontSize: '18px', fontWeight: 'bold' }}>Parcelas sem Talhão (Legado)</h3>
-                  <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Mapeadas antes da atualização dos talhões</span>
+                  <h3 style={{ color: '#fbc02d', fontSize: '17px', fontWeight: '800' }}>Parcelas sem Talhão (Legado)</h3>
+                  <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Cadastradas antes da atualização dos talhões</span>
                 </div>
               </div>
-              <div className="divider-dashed" style={{ margin: '8px 0 16px' }}></div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '16px' }}>
+              <div className="divider-dashed" style={{ margin: '6px 0 12px' }}></div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '16px' }}>
                 {legacyParcels.map(renderParcelCard)}
               </div>
             </div>
@@ -256,26 +258,26 @@ export const FieldWorkDetail = () => {
       )}
 
       {/* Delete Field Work button */}
-      <button className="btn btn-danger" style={{ marginTop: '40px', opacity: 0.8 }} onClick={handleDeleteFieldWork}>
+      <button className="btn btn-danger" style={{ marginTop: '36px', opacity: 0.8 }} onClick={handleDeleteFieldWork}>
         Excluir Trabalho de Campo Completo
       </button>
 
-      {/* Talhao Creation Modal */}
+      {/* Talhao Creation Modal (Rounded 24px) */}
       {showTalhaoModal && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
-           <div className="glass-card" style={{ width: '100%', maxWidth: '400px' }}>
-              <h3 style={{ color: 'var(--primary-color)' }}>Novo Talhão</h3>
-              <p style={{ color: 'var(--text-muted)', fontSize: '14px', marginTop: '8px' }}>
-                Crie um talhão para organizar suas parcelas de amostragem.
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.82)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
+           <div className="glass-card" style={{ width: '100%', maxWidth: '400px', marginBottom: 0 }}>
+              <h3 style={{ color: 'var(--primary-hover)', fontSize: '20px', fontWeight: '800' }}>Novo Talhão</h3>
+              <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginTop: '6px' }}>
+                Defina o nome do talhão para organizar as parcelas de amostragem florestal.
               </p>
               <input 
                 className="input-field" 
-                placeholder="Nome do Talhão (Ex: Talhão Sul, Quadra B)" 
+                placeholder="Ex: Talhão Leste, Quadra B" 
                 value={newTalhaoName} 
                 onChange={e => setNewTalhaoName(e.target.value)} 
-                style={{ marginTop: '24px' }} 
+                style={{ marginTop: '20px' }} 
               />
-              <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
+              <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
                 <button className="btn btn-secondary" onClick={() => { setShowTalhaoModal(false); setNewTalhaoName(''); }}>Cancelar</button>
                 <button className="btn btn-primary" onClick={handleCreateTalhao}>Criar</button>
               </div>

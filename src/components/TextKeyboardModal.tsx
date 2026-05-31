@@ -79,12 +79,13 @@ export const TextKeyboardModal: React.FC<TextKeyboardModalProps> = ({
       width: '100%',
       maxWidth: '520px',
       margin: '0 auto',
-      background: 'rgba(20, 25, 22, 0.65)',
-      backdropFilter: 'blur(12px)',
-      WebkitBackdropFilter: 'blur(12px)',
+      background: 'rgba(5, 10, 7, 0.7)',
+      backdropFilter: 'blur(16px)',
+      WebkitBackdropFilter: 'blur(16px)',
       border: '1px solid rgba(255, 255, 255, 0.08)',
+      borderRadius: '20px',
       padding: '12px',
-      boxShadow: '0 4px 30px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
+      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
       display: 'flex',
       flexDirection: 'column',
       gap: '6px',
@@ -103,13 +104,13 @@ export const TextKeyboardModal: React.FC<TextKeyboardModalProps> = ({
 
         {/* Row 2 */}
         <div style={rowStyle}>
-          <div style={{ width: '4%' }} />
+          <div style={{ width: '2%' }} />
           {row2.map(char => (
             <button key={char} type="button" style={keyStyle} onClick={() => handleKeyPress(char)}>
               {isUppercase ? char.toUpperCase() : char.toLowerCase()}
             </button>
           ))}
-          <div style={{ width: '4%' }} />
+          <div style={{ width: '2%' }} />
         </div>
 
         {/* Row 3 */}
@@ -122,7 +123,7 @@ export const TextKeyboardModal: React.FC<TextKeyboardModalProps> = ({
               {isUppercase ? char.toUpperCase() : char.toLowerCase()}
             </button>
           ))}
-          <button type="button" style={actionKeyStyle('#ef233c')} onClick={handleBackspace}>
+          <button type="button" style={actionKeyStyle('#ff4d6d', 'rgba(239, 35, 60, 0.1)', 'rgba(239, 35, 60, 0.35)')} onClick={handleBackspace}>
             Apagar
           </button>
         </div>
@@ -132,7 +133,7 @@ export const TextKeyboardModal: React.FC<TextKeyboardModalProps> = ({
           <button type="button" style={shortcutStyle} onClick={handleSpShort}>sp.</button>
           <button type="button" style={shortcutStyle} onClick={handleCfShort}>cf.</button>
           <button type="button" style={shortcutStyle} onClick={handleNiShort}>NI</button>
-          <button type="button" style={{ ...keyStyle, flex: 2, background: 'rgba(255,255,255,0.06)' }} onClick={handleSpace}>Espaco</button>
+          <button type="button" style={{ ...keyStyle, flex: 2, background: 'rgba(255, 255, 255, 0.08)' }} onClick={handleSpace}>Espaço</button>
           <button type="button" style={clearStyle} onClick={handleClear}>Limpar</button>
           <button type="button" style={confirmStyle} onClick={onConfirm}>Confirmar</button>
         </div>
@@ -151,10 +152,10 @@ const rowStyle: React.CSSProperties = {
 const keyStyle: React.CSSProperties = {
   flex: 1,
   height: '38px',
-  fontSize: '15px',
-  fontWeight: '600',
-  borderRadius: '0px',
-  background: 'rgba(255,255,255,0.03)',
+  fontSize: '14.5px',
+  fontWeight: '700',
+  borderRadius: '12px', /* Arredondado 12px */
+  background: 'rgba(255, 255, 255, 0.04)',
   border: '1px solid rgba(255, 255, 255, 0.08)',
   color: 'white',
   padding: 0,
@@ -164,46 +165,53 @@ const keyStyle: React.CSSProperties = {
   justifyContent: 'center',
   userSelect: 'none',
   outline: 'none',
-  transition: 'background 0.2s ease'
+  fontFamily: "'Plus Jakarta Sans', sans-serif",
+  transition: 'all 0.2s ease',
+  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)'
 };
 
 const shiftKeyStyle = (active: boolean): React.CSSProperties => ({
   ...keyStyle,
-  background: active ? 'var(--primary-color)' : 'rgba(255,255,255,0.06)',
-  color: 'white',
+  background: active ? 'rgba(46, 125, 50, 0.25)' : 'rgba(255, 255, 255, 0.06)',
+  border: active ? '1px solid rgba(46, 125, 50, 0.45)' : '1px solid rgba(255, 255, 255, 0.08)',
+  color: active ? '#a5d6a7' : 'white',
   fontWeight: 'bold',
-  fontSize: '12px',
-  flex: '1.2'
+  fontSize: '11px',
+  flex: '1.3'
 });
 
-const actionKeyStyle = (color: string): React.CSSProperties => ({
+const actionKeyStyle = (color: string, bg: string, border: string): React.CSSProperties => ({
   ...keyStyle,
   color,
-  background: 'rgba(255,255,255,0.01)',
-  fontSize: '12px',
-  flex: '1.5'
+  background: bg,
+  border: `1px solid ${border}`,
+  fontSize: '11px',
+  flex: '1.6'
 });
 
 const shortcutStyle: React.CSSProperties = {
   ...keyStyle,
-  background: 'rgba(46, 125, 50, 0.1)',
-  border: '1px solid rgba(46, 125, 50, 0.3)',
-  color: 'var(--primary-hover)',
-  fontSize: '13px',
+  background: 'rgba(46, 125, 50, 0.12)',
+  border: '1px solid rgba(46, 125, 50, 0.35)',
+  color: '#a5d6a7',
+  fontSize: '12px',
   fontWeight: 'bold'
 };
 
 const clearStyle: React.CSSProperties = {
   ...keyStyle,
-  fontSize: '12px',
+  fontSize: '11px',
+  background: 'rgba(255, 255, 255, 0.01)',
+  border: '1px solid rgba(255, 255, 255, 0.05)',
   color: 'var(--text-muted)'
 };
 
 const confirmStyle: React.CSSProperties = {
   ...keyStyle,
-  background: 'var(--primary-color)',
-  border: '1px solid var(--primary-color)',
+  background: 'rgba(46, 125, 50, 0.25)',
+  border: '1px solid rgba(46, 125, 50, 0.45)',
   color: 'white',
   fontWeight: 'bold',
-  fontSize: '12px'
+  fontSize: '11px',
+  boxShadow: '0 4px 10px rgba(46, 125, 50, 0.15)'
 };

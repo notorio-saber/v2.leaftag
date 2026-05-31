@@ -15,7 +15,6 @@ export const NumericKeyboardModal: React.FC<NumericKeyboardModalProps> = ({
 }) => {
   const handleKeyPress = (key: string) => {
     if (key === '.' || key === ',') {
-      // Prevent multiple decimals, store internally as '.'
       if (!value.includes('.')) {
         onChange(value === '' ? '0.' : value + '.');
       }
@@ -24,7 +23,6 @@ export const NumericKeyboardModal: React.FC<NumericKeyboardModalProps> = ({
     } else if (key === 'C') {
       onChange('');
     } else {
-      // Prevent multiple leading zeroes
       if (value === '0') {
         onChange(key);
       } else {
@@ -57,12 +55,13 @@ export const NumericKeyboardModal: React.FC<NumericKeyboardModalProps> = ({
       width: '100%',
       maxWidth: '480px',
       margin: '0 auto',
-      background: 'rgba(20, 25, 22, 0.65)',
-      backdropFilter: 'blur(12px)',
-      WebkitBackdropFilter: 'blur(12px)',
+      background: 'rgba(5, 10, 7, 0.7)',
+      backdropFilter: 'blur(16px)',
+      WebkitBackdropFilter: 'blur(16px)',
       border: '1px solid rgba(255, 255, 255, 0.08)',
+      borderRadius: '20px',
       padding: '12px',
-      boxShadow: '0 4px 30px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
+      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
       display: 'flex',
       flexDirection: 'column',
       gap: '8px',
@@ -72,7 +71,7 @@ export const NumericKeyboardModal: React.FC<NumericKeyboardModalProps> = ({
       <div style={{ 
         display: 'grid', 
         gridTemplateColumns: 'repeat(3, 1fr)', 
-        gap: '6px',
+        gap: '8px',
         width: '100%'
       }}>
         {/* Row 1 */}
@@ -106,43 +105,48 @@ export const NumericKeyboardModal: React.FC<NumericKeyboardModalProps> = ({
 
 const keyStyle: React.CSSProperties = {
   height: '46px',
-  fontSize: '20px',
-  fontWeight: '600',
-  borderRadius: '0px',
-  background: 'rgba(255,255,255,0.03)',
+  fontSize: '18px',
+  fontWeight: '700',
+  borderRadius: '12px', /* Arredondado 12px */
+  background: 'rgba(255, 255, 255, 0.04)',
   border: '1px solid rgba(255, 255, 255, 0.08)',
   color: 'white',
   padding: 0,
   cursor: 'pointer',
   outline: 'none',
-  transition: 'background 0.2s ease'
+  fontFamily: "'Plus Jakarta Sans', sans-serif",
+  transition: 'all 0.2s ease',
+  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)'
 };
 
 const specialKeyStyle: React.CSSProperties = {
   ...keyStyle,
-  background: 'rgba(255,255,255,0.01)',
+  background: 'rgba(255, 255, 255, 0.02)',
   color: 'var(--text-muted)'
 };
 
 const dangerKeyStyle: React.CSSProperties = {
   ...keyStyle,
-  fontSize: '14px',
-  border: '1px solid rgba(239, 35, 60, 0.2)',
-  color: '#ef233c'
+  fontSize: '13px',
+  background: 'rgba(239, 35, 60, 0.1)',
+  border: '1px solid rgba(239, 35, 60, 0.3)',
+  color: '#ff4d6d'
 };
 
 const clearKeyStyle: React.CSSProperties = {
   ...keyStyle,
-  fontSize: '14px',
-  border: '1px solid rgba(255, 255, 255, 0.1)',
+  fontSize: '13px',
+  background: 'rgba(255, 255, 255, 0.01)',
+  border: '1px solid rgba(255, 255, 255, 0.05)',
   color: 'var(--text-muted)'
 };
 
 const confirmKeyStyle: React.CSSProperties = {
   ...keyStyle,
-  fontSize: '14px',
+  fontSize: '13px',
   fontWeight: 'bold',
-  background: 'var(--primary-color)',
-  color: 'white',
-  border: '1px solid var(--primary-color)'
+  background: 'rgba(46, 125, 50, 0.25)',
+  color: '#ffffff',
+  border: '1px solid rgba(46, 125, 50, 0.45)',
+  boxShadow: '0 4px 10px rgba(46, 125, 50, 0.15)'
 };

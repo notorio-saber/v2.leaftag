@@ -59,7 +59,7 @@ export const InventorySetup = () => {
       return;
     }
     if (!nome || !area) {
-      alert('Por favor, preencha Nome e Área.');
+      alert('Por favor, preencha o Nome e a Área da Parcela.');
       return;
     }
     const finalCols: InventoryColumn[] = [
@@ -96,36 +96,52 @@ export const InventorySetup = () => {
 
   return (
     <div className="container" style={{ marginTop: '20px' }}>
-      <h2 style={{ color: 'var(--primary-color)' }}>Configurar Parcela</h2>
-      <div className="glass-card" style={{ marginTop: '16px' }}>
-        <label className="input-label">Nome/Número da Parcela</label>
-        <input className="input-field" value={nome} onChange={e => setNome(e.target.value)} placeholder="Ex: Parcela 01" />
+      {/* Header */}
+      <div className="app-header" style={{ marginBottom: '20px' }}>
+        <div>
+          <h2 style={{ color: 'var(--primary-hover)', fontSize: '22px', fontWeight: '800' }}>Configurar Parcela</h2>
+          <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Defina as colunas e os parâmetros da nova parcela florestal.</span>
+        </div>
+      </div>
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div className="glass-card" style={{ marginTop: '8px' }}>
+        <label className="input-label">Nome ou Número da Parcela</label>
+        <input className="input-field" value={nome} onChange={e => setNome(e.target.value)} placeholder="Ex: Parcela 01, P-04" />
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
           <label className="input-label" style={{ marginBottom: 0 }}>Área da Parcela (m²)</label>
           <button 
             type="button" 
             className="btn btn-secondary" 
-            style={{ padding: '2px 8px', fontSize: '12px', width: 'auto' }}
+            style={{ padding: '4px 12px', fontSize: '10px', width: 'auto' }}
             onClick={() => setShowCalc(!showCalc)}
           >
-            {showCalc ? 'Ocultar Calculadora' : 'Calcular L x L'}
+            {showCalc ? 'Ocultar Calculadora' : 'Calcular por Comprimento x Largura'}
           </button>
         </div>
         
         {showCalc && (
-          <div style={{ display: 'flex', gap: '8px', marginTop: '8px', marginBottom: '8px', background: '#252b28', padding: '12px', borderRadius: '8px' }}>
+          <div style={{ 
+            display: 'flex', 
+            gap: '12px', 
+            marginTop: '8px', 
+            marginBottom: '16px', 
+            background: 'rgba(0,0,0,0.25)', 
+            padding: '16px', 
+            borderRadius: '12px',
+            border: '1px solid rgba(255,255,255,0.06)'
+          }}>
             <div style={{ flex: 1 }}>
-              <label style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Comprimento (m)</label>
-              <input type="number" className="input-field" style={{ marginBottom: 0 }} value={comprimento} onChange={e => {
+              <label style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Comprimento (m)</label>
+              <input type="number" className="input-field" style={{ marginBottom: 0, marginTop: '4px' }} value={comprimento} onChange={e => {
                 setComprimento(e.target.value);
                 const a = parseFloat(e.target.value) * parseFloat(largura || '0');
                 if (a > 0) setArea(a.toString());
               }} placeholder="0.0" />
             </div>
             <div style={{ flex: 1 }}>
-              <label style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Largura (m)</label>
-              <input type="number" className="input-field" style={{ marginBottom: 0 }} value={largura} onChange={e => {
+              <label style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Largura (m)</label>
+              <input type="number" className="input-field" style={{ marginBottom: 0, marginTop: '4px' }} value={largura} onChange={e => {
                 setLargura(e.target.value);
                 const a = parseFloat(comprimento || '0') * parseFloat(e.target.value);
                 if (a > 0) setArea(a.toString());
@@ -134,25 +150,29 @@ export const InventorySetup = () => {
           </div>
         )}
 
-        <input type="number" className="input-field" value={area} onChange={e => setArea(e.target.value)} placeholder="0.0" style={{ marginTop: showCalc ? '8px' : '8px' }} />
+        <input type="number" className="input-field" value={area} onChange={e => setArea(e.target.value)} placeholder="Área em m² (Ex: 400)" />
 
-        <h3 style={{ margin: '16px 0 8px', color: 'var(--primary-color)' }}>Modelo Padrão</h3>
+        <h3 style={{ margin: '20px 0 10px', color: 'var(--primary-hover)', fontSize: '16px', fontWeight: '800' }}>Modelo de Parcela</h3>
         <select 
           className="input-field" 
           value={selectedTemplate} 
           onChange={e => applyTemplate(e.target.value)}
-          style={{ appearance: 'none' }}
+          style={{ 
+            appearance: 'none',
+            background: 'rgba(0,0,0,0.25) url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'white\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'%3e%3cpolyline points=\'6 9 12 15 18 9\'%3e%3c/polyline%3e%3c/svg%3e") no-repeat right 12px center',
+            backgroundSize: '16px'
+          }}
         >
-          <option value="custom">Personalizado...</option>
-          <option value="basico">Básico (Nome + CAP + DAP)</option>
-          <option value="completo">Completo (Todos os campos)</option>
-          <option value="rapido">Rápido (Essenciais)</option>
+          <option value="custom" style={{ background: '#0a0f0d', color: '#fff' }}>Personalizado...</option>
+          <option value="basico" style={{ background: '#0a0f0d', color: '#fff' }}>Básico (Nome Popular + CAP + DAP)</option>
+          <option value="completo" style={{ background: '#0a0f0d', color: '#fff' }}>Completo (Todos os campos padrões)</option>
+          <option value="rapido" style={{ background: '#0a0f0d', color: '#fff' }}>Rápido (Campos essenciais de medição)</option>
         </select>
 
-        <h3 style={{ margin: '16px 0 8px', color: 'var(--primary-color)' }}>Colunas de Coleta</h3>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+        <h3 style={{ margin: '24px 0 12px', color: 'var(--primary-hover)', fontSize: '16px', fontWeight: '800' }}>Colunas de Coleta Padrão</h3>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '20px' }}>
           {cols.map((col, i) => (
-            <label key={col.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+            <label key={col.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', userSelect: 'none' }}>
               <input 
                 type="checkbox" 
                 checked={col.checked} 
@@ -162,78 +182,107 @@ export const InventorySetup = () => {
                   setCols(newCols);
                   setSelectedTemplate('custom');
                 }} 
+                style={{ 
+                  accentColor: 'var(--primary-hover)',
+                  width: '16px',
+                  height: '16px'
+                }}
               />
-              <span style={{ fontSize: '14px' }}>{col.nome}</span>
+              <span style={{ fontSize: '13.5px', color: col.checked ? '#ffffff' : 'var(--text-muted)', transition: 'color 0.2s' }}>{col.nome}</span>
             </label>
           ))}
         </div>
 
-        <h4 style={{ margin: '16px 0 8px', color: 'var(--primary-color)' }}>Colunas Personalizadas</h4>
+        <h3 style={{ margin: '28px 0 12px', color: 'var(--primary-hover)', fontSize: '16px', fontWeight: '800' }}>Colunas Personalizadas</h3>
         {customCols.map((col, idx) => (
           <div key={idx} style={{ 
             display: 'flex', 
             flexWrap: 'wrap', 
             gap: '8px', 
             alignItems: 'center', 
-            marginBottom: '12px',
-            background: 'var(--bg-color)',
-            padding: '12px',
-            borderRadius: '8px',
-            border: '1px solid #333'
+            marginBottom: '14px',
+            background: 'rgba(0,0,0,0.2)',
+            padding: '16px',
+            borderRadius: '12px',
+            border: '1px solid rgba(255, 255, 255, 0.05)'
           }}>
-            <input
-              className="input-field"
-              style={{ flex: '1 1 80px', marginBottom: 0, minWidth: '80px' }}
-              placeholder="ID (sem espaços)"
-              value={col.id}
-              onChange={e => {
-                const newCols = [...customCols];
-                newCols[idx].id = e.target.value;
-                setCustomCols(newCols);
-              }}
-            />
-            <input
-              className="input-field"
-              style={{ flex: '2 1 120px', marginBottom: 0, minWidth: '120px' }}
-              placeholder="Nome da Coluna"
-              value={col.nome}
-              onChange={e => {
-                const newCols = [...customCols];
-                newCols[idx].nome = e.target.value;
-                setCustomCols(newCols);
-              }}
-            />
-            <select
-              className="input-field"
-              style={{ flex: '1 1 100px', marginBottom: 0, minWidth: '100px' }}
-              value={col.tipo}
-              onChange={e => {
-                const newCols = [...customCols];
-                newCols[idx].tipo = e.target.value;
-                setCustomCols(newCols);
-              }}
-            >
-              <option value="text">Texto</option>
-              <option value="number">Número</option>
-              <option value="textarea">Longo</option>
-              <option value="photo">Foto (Câmera)</option>
-            </select>
+            <div style={{ flex: '1 1 100px', minWidth: '100px' }}>
+              <label style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Identificador (Sem espaços)</label>
+              <input
+                className="input-field"
+                style={{ marginBottom: 0, marginTop: '4px', fontSize: '13px' }}
+                placeholder="Ex: d_copa"
+                value={col.id}
+                onChange={e => {
+                  const newCols = [...customCols];
+                  newCols[idx].id = e.target.value.toLowerCase().replace(/\s+/g, '_');
+                  setCustomCols(newCols);
+                }}
+              />
+            </div>
+            
+            <div style={{ flex: '2 1 150px', minWidth: '150px' }}>
+              <label style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Nome do Campo</label>
+              <input
+                className="input-field"
+                style={{ marginBottom: 0, marginTop: '4px', fontSize: '13px' }}
+                placeholder="Ex: Diâmetro da Copa (m)"
+                value={col.nome}
+                onChange={e => {
+                  const newCols = [...customCols];
+                  newCols[idx].nome = e.target.value;
+                  setCustomCols(newCols);
+                }}
+              />
+            </div>
+
+            <div style={{ flex: '1 1 110px', minWidth: '110px' }}>
+              <label style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Tipo de Dado</label>
+              <select
+                className="input-field"
+                style={{ 
+                  marginBottom: 0, 
+                  marginTop: '4px', 
+                  fontSize: '13px',
+                  appearance: 'none',
+                  background: 'rgba(0,0,0,0.25) url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'white\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'%3e%3cpolyline points=\'6 9 12 15 18 9\'%3e%3c/polyline%3e%3c/svg%3e") no-repeat right 8px center',
+                  backgroundSize: '12px'
+                }}
+                value={col.tipo}
+                onChange={e => {
+                  const newCols = [...customCols];
+                  newCols[idx].tipo = e.target.value;
+                  setCustomCols(newCols);
+                }}
+              >
+                <option value="text" style={{ background: '#0a0f0d', color: '#fff' }}>Texto</option>
+                <option value="number" style={{ background: '#0a0f0d', color: '#fff' }}>Número</option>
+                <option value="textarea" style={{ background: '#0a0f0d', color: '#fff' }}>Longo</option>
+                <option value="photo" style={{ background: '#0a0f0d', color: '#fff' }}>Foto (Câmera)</option>
+              </select>
+            </div>
+            
             <button
               className="btn btn-danger"
-              style={{ flex: '1 1 100%', padding: '8px', marginTop: '4px' }}
+              style={{ flex: '1 1 100%', padding: '10px', marginTop: '8px' }}
               onClick={() => {
                 setCustomCols(cols => cols.filter((_, i) => i !== idx));
               }}
-            >Remover Coluna</button>
+            >
+              Remover Campo
+            </button>
           </div>
         ))}
+        
         <button
           className="btn btn-secondary"
-          style={{ marginTop: 8, marginBottom: 16 }}
+          style={{ marginTop: '8px', marginBottom: '24px', borderStyle: 'dashed' }}
           onClick={() => setCustomCols(cols => [...cols, getNewCustomCol()])}
-        >+ Adicionar Coluna Personalizada</button>
+        >
+          + Adicionar Campo Personalizado
+        </button>
 
-        <div style={{ display: 'flex', gap: '12px', marginTop: '32px' }}>
+        <div style={{ display: 'flex', gap: '12px', marginTop: '20px' }}>
           <button className="btn btn-secondary" onClick={() => navigate(-1)}>Cancelar</button>
           <button className="btn btn-primary" onClick={submitSetup}>Iniciar Coleta</button>
         </div>

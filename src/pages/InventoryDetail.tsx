@@ -61,7 +61,14 @@ export const InventoryDetail = () => {
   const [editingInd, setEditingInd] = useState<any>(null);
 
   if (!inventory) {
-    return <div style={{ color: 'white', padding: '20px' }}>Inventário não encontrado.</div>;
+    return (
+      <div className="container" style={{ marginTop: '20px', textAlign: 'center' }}>
+        <div className="glass-card">
+          <h2>Parcela não encontrada</h2>
+          <button className="btn btn-primary" style={{ marginTop: '16px' }} onClick={() => navigate('/')}>Voltar</button>
+        </div>
+      </div>
+    );
   }
 
   const handleExportRaw = () => {
@@ -157,14 +164,13 @@ export const InventoryDetail = () => {
     try {
       const photos = await getPhotosForInventory(inventory.id);
       if (photos.length === 0) {
-        alert("Nenhuma foto encontrada para este inventário no banco offline.");
+        alert("Nenhuma foto encontrada para esta parcela no banco offline.");
         setIsZipping(false);
         return;
       }
       
       const zip = new JSZip();
       photos.forEach(photo => {
-        // extract base64 data without header (e.g. data:image/jpeg;base64,xxxx)
         const base64Data = photo.base64Data.split(',')[1];
         zip.file(photo.fileName, base64Data, { base64: true });
       });
@@ -180,7 +186,7 @@ export const InventoryDetail = () => {
       window.URL.revokeObjectURL(url);
     } catch (err) {
       console.error(err);
-      alert("Erro ao extrair zip: " + err);
+      alert("Erro ao extrair zip de fotos: " + err);
     }
     setIsZipping(false);
   };
@@ -188,120 +194,150 @@ export const InventoryDetail = () => {
   return (
     <div className="container" style={{ marginTop: '20px' }}>
       {/* Breadcrumbs Navigation */}
-      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '16px', fontSize: '12px', color: 'var(--text-muted)' }}>
-        <span style={{ cursor: 'pointer', textDecoration: 'underline' }} onClick={() => navigate('/')}>Trabalhos</span>
+      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '18px', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold', fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '0.5px' }}>
+        <span style={{ cursor: 'pointer', textDecoration: 'none', transition: 'color 0.2s' }} className="hover:text-white" onClick={() => navigate('/')}>Trabalhos</span>
         <span>/</span>
-        <span style={{ cursor: 'pointer', textDecoration: 'underline' }} onClick={() => navigate(`/fieldwork/${inventory.fieldWorkId}`)}>{fieldwork?.nome || 'Trabalho'}</span>
+        <span style={{ cursor: 'pointer', textDecoration: 'none', transition: 'color 0.2s' }} className="hover:text-white" onClick={() => navigate(`/fieldwork/${inventory.fieldWorkId}`)}>{fieldwork?.nome || 'Trabalho'}</span>
         <span>/</span>
         <span>{talhao ? talhao.nome : 'Sem Talhão'}</span>
         <span>/</span>
-        <span style={{ color: 'var(--primary-color)', fontWeight: 'bold' }}>{inventory.nome}</span>
+        <span style={{ color: 'var(--primary-hover)', fontWeight: 'bold' }}>{inventory.nome}</span>
       </div>
 
+      {/* Header */}
       <div className="app-header">
         <div>
-          <h2 style={{ color: 'var(--primary-color)' }}>{inventory.nome}</h2>
-          <span style={{ fontSize: '14px', color: 'var(--text-muted)' }}>
-            Projeto: {fieldwork?.nome || 'Trabalho Desconhecido'} | Talhão: {talhao ? talhao.nome : 'Sem Talhão'} | Área: {inventory.areaParcela} m²
+          <h2 style={{ color: 'var(--primary-hover)', fontSize: '24px', fontWeight: '800' }}>{inventory.nome}</h2>
+          <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+            Manejo: {fieldwork?.nome || 'Sem Projeto'} | Talhão: {talhao ? talhao.nome : 'Sem Talhão'} | Área: {inventory.areaParcela} m²
           </span>
         </div>
-        <button className="btn btn-secondary" style={{ width: 'auto', borderRadius: '0px' }} onClick={() => navigate(`/fieldwork/${inventory.fieldWorkId}`)}>Voltar</button>
+        <button className="btn btn-secondary" style={{ width: 'auto', padding: '10px 20px' }} onClick={() => navigate(`/fieldwork/${inventory.fieldWorkId}`)}>
+          Voltar
+        </button>
       </div>
 
-      <div className="glass-card" style={{ marginBottom: '16px', borderRadius: '0px' }}>
-        <h3 style={{ marginBottom: '16px' }}>Exportar Dados (Excel)</h3>
+      {/* Data Export Options & Actions */}
+      <div className="glass-card">
+        <h3 style={{ marginBottom: '16px', fontSize: '16px', fontWeight: '800' }}>Exportações e Painel</h3>
         
-        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-          <button className="btn btn-secondary" style={{ flex: '1 1 200px', borderRadius: '0px' }} onClick={handleExportRaw}>
-            Exportar Dados Brutos
+        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '12px' }}>
+          <button className="btn btn-secondary" style={{ flex: '1 1 180px' }} onClick={handleExportRaw}>
+            Exportar Brutos
           </button>
-          <button className="btn btn-primary" style={{ flex: '1 1 200px', borderRadius: '0px' }} onClick={() => setShowExportOptions(!showExportOptions)}>
-            Exportar Processados
+          <button className="btn btn-primary" style={{ flex: '1 1 180px' }} onClick={() => setShowExportOptions(!showExportOptions)}>
+            Processar e Baixar
           </button>
         </div>
         
-        <div style={{ marginTop: '16px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-          <button className="btn btn-secondary" style={{ flex: '1 1 200px', borderColor: '#ffb74d', color: '#ffb74d', borderRadius: '0px' }} onClick={() => setShowDashboard(true)}>
-            Ver Dashboard da Parcela
+        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+          <button className="btn btn-secondary" style={{ flex: '1 1 180px', borderColor: '#2e7d32', color: '#a5d6a7', background: 'rgba(46, 125, 50, 0.08)' }} onClick={() => setShowDashboard(true)}>
+            Dashboard Estatístico
           </button>
-          <button className="btn btn-secondary" style={{ flex: '1 1 200px', borderColor: '#4fc3f7', color: '#4fc3f7', borderRadius: '0px' }} onClick={handleDownloadPhotos} disabled={isZipping}>
-            {isZipping ? "Compactando..." : "Baixar Galeria (ZIP)"}
+          <button className="btn btn-secondary" style={{ flex: '1 1 180px', borderColor: '#009688', color: '#80cbc4', background: 'rgba(0, 150, 136, 0.08)' }} onClick={handleDownloadPhotos} disabled={isZipping}>
+            {isZipping ? "Gerando ZIP..." : "Galeria de Fotos (ZIP)"}
           </button>
         </div>
 
         {showExportOptions && (
-          <div style={{ marginTop: 16, background: '#e0e0e0', padding: 16, borderRadius: 8, color: '#333' }}>
-            <label className="input-label" style={{ color: '#333' }}>Fator de Forma (cálculos avançados)</label>
+          <div style={{ 
+            marginTop: '20px', 
+            background: 'rgba(0,0,0,0.3)', 
+            padding: '20px', 
+            borderRadius: '16px', 
+            border: '1px solid rgba(255,255,255,0.06)' 
+          }}>
+            <label className="input-label">Fator de Forma Comercial (Cálculo Volumétrico)</label>
             <input 
               type="number" step="0.01" 
               className="input-field" 
-              style={{ background: 'white', color: 'black' }}
               value={fatorForma} 
               onChange={e => setFatorForma(e.target.value)} 
             />
 
-            <h4 style={{ marginBottom: 8, color: '#333' }}>Escolha os cálculos associados:</h4>
-            <label style={{ display: 'block', marginBottom: 4, cursor: 'pointer' }}>
-              <input type="checkbox" checked={selectedCalcs.areaBasal} onChange={e => setSelectedCalcs(c => ({...c, areaBasal: e.target.checked}))} /> Área Basal
-            </label>
-            <label style={{ display: 'block', marginBottom: 4, cursor: 'pointer' }}>
-              <input type="checkbox" checked={selectedCalcs.volume} onChange={e => setSelectedCalcs(c => ({...c, volume: e.target.checked}))} /> Volume Estimado
-            </label>
-            <label style={{ display: 'block', marginBottom: 4, cursor: 'pointer' }}>
-              <input type="checkbox" checked={selectedCalcs.dapEquivalente} onChange={e => setSelectedCalcs(c => ({...c, dapEquivalente: e.target.checked}))} /> DAP Equivalente
-            </label>
-            <label style={{ display: 'block', marginBottom: 4, cursor: 'pointer' }}>
-              <input type="checkbox" checked={selectedCalcs.fustes} onChange={e => setSelectedCalcs(c => ({...c, fustes: e.target.checked}))} /> Detalhar Fustes Exclusivos
-            </label>
+            <h4 style={{ marginBottom: '12px', fontSize: '13px', color: '#ffffff', textTransform: 'uppercase', fontWeight: 'bold' }}>Cálculos e Parâmetros:</h4>
             
-            <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-              <button className="btn btn-primary" onClick={handleExportProcessed} style={{ background: '#2196f3' }}>Confirmar e Baixar</button>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', userSelect: 'none', fontSize: '13.5px' }}>
+                <input type="checkbox" checked={selectedCalcs.areaBasal} onChange={e => setSelectedCalcs(c => ({...c, areaBasal: e.target.checked}))} style={{ accentColor: 'var(--primary-hover)' }} /> Área Basal (g)
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', userSelect: 'none', fontSize: '13.5px' }}>
+                <input type="checkbox" checked={selectedCalcs.volume} onChange={e => setSelectedCalcs(c => ({...c, volume: e.target.checked}))} style={{ accentColor: 'var(--primary-hover)' }} /> Volume Estimado (v)
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', userSelect: 'none', fontSize: '13.5px' }}>
+                <input type="checkbox" checked={selectedCalcs.dapEquivalente} onChange={e => setSelectedCalcs(c => ({...c, dapEquivalente: e.target.checked}))} style={{ accentColor: 'var(--primary-hover)' }} /> DAP Equivalente (d)
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', userSelect: 'none', fontSize: '13.5px' }}>
+                <input type="checkbox" checked={selectedCalcs.fustes} onChange={e => setSelectedCalcs(c => ({...c, fustes: e.target.checked}))} style={{ accentColor: 'var(--primary-hover)' }} /> Detalhar Fustes Bifurcados
+              </label>
+            </div>
+            
+            <div style={{ display: 'flex', gap: '12px', marginTop: '20px' }}>
+              <button className="btn btn-primary" onClick={handleExportProcessed}>Confirmar e Exportar</button>
             </div>
           </div>
         )}
       </div>
 
-      <div className="glass-card" style={{ marginBottom: '16px', padding: 0, overflow: 'hidden', borderRadius: '0px' }}>
-        <div style={{ padding: '16px', borderBottom: '1px solid #333', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <h3 style={{ margin: 0 }}>Dados Coletados ({inventory.dados.length})</h3>
+      {/* Collected Data List */}
+      <div className="glass-card" style={{ padding: 0 }}>
+        <div style={{ 
+          padding: '20px 24px', 
+          borderBottom: '1px solid rgba(255,255,255,0.06)', 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center', 
+          flexWrap: 'wrap', 
+          gap: '12px' 
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+            <h3 style={{ margin: 0, fontSize: '17px', fontWeight: '800' }}>Dados Coletados ({inventory.dados.length})</h3>
             {isSufficiencyReached && (
-              <span style={{ background: '#2e7d32', color: 'white', padding: '4px 8px', borderRadius: '0px', fontSize: '12px', fontWeight: 'bold' }}>
-                Suficiência Amostral (Assíntota)
+              <span style={{ 
+                background: 'rgba(46, 125, 50, 0.15)', 
+                border: '1px solid rgba(46, 125, 50, 0.45)', 
+                color: '#a5d6a7', 
+                padding: '4px 12px', 
+                borderRadius: '100px', 
+                fontSize: '11px', 
+                fontWeight: 'bold',
+                letterSpacing: '0.5px'
+              }}>
+                Suficiência Atingida
               </span>
             )}
           </div>
-          <button className="btn btn-primary" style={{ width: 'auto', padding: '6px 12px', fontSize: 14, borderRadius: '0px' }} onClick={() => { setCurrentInventory(inventory); navigate('/collect'); }}>
-            + Continuar Coletando
+          <button className="btn btn-primary" style={{ width: 'auto', padding: '8px 16px' }} onClick={() => { setCurrentInventory(inventory); navigate('/collect'); }}>
+            + Coletar Árvores
           </button>
         </div>
         
-        <div style={{ overflowX: 'auto', padding: '16px' }}>
+        <div style={{ overflowX: 'auto', padding: '8px 16px 20px 16px' }}>
           {inventory.dados.length === 0 ? (
-            <p style={{ color: 'var(--text-muted)' }}>Nenhum dado coletado nesta parcela ainda.</p>
+            <p style={{ color: 'var(--text-muted)', padding: '24px 8px', fontSize: '14px' }}>Nenhum indivíduo coletado nesta parcela ainda.</p>
           ) : (
-            <table style={{ width: '100%', minWidth: '600px', borderCollapse: 'collapse', textAlign: 'left' }}>
+            <table style={{ width: '100%', minWidth: '600px' }}>
               <thead>
                 <tr>
-                  <th style={{ padding: '8px', borderBottom: '2px solid #555' }}>Nº</th>
+                  <th style={{ width: '60px' }}>Nº</th>
                   {inventory.colunas.map(col => (
-                    <th key={col.id} style={{ padding: '8px', borderBottom: '2px solid #555' }}>{col.nome}</th>
+                    <th key={col.id}>{col.nome}</th>
                   ))}
-                  <th style={{ padding: '8px', borderBottom: '2px solid #555' }}>Ação</th>
+                  <th style={{ width: '100px', textAlign: 'center' }}>Ação</th>
                 </tr>
               </thead>
               <tbody>
                 {inventory.dados.map((ind: any) => (
-                  <tr key={ind.id} style={{ borderBottom: '1px solid #333' }}>
-                    <td style={{ padding: '12px 8px' }}>{ind.numeroIndividuo}</td>
+                  <tr key={ind.id}>
+                    <td style={{ fontWeight: 'bold' }}>{ind.numeroIndividuo}</td>
                     {inventory.colunas.map(col => (
-                      <td key={col.id} style={{ padding: '12px 8px' }}>
+                      <td key={col.id}>
                          {col.id === 'coordenadas' ? ind[col.id]?.substring(0, 15) + '...' : ind[col.id]}
-                         {ind.multipleStems && ['cap', 'hc', 'ht'].includes(col.id) ? `[Múltiplos: ${ind.stems?.length}]` : ''}
+                         {ind.multipleStems && ['cap', 'hc', 'ht'].includes(col.id) ? ` [Bifurcado: ${ind.stems?.length}]` : ''}
                       </td>
                     ))}
-                    <td style={{ padding: '12px 8px' }}>
-                      <button className="btn btn-secondary" style={{ padding: '4px 12px', width: 'auto' }} onClick={() => setEditingInd(JSON.parse(JSON.stringify(ind)))}>
+                    <td style={{ textAlign: 'center' }}>
+                      <button className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '11px', width: 'auto' }} onClick={() => setEditingInd(JSON.parse(JSON.stringify(ind)))}>
                         Editar
                       </button>
                     </td>
@@ -313,36 +349,41 @@ export const InventoryDetail = () => {
         </div>
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'center' }}>
-          <button className="btn btn-danger" style={{ opacity: 0.8, borderRadius: '0px' }} onClick={() => {
+      <div style={{ display: 'flex', justifyContent: 'center', marginTop: '24px' }}>
+          <button className="btn btn-danger" style={{ maxWidth: '240px' }} onClick={() => {
             if(window.confirm('Tem certeza em excluir definitivamente a parcela e TODOS OS SEUS DADOS E FOTOS? Essa ação é vitalícia.')) {
-              // Hard cascade deletion 
               inventory.dados.forEach((d: any) => deletePhotosForIndividual(d.id));
               deleteInventory(inventory.id);
               navigate(`/fieldwork/${inventory.fieldWorkId}`);
             }
           }}>
-            Excluir Parcela (Irreversível)
+            Excluir Parcela
           </button>
       </div>
 
+      {/* Edit Modal (Rounded 24px) */}
       {editingInd && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.9)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', zIndex: 1000, padding: '20px', overflowY: 'auto' }}>
-           <div className="glass-card" style={{ width: '100%', maxWidth: '600px', marginTop: '20px', marginBottom: '40px', borderRadius: '0px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                <h3>Edição: Indivíduo #{editingInd.numeroIndividuo}</h3>
-                <button onClick={() => setEditingInd(null)} style={{ background: 'transparent', color: 'white', border: 'none', fontSize: 20 }}>X</button>
+        <div style={{ 
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
+          background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', 
+          zIndex: 1000, padding: '20px', overflowY: 'auto', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' 
+        }}>
+           <div className="glass-card" style={{ width: '100%', maxWidth: '540px', marginTop: '30px', marginBottom: '30px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                <h3 style={{ fontSize: '18px', fontWeight: '800' }}>Editar Indivíduo #{editingInd.numeroIndividuo}</h3>
+                <button onClick={() => setEditingInd(null)} style={{ background: 'transparent', color: 'white', border: 'none', fontSize: '20px', cursor: 'pointer' }}>×</button>
               </div>
 
               {inventory.colunas.map(col => {
                 if (editingInd.multipleStems && ['cap', 'hc', 'ht'].includes(col.id)) return null;
 
                 return (
-                  <div key={col.id} style={{ marginBottom: 12 }}>
+                  <div key={col.id} style={{ marginBottom: '14px' }}>
                     <label className="input-label">{col.nome}</label>
                     <input 
                       type={col.tipo === 'number' ? 'number' : 'text'} 
                       className="input-field" 
+                      style={{ marginBottom: 0, marginTop: '4px' }}
                       value={editingInd[col.id] || ''} 
                       onChange={e => setEditingInd({...editingInd, [col.id]: e.target.value})} 
                     />
@@ -351,10 +392,16 @@ export const InventoryDetail = () => {
               })}
 
               {editingInd.multipleStems && editingInd.stems && (
-                <div style={{ background: '#252b28', padding: 12, borderRadius: 8, marginTop: 16 }}>
-                  <h4>Fustes de Ramificação</h4>
+                <div style={{ 
+                  background: 'rgba(0,0,0,0.25)', 
+                  padding: '16px', 
+                  borderRadius: '12px', 
+                  marginTop: '16px',
+                  border: '1px solid rgba(255,255,255,0.06)'
+                }}>
+                  <h4 style={{ marginBottom: '10px', fontSize: '12px', color: 'var(--primary-hover)', textTransform: 'uppercase', fontWeight: 'bold' }}>Fustes de Ramificação</h4>
                   {editingInd.stems.map((stem: any, i: number) => (
-                    <div key={stem.id} style={{ display: 'flex', gap: 8, marginBottom: 8, marginTop: 8 }}>
+                    <div key={stem.id} style={{ display: 'flex', gap: '8px', marginBottom: '8px', marginTop: '8px' }}>
                       <input type="number" className="input-field" placeholder="CAP" value={stem.cap} onChange={e => {
                         const s = [...editingInd.stems]; s[i].cap = e.target.value; setEditingInd({...editingInd, stems: s});
                       }} style={{ marginBottom: 0 }} />
@@ -366,9 +413,9 @@ export const InventoryDetail = () => {
                 </div>
               )}
 
-              <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
-                <button className="btn btn-secondary" style={{ borderRadius: '0px' }} onClick={() => setEditingInd(null)}>Cancelar</button>
-                <button className="btn btn-primary" style={{ borderRadius: '0px' }} onClick={handleSaveEdit}>Salvar Alterações</button>
+              <div style={{ display: 'flex', gap: '12px', marginTop: '28px' }}>
+                <button className="btn btn-secondary" onClick={() => setEditingInd(null)}>Cancelar</button>
+                <button className="btn btn-primary" onClick={handleSaveEdit}>Salvar</button>
               </div>
            </div>
         </div>
