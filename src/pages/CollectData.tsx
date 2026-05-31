@@ -217,13 +217,14 @@ export const CollectData = () => {
       <div 
         className="container" 
         style={{ 
-          marginTop: '10px', 
-          paddingBottom: '20px',
+          marginTop: '6px', 
+          padding: '10px 8px',
+          paddingBottom: '16px',
           display: 'flex',
           flexDirection: 'column',
-          minHeight: '94vh',
+          minHeight: '96vh',
           justifyContent: 'space-between',
-          gap: '12px',
+          gap: '8px',
           boxSizing: 'border-box',
           maxWidth: '480px',
           margin: '0 auto',
@@ -247,17 +248,17 @@ export const CollectData = () => {
           </div>
         </div>
 
-        {/* Wizard Step Card (Rounded 24px) */}
+        {/* Wizard Step Card (Rounded 24px, compact) */}
         <div 
           className="glass-card" 
           style={{ 
-            flex: 1, 
-            margin: '0 0 12px 0', 
-            padding: '24px 20px', 
+            flex: '0 0 auto', 
+            margin: '0 0 8px 0', 
+            padding: '18px 16px', 
             display: 'flex', 
             flexDirection: 'column', 
             justifyContent: 'center', 
-            minHeight: '180px',
+            minHeight: '130px',
             borderRadius: '24px'
           }}
         >

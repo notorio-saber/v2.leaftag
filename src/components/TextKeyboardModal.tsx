@@ -77,15 +77,13 @@ export const TextKeyboardModal: React.FC<TextKeyboardModalProps> = ({
   return (
     <div style={{
       width: '100%',
-      maxWidth: '520px',
-      margin: '0 auto',
-      background: 'rgba(5, 10, 7, 0.7)',
-      backdropFilter: 'blur(16px)',
-      WebkitBackdropFilter: 'blur(16px)',
-      border: '1px solid rgba(255, 255, 255, 0.08)',
-      borderRadius: '20px',
-      padding: '12px',
-      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
+      maxWidth: 'none',
+      margin: '0',
+      background: 'transparent',
+      border: 'none',
+      borderRadius: '0px',
+      padding: '4px 0px',
+      boxShadow: 'none',
       display: 'flex',
       flexDirection: 'column',
       gap: '6px',
@@ -151,8 +149,8 @@ const rowStyle: React.CSSProperties = {
 
 const keyStyle: React.CSSProperties = {
   flex: 1,
-  height: '38px',
-  fontSize: '14.5px',
+  height: '48px', /* Taller keys */
+  fontSize: '18px', /* Larger font */
   fontWeight: '700',
   borderRadius: '12px', /* Arredondado 12px */
   background: 'rgba(255, 255, 255, 0.04)',
@@ -176,7 +174,7 @@ const shiftKeyStyle = (active: boolean): React.CSSProperties => ({
   border: active ? '1px solid rgba(46, 125, 50, 0.45)' : '1px solid rgba(255, 255, 255, 0.08)',
   color: active ? '#a5d6a7' : 'white',
   fontWeight: 'bold',
-  fontSize: '11px',
+  fontSize: '12.5px',
   flex: '1.3'
 });
 
@@ -185,7 +183,7 @@ const actionKeyStyle = (color: string, bg: string, border: string): React.CSSPro
   color,
   background: bg,
   border: `1px solid ${border}`,
-  fontSize: '11px',
+  fontSize: '12.5px',
   flex: '1.6'
 });
 
@@ -194,13 +192,13 @@ const shortcutStyle: React.CSSProperties = {
   background: 'rgba(46, 125, 50, 0.12)',
   border: '1px solid rgba(46, 125, 50, 0.35)',
   color: '#a5d6a7',
-  fontSize: '12px',
+  fontSize: '13px',
   fontWeight: 'bold'
 };
 
 const clearStyle: React.CSSProperties = {
   ...keyStyle,
-  fontSize: '11px',
+  fontSize: '12px',
   background: 'rgba(255, 255, 255, 0.01)',
   border: '1px solid rgba(255, 255, 255, 0.05)',
   color: 'var(--text-muted)'
@@ -212,6 +210,6 @@ const confirmStyle: React.CSSProperties = {
   border: '1px solid rgba(46, 125, 50, 0.45)',
   color: 'white',
   fontWeight: 'bold',
-  fontSize: '11px',
+  fontSize: '12.5px',
   boxShadow: '0 4px 10px rgba(46, 125, 50, 0.15)'
 };

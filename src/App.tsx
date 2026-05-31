@@ -83,17 +83,19 @@ const Home = () => {
           <p style={{ color: '#666', marginTop: '8px' }}>Crie seu primeiro trabalho de campo!</p>
         </div>
       ) : (
-        fieldWorks.map(fw => (
-          <div 
-            key={fw.id} 
-            className="inventory-card" 
-            onClick={() => navigate(`/fieldwork/${fw.id}`)}
-          >
-            <div className="inventory-card-title">{fw.nome}</div>
-            <div className="inventory-card-info">Local: {fw.local}</div>
-            <div className="inventory-card-info">Data: {fw.dataInicio}</div>
-          </div>
-        ))
+        <div className="inventory-list">
+          {fieldWorks.map(fw => (
+            <div 
+              key={fw.id} 
+              className="inventory-card" 
+              onClick={() => navigate(`/fieldwork/${fw.id}`)}
+            >
+              <div className="inventory-card-title">{fw.nome}</div>
+              <div className="inventory-card-info">Local: {fw.local}</div>
+              <div className="inventory-card-info">Data: {fw.dataInicio}</div>
+            </div>
+          ))}
+        </div>
       )}
 
       {showModal && (

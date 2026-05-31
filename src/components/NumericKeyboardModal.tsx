@@ -53,25 +53,23 @@ export const NumericKeyboardModal: React.FC<NumericKeyboardModalProps> = ({
   return (
     <div style={{
       width: '100%',
-      maxWidth: '480px',
-      margin: '0 auto',
-      background: 'rgba(5, 10, 7, 0.7)',
-      backdropFilter: 'blur(16px)',
-      WebkitBackdropFilter: 'blur(16px)',
-      border: '1px solid rgba(255, 255, 255, 0.08)',
-      borderRadius: '20px',
-      padding: '12px',
-      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
+      maxWidth: 'none',
+      margin: '0',
+      background: 'transparent',
+      border: 'none',
+      borderRadius: '0px',
+      padding: '4px 0px',
+      boxShadow: 'none',
       display: 'flex',
       flexDirection: 'column',
-      gap: '8px',
+      gap: '6px',
       boxSizing: 'border-box'
     }}>
       {/* Grid Keypad */}
       <div style={{ 
         display: 'grid', 
         gridTemplateColumns: 'repeat(3, 1fr)', 
-        gap: '8px',
+        gap: '6px',
         width: '100%'
       }}>
         {/* Row 1 */}
@@ -104,11 +102,11 @@ export const NumericKeyboardModal: React.FC<NumericKeyboardModalProps> = ({
 };
 
 const keyStyle: React.CSSProperties = {
-  height: '46px',
-  fontSize: '18px',
+  height: '58px', /* Taller keys */
+  fontSize: '22px', /* Larger font */
   fontWeight: '700',
-  borderRadius: '12px', /* Arredondado 12px */
-  background: 'rgba(255, 255, 255, 0.04)',
+  borderRadius: '12px',
+  background: 'rgba(255, 255, 255, 0.05)',
   border: '1px solid rgba(255, 255, 255, 0.08)',
   color: 'white',
   padding: 0,
@@ -127,23 +125,23 @@ const specialKeyStyle: React.CSSProperties = {
 
 const dangerKeyStyle: React.CSSProperties = {
   ...keyStyle,
-  fontSize: '13px',
-  background: 'rgba(239, 35, 60, 0.1)',
+  fontSize: '14.5px',
+  background: 'rgba(239, 35, 60, 0.12)',
   border: '1px solid rgba(239, 35, 60, 0.3)',
   color: '#ff4d6d'
 };
 
 const clearKeyStyle: React.CSSProperties = {
   ...keyStyle,
-  fontSize: '13px',
-  background: 'rgba(255, 255, 255, 0.01)',
-  border: '1px solid rgba(255, 255, 255, 0.05)',
+  fontSize: '14.5px',
+  background: 'rgba(255, 255, 255, 0.02)',
+  border: '1px solid rgba(255, 255, 255, 0.06)',
   color: 'var(--text-muted)'
 };
 
 const confirmKeyStyle: React.CSSProperties = {
   ...keyStyle,
-  fontSize: '13px',
+  fontSize: '14.5px',
   fontWeight: 'bold',
   background: 'rgba(46, 125, 50, 0.25)',
   color: '#ffffff',
