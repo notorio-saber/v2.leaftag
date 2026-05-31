@@ -134,8 +134,8 @@ export const MapVisualization: React.FC<MapVisProps> = ({ inventories, onClose }
     }}>
       {/* Header */}
       <div style={{ padding: '16px', background: 'var(--card-bg)', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h2 style={{ color: 'var(--primary-color)' }}>🌍 Mapa GIS: Trabalhos de Campo</h2>
-        <button className="btn btn-secondary" style={{ width: 'auto', padding: '6px 12px' }} onClick={onClose}>✕ Fechar Mapa</button>
+        <h2 style={{ color: 'var(--primary-color)' }}>Mapa GIS: Trabalhos de Campo</h2>
+        <button className="btn btn-secondary" style={{ width: 'auto', padding: '6px 12px', borderRadius: '0px' }} onClick={onClose}>Fechar Mapa</button>
       </div>
 
       <div className="map-layout-container">
@@ -143,7 +143,7 @@ export const MapVisualization: React.FC<MapVisProps> = ({ inventories, onClose }
         <div className="map-sidebar">
           <h3 style={{ marginBottom: '16px', fontSize: '14px', textTransform: 'uppercase', letterSpacing: '1px' }}>Filtros de Parcela</h3>
           
-          <button className="btn btn-secondary" style={{ padding: '8px', fontSize: '12px', marginBottom: '16px' }} onClick={() => {
+          <button className="btn btn-secondary" style={{ padding: '8px', fontSize: '12px', marginBottom: '16px', borderRadius: '0px' }} onClick={() => {
              const anyFalse = Object.values(visibleInventories).some(v => !v);
              // If any is false, check all. Else uncheck all.
              const nextState = inventories.reduce((acc, inv) => ({ ...acc, [inv.id]: anyFalse }), {});
@@ -171,9 +171,9 @@ export const MapVisualization: React.FC<MapVisProps> = ({ inventories, onClose }
           })}
 
           <div style={{ marginTop: '32px' }}>
-            <h3 style={{ marginBottom: '16px', fontSize: '14px', textTransform: 'uppercase', letterSpacing: '1px' }}>📥 Extração GIS</h3>
-            <button className="btn btn-primary" style={{ padding: '10px', fontSize: '12px', marginBottom: '12px' }} onClick={exportKML}>Google Earth (.KML)</button>
-            <button className="btn btn-secondary" style={{ padding: '10px', fontSize: '12px' }} onClick={exportCSV}>Tabela SIG (.CSV)</button>
+            <h3 style={{ marginBottom: '16px', fontSize: '14px', textTransform: 'uppercase', letterSpacing: '1px' }}>Extração GIS</h3>
+            <button className="btn btn-primary" style={{ padding: '10px', fontSize: '12px', marginBottom: '12px', borderRadius: '0px' }} onClick={exportKML}>Google Earth (.KML)</button>
+            <button className="btn btn-secondary" style={{ padding: '10px', fontSize: '12px', borderRadius: '0px' }} onClick={exportCSV}>Tabela SIG (.CSV)</button>
           </div>
         </div>
 

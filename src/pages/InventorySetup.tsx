@@ -109,7 +109,7 @@ export const InventorySetup = () => {
             style={{ padding: '2px 8px', fontSize: '12px', width: 'auto' }}
             onClick={() => setShowCalc(!showCalc)}
           >
-            {showCalc ? 'Ocultar Calculadora' : '🧮 Calcular L x L'}
+            {showCalc ? 'Ocultar Calculadora' : 'Calcular L x L'}
           </button>
         </div>
         

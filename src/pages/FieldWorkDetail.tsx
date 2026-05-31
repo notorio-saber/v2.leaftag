@@ -126,9 +126,9 @@ export const FieldWorkDetail = () => {
       <div className="app-header">
         <div>
           <h1 style={{ color: 'var(--primary-color)' }}>{fw.nome}</h1>
-          <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>📍 {fw.local} | 📅 {fw.dataInicio}</p>
+          <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Local: {fw.local} | Data: {fw.dataInicio}</p>
         </div>
-        <button className="btn btn-secondary" style={{ width: 'auto', padding: '8px 16px' }} onClick={() => navigate('/')}>
+        <button className="btn btn-secondary" style={{ width: 'auto', padding: '8px 16px', borderRadius: '0px' }} onClick={() => navigate('/')}>
           Voltar
         </button>
       </div>
@@ -138,11 +138,11 @@ export const FieldWorkDetail = () => {
         <h2 style={{ fontSize: '18px' }}>Talhões ({fwTalhoes.length}) • Parcelas ({parcels.length})</h2>
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           {parcels.length > 0 && (
-            <button className="btn btn-secondary" style={{ width: 'auto', padding: '8px 16px' }} onClick={handleExportAll}>
-               📥 Baixar Todo Projeto
+            <button className="btn btn-secondary" style={{ width: 'auto', padding: '8px 16px', borderRadius: '0px' }} onClick={handleExportAll}>
+               Baixar Todo Projeto
             </button>
           )}
-          <button className="btn btn-primary" style={{ width: 'auto', padding: '8px 16px' }} onClick={() => setShowTalhaoModal(true)}>
+          <button className="btn btn-primary" style={{ width: 'auto', padding: '8px 16px', borderRadius: '0px' }} onClick={() => setShowTalhaoModal(true)}>
             + Novo Talhão
           </button>
         </div>
@@ -151,11 +151,11 @@ export const FieldWorkDetail = () => {
       {/* GIS and Dashboard shortcuts */}
       {parcels.length > 0 && (
         <div style={{ display: 'flex', gap: '8px', marginBottom: '32px' }}>
-          <button className="btn btn-secondary" style={{ flex: 1, borderColor: '#4fc3f7', color: '#4fc3f7' }} onClick={() => setShowMap(true)}>
-            🌍 Ver Mapa GIS
+          <button className="btn btn-secondary" style={{ flex: 1, borderColor: '#4fc3f7', color: '#4fc3f7', borderRadius: '0px' }} onClick={() => setShowMap(true)}>
+            Ver Mapa GIS
           </button>
-          <button className="btn btn-secondary" style={{ flex: 1, borderColor: '#ffb74d', color: '#ffb74d' }} onClick={() => setShowDashboard(true)}>
-            📊 Ver Dashboard
+          <button className="btn btn-secondary" style={{ flex: 1, borderColor: '#ffb74d', color: '#ffb74d', borderRadius: '0px' }} onClick={() => setShowDashboard(true)}>
+            Ver Dashboard
           </button>
         </div>
       )}
@@ -190,23 +190,23 @@ export const FieldWorkDetail = () => {
                 {/* Talhao Header Block */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
                   <div>
-                    <h3 style={{ color: 'white', fontSize: '20px', fontWeight: 'bold' }}>🌳 {talhao.nome}</h3>
+                    <h3 style={{ color: 'white', fontSize: '20px', fontWeight: 'bold' }}>{talhao.nome}</h3>
                     <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{talhaoParcels.length} parcelas registradas</span>
                   </div>
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <button 
                       className="btn btn-secondary" 
-                      style={{ width: 'auto', padding: '6px 12px', fontSize: '10px' }}
+                      style={{ width: 'auto', padding: '6px 12px', fontSize: '10px', borderRadius: '0px' }}
                       onClick={() => navigate(`/setup/${fw.id}/${talhao.id}`)}
                     >
                       + Nova Parcela
                     </button>
                     <button 
                       className="btn btn-danger" 
-                      style={{ width: 'auto', padding: '6px 12px', fontSize: '10px' }}
+                      style={{ width: 'auto', padding: '6px 12px', fontSize: '10px', borderRadius: '0px' }}
                       onClick={() => handleDeleteTalhao(talhao.id, talhao.nome)}
                     >
-                      🗑️ Excluir
+                      Excluir
                     </button>
                   </div>
                 </div>
@@ -242,7 +242,7 @@ export const FieldWorkDetail = () => {
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                  <h3 style={{ color: '#fbc02d', fontSize: '18px', fontWeight: 'bold' }}>⚠️ Parcelas sem Talhão (Legado)</h3>
+                  <h3 style={{ color: '#fbc02d', fontSize: '18px', fontWeight: 'bold' }}>Parcelas sem Talhão (Legado)</h3>
                   <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Mapeadas antes da atualização dos talhões</span>
                 </div>
               </div>

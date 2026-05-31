@@ -22,15 +22,15 @@ export const Login = () => {
   }
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--bg-color)', overflowX: 'hidden' }}>
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'transparent', overflowX: 'hidden' }}>
       {/* Header */}
-      <header style={{ padding: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #222', maxWidth: '1200px', margin: '0 auto', width: '100%', boxSizing: 'border-box' }}>
+      <header style={{ padding: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255, 255, 255, 0.08)', backdropFilter: 'blur(8px)', maxWidth: '1200px', margin: '0 auto', width: '100%', boxSizing: 'border-box' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <img src="/logo.png" alt="LeafTag Logo" style={{ width: '40px', height: '40px', borderRadius: '8px' }} />
-          <span style={{ fontSize: '20px', fontWeight: 'bold', color: 'var(--primary-color)' }}>LeafTag</span>
+          <img src="/logo.png" alt="LeafTag Logo" style={{ width: '40px', height: '40px', borderRadius: '0px' }} />
+          <span style={{ fontSize: '20px', fontWeight: 'bold', color: 'var(--primary-color)', textTransform: 'uppercase', letterSpacing: '1px' }}>LeafTag</span>
         </div>
         <div style={{ display: 'flex', gap: '12px' }}>
-          <button className="btn btn-secondary" style={{ width: 'auto', padding: '8px 24px', border: '1px solid #4fc3f7', color: '#4fc3f7' }} onClick={loginWithGoogle}>
+          <button className="btn btn-secondary" style={{ width: 'auto', padding: '8px 24px', borderRadius: '0px' }} onClick={loginWithGoogle}>
             Acessar Sistema
           </button>
         </div>
@@ -38,11 +38,11 @@ export const Login = () => {
 
       {/* Hero Section */}
       <main style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 20px', textAlign: 'center' }}>
-        <div style={{ background: 'rgba(76, 175, 80, 0.1)', color: 'var(--primary-color)', padding: '6px 16px', borderRadius: '20px', fontSize: '14px', marginBottom: '24px', border: '1px solid rgba(76, 175, 80, 0.2)' }}>
-          🌱 Desenvolvido pela <strong>EcoAds</strong>
+        <div style={{ background: 'rgba(46, 125, 50, 0.1)', color: 'var(--primary-hover)', padding: '6px 16px', borderRadius: '0px', fontSize: '13px', marginBottom: '24px', border: '1px solid rgba(46, 125, 50, 0.25)', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 'bold' }}>
+          Desenvolvido pela EcoAds
         </div>
         
-        <h1 style={{ fontSize: 'clamp(32px, 5vw, 56px)', lineHeight: 1.1, marginBottom: '24px', maxWidth: '800px', color: '#fff' }}>
+        <h1 style={{ fontSize: 'clamp(32px, 5vw, 56px)', lineHeight: 1.1, marginBottom: '24px', maxWidth: '800px', color: '#fff', fontWeight: '700' }}>
           O padrão profissional para <span style={{ color: 'var(--primary-color)' }}>inventários florestais</span>.
         </h1>
         
@@ -52,12 +52,12 @@ export const Login = () => {
           Com validação de suficiência amostral integrada.
         </p>
 
-        <p style={{ fontSize: '16px', color: 'var(--primary-color)', fontWeight: 'bold', marginBottom: '48px' }}>
-          👉 Pare de perder tempo com planilhas manuais. Trabalhe como engenheiro.
+        <p style={{ fontSize: '16px', color: 'var(--primary-hover)', fontWeight: 'bold', marginBottom: '48px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+          Pare de perder tempo com planilhas manuais. Trabalhe como engenheiro.
         </p>
 
         <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', justifyContent: 'center' }}>
-          <button className="btn btn-primary" style={{ padding: '16px 40px', fontSize: '18px', width: 'auto', background: '#2e7d32', color: 'white' }} onClick={loginWithGoogle}>
+          <button className="btn btn-primary" style={{ padding: '16px 40px', fontSize: '16px', width: 'auto', borderRadius: '0px' }} onClick={loginWithGoogle}>
             Ativar Conta (Google)
           </button>
         </div>
@@ -71,18 +71,18 @@ export const Login = () => {
 
         {/* Cards de Autoridade Técnica */}
         <div style={{ marginTop: '80px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px', width: '100%', maxWidth: '1000px', textAlign: 'left' }}>
-           <div className="glass-card" style={{ padding: '32px' }}>
-              <div style={{ fontSize: '32px', marginBottom: '16px' }}>🌲</div>
-              <h3 style={{ color: 'white', marginBottom: '12px' }}>Coleta de Campo Profissional</h3>
+           <div className="glass-card" style={{ padding: '32px', borderRadius: '0px' }}>
+              <div style={{ height: '3px', background: 'var(--primary-color)', width: '32px', marginBottom: '24px' }}></div>
+              <h3 style={{ color: 'white', marginBottom: '12px', fontSize: '18px' }}>Coleta de Campo Profissional</h3>
               <p style={{ color: 'gray', fontSize: '14px', lineHeight: 1.5 }}>
                 Registre árvores com nome popular, científico, DAP, altura, coordenadas e observações. 
                 <br/>Tudo organizado e pronto para análise — mesmo sem internet.
               </p>
            </div>
 
-           <div className="glass-card" style={{ padding: '32px' }}>
-              <div style={{ fontSize: '32px', marginBottom: '16px' }}>📊</div>
-              <h3 style={{ color: 'white', marginBottom: '12px' }}>Processamento Automático</h3>
+           <div className="glass-card" style={{ padding: '32px', borderRadius: '0px' }}>
+              <div style={{ height: '3px', background: 'var(--primary-color)', width: '32px', marginBottom: '24px' }}></div>
+              <h3 style={{ color: 'white', marginBottom: '12px', fontSize: '18px' }}>Processamento Automático</h3>
               <div style={{ color: 'gray', fontSize: '14px', lineHeight: 1.6 }}>
                 O LeafTag transforma seus dados em:
                 <ul style={{ paddingLeft: '20px', marginTop: '8px', marginBottom: '8px' }}>
@@ -95,9 +95,9 @@ export const Login = () => {
               </div>
            </div>
 
-           <div className="glass-card" style={{ padding: '32px' }}>
-              <div style={{ fontSize: '32px', marginBottom: '16px' }}>📈</div>
-              <h3 style={{ color: 'white', marginBottom: '12px' }}>Suficiência Amostral em Tempo Real</h3>
+           <div className="glass-card" style={{ padding: '32px', borderRadius: '0px' }}>
+              <div style={{ height: '3px', background: 'var(--primary-color)', width: '32px', marginBottom: '24px' }}></div>
+              <h3 style={{ color: 'white', marginBottom: '12px', fontSize: '18px' }}>Suficiência Amostral em Tempo Real</h3>
               <p style={{ color: 'gray', fontSize: '14px', lineHeight: 1.5 }}>
                 Acompanhe a curva do coletor diretamente no campo. 
                 Saiba exatamente quando sua amostragem é suficiente — com base técnica irrefutável.
@@ -106,24 +106,24 @@ export const Login = () => {
         </div>
 
         {/* Bloco de Autoridade e Punch */}
-        <div style={{ marginTop: '80px', maxWidth: '800px', textAlign: 'center', background: 'rgba(0,0,0,0.4)', padding: '48px 24px', borderRadius: '16px', border: '1px solid #333' }}>
+        <div style={{ marginTop: '80px', maxWidth: '800px', textAlign: 'center', background: 'rgba(20, 25, 22, 0.65)', padding: '48px 24px', borderRadius: '0px', border: '1px solid rgba(255, 255, 255, 0.08)', boxShadow: '0 4px 30px rgba(0, 0, 0, 0.4)' }}>
            <h2 style={{ color: 'var(--primary-color)', marginBottom: '24px' }}>Desenvolvido pela EcoAds</h2>
            <p style={{ color: 'var(--text-muted)', fontSize: '16px', lineHeight: 1.6, marginBottom: '24px' }}>
              A única agência especializada no setor ambiental e florestal do Brasil.
              <br/><br/>
              Criado por engenheiro florestal com experiência real em inventários, o LeafTag não é um sistema genérico — é uma ferramenta construída para quem trabalha em campo.
            </p>
-           <h3 style={{ color: '#fff', fontSize: '24px', marginTop: '40px' }}>
-             ⚡ Se você ainda usa caderno ou Excel para inventário, você está atrasado!
+           <h3 style={{ color: '#fff', fontSize: '20px', marginTop: '40px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+             Se você ainda usa caderno ou Excel para inventário, você está atrasado!
            </h3>
-           <button className="btn btn-primary" style={{ padding: '16px 40px', fontSize: '18px', width: 'auto', marginTop: '32px' }} onClick={loginWithGoogle}>
+           <button className="btn btn-primary" style={{ padding: '16px 40px', fontSize: '16px', width: 'auto', marginTop: '32px', borderRadius: '0px' }} onClick={loginWithGoogle}>
              Acessar Sistema Clicando Aqui
            </button>
         </div>
       </main>
 
       {/* Footer */}
-      <footer style={{ padding: '32px 24px', textAlign: 'center', borderTop: '1px solid #1a1a1a', background: '#0a0d0b', color: '#666', fontSize: '14px' }}>
+      <footer style={{ padding: '32px 24px', textAlign: 'center', borderTop: '1px solid rgba(255, 255, 255, 0.08)', background: 'rgba(20, 25, 22, 0.95)', color: '#666', fontSize: '14px' }}>
         <strong>LeafTag</strong> &copy; {new Date().getFullYear()} - O ecossistema inteligente da <strong>EcoAds</strong>.
       </footer>
     </div>

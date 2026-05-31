@@ -180,8 +180,8 @@ export const StatisticalDashboard: React.FC<DashboardProps> = ({ inventories, on
       overflowX: 'hidden', maxWidth: '100vw'
     }}>
       <div style={{ padding: '16px', background: 'var(--card-bg)', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h2 style={{ color: 'var(--primary-color)' }}>📊 Dashboard Analítico (Fitossociologia)</h2>
-        <button className="btn btn-secondary" style={{ width: 'auto', padding: '6px 12px' }} onClick={onClose}>✕ Fechar</button>
+        <h2 style={{ color: 'var(--primary-color)' }}>Dashboard Analítico (Fitossociologia)</h2>
+        <button className="btn btn-secondary" style={{ width: 'auto', padding: '6px 12px', borderRadius: '0px' }} onClick={onClose}>Fechar</button>
       </div>
 
       {/* Control Strip */}
@@ -198,8 +198,8 @@ export const StatisticalDashboard: React.FC<DashboardProps> = ({ inventories, on
              <label style={{ fontSize: '12px', color: 'gray' }}>Classe de HT (m):</label>
              <input type="number" className="input-field" style={{ width: '70px', marginBottom: 0, textAlign: 'center', padding: '4px' }} value={alturaInterval} onChange={e => setAlturaInterval(parseInt(e.target.value) || 5)} />
           </div>
-          <button className="btn btn-primary" style={{ width: 'auto', marginLeft: 'auto', padding: '8px 16px' }} onClick={handleExportSnapshot} disabled={isExporting}>
-            📸 {isExporting ? 'Renderizando...' : 'Gerar Laudo (PNG)'}
+          <button className="btn btn-primary" style={{ width: 'auto', marginLeft: 'auto', padding: '8px 16px', borderRadius: '0px' }} onClick={handleExportSnapshot} disabled={isExporting}>
+            {isExporting ? 'Renderizando...' : 'Gerar Laudo (PNG)'}
           </button>
       </div>
 

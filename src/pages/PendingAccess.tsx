@@ -11,7 +11,7 @@ export const PendingAccess = () => {
   return (
     <div className="container" style={{ display: 'flex', flexDirection: 'column', height: '100vh', justifyContent: 'center' }}>
       <div className="glass-card" style={{ textAlign: 'center' }}>
-        <div style={{ fontSize: '48px', marginBottom: '16px' }}>⏳</div>
+        <div style={{ height: '3px', background: 'var(--primary-color)', width: '48px', margin: '0 auto 20px' }}></div>
         <h2 style={{ color: 'var(--primary-color)', marginBottom: '8px' }}>Acesso Pendente</h2>
         <p style={{ color: 'var(--text-muted)' }}>
           Sua conta foi criada com sucesso, mas você precisa da aprovação do administrador para acessar os trabalhos de campo.

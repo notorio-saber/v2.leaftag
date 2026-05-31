@@ -55,7 +55,7 @@ const Home = () => {
     <div className="container" style={{ marginTop: '20px' }}>
       <div className="app-header">
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <img src="/logo.png" alt="Logo" style={{ width: '48px', height: '48px', borderRadius: '8px' }} />
+          <img src="/logo.png" alt="Logo" style={{ width: '48px', height: '48px', borderRadius: '0px' }} />
           <div>
             <h1 style={{ color: 'var(--primary-color)', fontSize: '20px', whiteSpace: 'nowrap', margin: 0 }}>Trabalhos de Campo</h1>
             <p style={{ color: 'var(--text-muted)', fontSize: '14px', margin: 0 }}>Gerenciamento</p>
@@ -90,15 +90,15 @@ const Home = () => {
             onClick={() => navigate(`/fieldwork/${fw.id}`)}
           >
             <div className="inventory-card-title">{fw.nome}</div>
-            <div className="inventory-card-info">📍 {fw.local}</div>
-            <div className="inventory-card-info">📅 {fw.dataInicio}</div>
+            <div className="inventory-card-info">Local: {fw.local}</div>
+            <div className="inventory-card-info">Data: {fw.dataInicio}</div>
           </div>
         ))
       )}
 
       {showModal && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
-           <div className="glass-card" style={{ width: '100%', maxWidth: '400px' }}>
+           <div className="glass-card" style={{ width: '100%', maxWidth: '400px', borderRadius: '0px' }}>
               <h3>Novo Trabalho</h3>
               <input className="input-field" placeholder="Nome (Ex: Inventário 2026)" value={newFwName} onChange={e => setNewFwName(e.target.value)} style={{ marginTop: '16px' }} />
               <input className="input-field" placeholder="Local / Fazenda" value={newFwLocal} onChange={e => setNewFwLocal(e.target.value)} />

@@ -202,30 +202,30 @@ export const InventoryDetail = () => {
         <div>
           <h2 style={{ color: 'var(--primary-color)' }}>{inventory.nome}</h2>
           <span style={{ fontSize: '14px', color: 'var(--text-muted)' }}>
-            📍 {fieldwork?.nome || 'Trabalho Desconhecido'} ➔ 🌳 {talhao ? talhao.nome : 'Sem Talhão'} • 📐 {inventory.areaParcela} m²
+            Projeto: {fieldwork?.nome || 'Trabalho Desconhecido'} | Talhão: {talhao ? talhao.nome : 'Sem Talhão'} | Área: {inventory.areaParcela} m²
           </span>
         </div>
-        <button className="btn btn-secondary" style={{ width: 'auto' }} onClick={() => navigate(`/fieldwork/${inventory.fieldWorkId}`)}>Voltar</button>
+        <button className="btn btn-secondary" style={{ width: 'auto', borderRadius: '0px' }} onClick={() => navigate(`/fieldwork/${inventory.fieldWorkId}`)}>Voltar</button>
       </div>
 
-      <div className="glass-card" style={{ marginBottom: '16px' }}>
-        <h3 style={{ marginBottom: '16px' }}>📥 Exportar Dados (Excel)</h3>
+      <div className="glass-card" style={{ marginBottom: '16px', borderRadius: '0px' }}>
+        <h3 style={{ marginBottom: '16px' }}>Exportar Dados (Excel)</h3>
         
         <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-          <button className="btn btn-secondary" style={{ flex: '1 1 200px' }} onClick={handleExportRaw}>
-            📄 Exportar Dados Brutos
+          <button className="btn btn-secondary" style={{ flex: '1 1 200px', borderRadius: '0px' }} onClick={handleExportRaw}>
+            Exportar Dados Brutos
           </button>
-          <button className="btn btn-primary" style={{ flex: '1 1 200px' }} onClick={() => setShowExportOptions(!showExportOptions)}>
-            ⚙️ Exportar Processados
+          <button className="btn btn-primary" style={{ flex: '1 1 200px', borderRadius: '0px' }} onClick={() => setShowExportOptions(!showExportOptions)}>
+            Exportar Processados
           </button>
         </div>
         
         <div style={{ marginTop: '16px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-          <button className="btn btn-secondary" style={{ flex: '1 1 200px', borderColor: '#ffb74d', color: '#ffb74d' }} onClick={() => setShowDashboard(true)}>
-            📊 Ver Dashboard da Parcela
+          <button className="btn btn-secondary" style={{ flex: '1 1 200px', borderColor: '#ffb74d', color: '#ffb74d', borderRadius: '0px' }} onClick={() => setShowDashboard(true)}>
+            Ver Dashboard da Parcela
           </button>
-          <button className="btn btn-secondary" style={{ flex: '1 1 200px', borderColor: '#4fc3f7', color: '#4fc3f7' }} onClick={handleDownloadPhotos} disabled={isZipping}>
-            {isZipping ? "⏳ Compactando Zíper..." : "🗃️ Baixar Galeria (ZIP)"}
+          <button className="btn btn-secondary" style={{ flex: '1 1 200px', borderColor: '#4fc3f7', color: '#4fc3f7', borderRadius: '0px' }} onClick={handleDownloadPhotos} disabled={isZipping}>
+            {isZipping ? "Compactando..." : "Baixar Galeria (ZIP)"}
           </button>
         </div>
 
@@ -261,17 +261,17 @@ export const InventoryDetail = () => {
         )}
       </div>
 
-      <div className="glass-card" style={{ marginBottom: '16px', padding: 0, overflow: 'hidden' }}>
+      <div className="glass-card" style={{ marginBottom: '16px', padding: 0, overflow: 'hidden', borderRadius: '0px' }}>
         <div style={{ padding: '16px', borderBottom: '1px solid #333', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <h3 style={{ margin: 0 }}>📋 Dados Coletados ({inventory.dados.length})</h3>
+            <h3 style={{ margin: 0 }}>Dados Coletados ({inventory.dados.length})</h3>
             {isSufficiencyReached && (
-              <span style={{ background: '#2e7d32', color: 'white', padding: '4px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: 'bold' }}>
-                ✅ Suficiência Amostral (Assíntota)
+              <span style={{ background: '#2e7d32', color: 'white', padding: '4px 8px', borderRadius: '0px', fontSize: '12px', fontWeight: 'bold' }}>
+                Suficiência Amostral (Assíntota)
               </span>
             )}
           </div>
-          <button className="btn btn-primary" style={{ width: 'auto', padding: '6px 12px', fontSize: 14 }} onClick={() => { setCurrentInventory(inventory); navigate('/collect'); }}>
+          <button className="btn btn-primary" style={{ width: 'auto', padding: '6px 12px', fontSize: 14, borderRadius: '0px' }} onClick={() => { setCurrentInventory(inventory); navigate('/collect'); }}>
             + Continuar Coletando
           </button>
         </div>
@@ -314,24 +314,24 @@ export const InventoryDetail = () => {
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'center' }}>
-        <button className="btn btn-danger" style={{ opacity: 0.8 }} onClick={() => {
-          if(window.confirm('Tem certeza em excluir definitivamente a parcela e TODOS OS SEUS DADOS E FOTOS? Essa ação é vitalícia.')) {
-            // Hard cascade deletion 
-            inventory.dados.forEach((d: any) => deletePhotosForIndividual(d.id));
-            deleteInventory(inventory.id);
-            navigate(`/fieldwork/${inventory.fieldWorkId}`);
-          }
-        }}>
-          ⚠️ Excluir Parcela (Irreversível)
-        </button>
+          <button className="btn btn-danger" style={{ opacity: 0.8, borderRadius: '0px' }} onClick={() => {
+            if(window.confirm('Tem certeza em excluir definitivamente a parcela e TODOS OS SEUS DADOS E FOTOS? Essa ação é vitalícia.')) {
+              // Hard cascade deletion 
+              inventory.dados.forEach((d: any) => deletePhotosForIndividual(d.id));
+              deleteInventory(inventory.id);
+              navigate(`/fieldwork/${inventory.fieldWorkId}`);
+            }
+          }}>
+            Excluir Parcela (Irreversível)
+          </button>
       </div>
 
       {editingInd && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.9)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', zIndex: 1000, padding: '20px', overflowY: 'auto' }}>
-           <div className="glass-card" style={{ width: '100%', maxWidth: '600px', marginTop: '20px', marginBottom: '40px' }}>
+           <div className="glass-card" style={{ width: '100%', maxWidth: '600px', marginTop: '20px', marginBottom: '40px', borderRadius: '0px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
                 <h3>Edição: Indivíduo #{editingInd.numeroIndividuo}</h3>
-                <button onClick={() => setEditingInd(null)} style={{ background: 'transparent', color: 'white', border: 'none', fontSize: 20 }}>✕</button>
+                <button onClick={() => setEditingInd(null)} style={{ background: 'transparent', color: 'white', border: 'none', fontSize: 20 }}>X</button>
               </div>
 
               {inventory.colunas.map(col => {
@@ -367,8 +367,8 @@ export const InventoryDetail = () => {
               )}
 
               <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
-                <button className="btn btn-secondary" onClick={() => setEditingInd(null)}>Cancelar</button>
-                <button className="btn btn-primary" onClick={handleSaveEdit}>💾 Salvar Alterações</button>
+                <button className="btn btn-secondary" style={{ borderRadius: '0px' }} onClick={() => setEditingInd(null)}>Cancelar</button>
+                <button className="btn btn-primary" style={{ borderRadius: '0px' }} onClick={handleSaveEdit}>Salvar Alterações</button>
               </div>
            </div>
         </div>

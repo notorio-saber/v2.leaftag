@@ -13,10 +13,20 @@ export const TextKeyboardModal: React.FC<TextKeyboardModalProps> = ({
   onConfirm,
   onClose
 }) => {
-  const [isUppercase, setIsUppercase] = useState(true);
+  const [isUppercase, setIsUppercase] = useState(value === '');
+
+  // Automatically force uppercase when text is cleared or empty
+  useEffect(() => {
+    if (value === '') {
+      setIsUppercase(true);
+    }
+  }, [value]);
 
   const handleKeyPress = (char: string) => {
     onChange(value + (isUppercase ? char.toUpperCase() : char.toLowerCase()));
+    if (isUppercase) {
+      setIsUppercase(false);
+    }
   };
 
   const handleBackspace = () => {
