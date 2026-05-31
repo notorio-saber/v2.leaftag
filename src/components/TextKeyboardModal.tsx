@@ -1,84 +1,64 @@
 import React, { useState, useEffect } from 'react';
 
 interface TextKeyboardModalProps {
-  title: string;
-  initialValue: string;
-  onConfirm: (val: string) => void;
+  value: string;
+  onChange: (val: string) => void;
+  onConfirm: () => void;
   onClose: () => void;
 }
 
 export const TextKeyboardModal: React.FC<TextKeyboardModalProps> = ({
-  title,
-  initialValue,
+  value,
+  onChange,
   onConfirm,
   onClose
 }) => {
-  const [value, setValue] = useState('');
   const [isUppercase, setIsUppercase] = useState(true);
 
-  // Synchronize initial value
-  useEffect(() => {
-    setValue(initialValue ? initialValue.toString() : '');
-  }, [initialValue]);
-
   const handleKeyPress = (char: string) => {
-    setValue(prev => prev + (isUppercase ? char.toUpperCase() : char.toLowerCase()));
+    onChange(value + (isUppercase ? char.toUpperCase() : char.toLowerCase()));
   };
 
   const handleBackspace = () => {
-    setValue(prev => prev.slice(0, -1));
+    onChange(value.slice(0, -1));
   };
 
   const handleClear = () => {
-    setValue('');
+    onChange('');
   };
 
   const handleSpace = () => {
-    setValue(prev => prev + ' ');
+    onChange(value + ' ');
   };
 
   const handleSpShort = () => {
-    setValue(prev => {
-      if (prev === '') return 'sp.';
-      if (prev.endsWith(' ')) return prev + 'sp.';
-      return prev + ' sp.';
-    });
+    onChange(value + (value === '' ? 'sp.' : value.endsWith(' ') ? 'sp.' : ' sp.'));
   };
 
   const handleCfShort = () => {
-    setValue(prev => {
-      if (prev === '') return 'cf.';
-      if (prev.endsWith(' ')) return prev + 'cf.';
-      return prev + ' cf.';
-    });
+    onChange(value + (value === '' ? 'cf.' : value.endsWith(' ') ? 'cf.' : ' cf.'));
   };
 
   const handleNiShort = () => {
-    setValue('NI');
-  };
-
-  const handleConfirm = () => {
-    onConfirm(value);
+    onChange('NI');
   };
 
   // Listen to physical keyboard events
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Prevent capturing input when target is another field (just in case, but inputs are readOnly so safe)
       if (e.key.length === 1) {
-        // Capture standard characters (letters, symbols, spaces)
-        setValue(prev => prev + e.key);
+        onChange(value + e.key);
       } else if (e.key === 'Backspace') {
         handleBackspace();
       } else if (e.key === 'Escape') {
         onClose();
       } else if (e.key === 'Enter') {
-        handleConfirm();
+        onConfirm();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [value]);
+  }, [value, onChange]);
 
   const row1 = ['q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p'];
   const row2 = ['a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l'];
@@ -92,7 +72,7 @@ export const TextKeyboardModal: React.FC<TextKeyboardModalProps> = ({
       transform: 'translate(-50%, 0)',
       width: '100%',
       maxWidth: '520px',
-      background: 'rgba(10, 13, 11, 0.95)',
+      background: 'rgba(10, 13, 11, 0.96)',
       backdropFilter: 'blur(16px)',
       WebkitBackdropFilter: 'blur(16px)',
       borderTop: '2px solid var(--primary-color)',
@@ -103,7 +83,7 @@ export const TextKeyboardModal: React.FC<TextKeyboardModalProps> = ({
       boxShadow: '0 -10px 40px rgba(0, 0, 0, 0.5)',
       display: 'flex',
       flexDirection: 'column',
-      gap: '12px',
+      gap: '10px',
       boxSizing: 'border-box',
       zIndex: 10000,
       animation: 'slideUpText 0.3s cubic-bezier(0.16, 1, 0.3, 1) both'
@@ -114,55 +94,6 @@ export const TextKeyboardModal: React.FC<TextKeyboardModalProps> = ({
           to { transform: translate(-50%, 0); }
         }
       `}</style>
-
-      {/* Header: Title and value display */}
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
-        <span style={{ 
-          fontSize: '11px', 
-          textTransform: 'uppercase', 
-          letterSpacing: '2px', 
-          color: 'var(--text-muted)',
-          fontWeight: 'bold'
-        }}>{title}</span>
-        
-        {/* Display box */}
-        <div style={{
-          width: '100%',
-          background: 'rgba(0,0,0,0.4)',
-          border: '1px solid var(--border-color)',
-          borderRadius: '12px',
-          padding: '12px',
-          textAlign: 'center',
-          minHeight: '56px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          position: 'relative'
-        }}>
-          <span style={{ 
-            fontSize: '24px', 
-            fontWeight: '700', 
-            color: value ? 'var(--primary-hover)' : 'rgba(255,255,255,0.15)',
-            letterSpacing: '0.5px',
-            wordBreak: 'break-all'
-          }}>
-            {value || 'Digitar...'}
-          </span>
-          <span style={{
-            width: '2px',
-            height: '24px',
-            background: 'var(--primary-color)',
-            marginLeft: '4px',
-            animation: 'blinkText 1s step-end infinite'
-          }} />
-          <style>{`
-            @keyframes blinkText {
-              from, to { background-color: transparent }
-              50% { background-color: var(--primary-color) }
-            }
-          `}</style>
-        </div>
-      </div>
 
       {/* Keyboard Keypad Layout */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
@@ -177,13 +108,13 @@ export const TextKeyboardModal: React.FC<TextKeyboardModalProps> = ({
 
         {/* Row 2 */}
         <div style={rowStyle}>
-          <div style={{ width: '4%' }} /> {/* Indent */}
+          <div style={{ width: '4%' }} />
           {row2.map(char => (
             <button key={char} type="button" style={keyStyle} onClick={() => handleKeyPress(char)}>
               {isUppercase ? char.toUpperCase() : char.toLowerCase()}
             </button>
           ))}
-          <div style={{ width: '4%' }} /> {/* Indent */}
+          <div style={{ width: '4%' }} />
         </div>
 
         {/* Row 3 */}
@@ -208,7 +139,7 @@ export const TextKeyboardModal: React.FC<TextKeyboardModalProps> = ({
           <button type="button" style={shortcutStyle} onClick={handleNiShort}>NI</button>
           <button type="button" style={{ ...keyStyle, flex: 2, background: 'rgba(255,255,255,0.06)' }} onClick={handleSpace}>Espaço</button>
           <button type="button" style={shortcutStyle} onClick={handleClear}>Limpar</button>
-          <button type="button" style={confirmStyle} onClick={handleConfirm}>OK</button>
+          <button type="button" style={confirmStyle} onClick={onConfirm}>OK</button>
         </div>
       </div>
 
@@ -219,15 +150,16 @@ export const TextKeyboardModal: React.FC<TextKeyboardModalProps> = ({
         onClick={onClose}
         style={{ 
           marginTop: '4px', 
-          padding: '10px', 
+          padding: '8px', 
           borderColor: 'transparent',
           color: 'var(--text-muted)',
           fontSize: '10px',
           letterSpacing: '2px',
-          textTransform: 'uppercase'
+          textTransform: 'uppercase',
+          cursor: 'pointer'
         }}
       >
-        Cancelar
+        Fechar Teclado
       </button>
     </div>
   );
@@ -242,7 +174,7 @@ const rowStyle: React.CSSProperties = {
 
 const keyStyle: React.CSSProperties = {
   flex: 1,
-  height: '46px',
+  height: '42px',
   fontSize: '16px',
   fontWeight: '600',
   borderRadius: '8px',

@@ -1,47 +1,36 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 
 interface NumericKeyboardModalProps {
-  title: string;
-  initialValue: string;
-  onConfirm: (val: string) => void;
+  value: string;
+  onChange: (val: string) => void;
+  onConfirm: () => void;
   onClose: () => void;
 }
 
 export const NumericKeyboardModal: React.FC<NumericKeyboardModalProps> = ({
-  title,
-  initialValue,
+  value,
+  onChange,
   onConfirm,
   onClose
 }) => {
-  const [value, setValue] = useState('');
-
-  // Synchronize initial clean value
-  useEffect(() => {
-    setValue(initialValue ? initialValue.toString() : '');
-  }, [initialValue]);
-
   const handleKeyPress = (key: string) => {
     if (key === '.' || key === ',') {
       // Prevent multiple decimals, store internally as '.'
       if (!value.includes('.')) {
-        setValue(prev => prev === '' ? '0.' : prev + '.');
+        onChange(value === '' ? '0.' : value + '.');
       }
     } else if (key === '⌫') {
-      setValue(prev => prev.slice(0, -1));
+      onChange(value.slice(0, -1));
     } else if (key === 'C') {
-      setValue('');
+      onChange('');
     } else {
       // Prevent multiple leading zeroes
       if (value === '0') {
-        setValue(key);
+        onChange(key);
       } else {
-        setValue(prev => prev + key);
+        onChange(value + key);
       }
     }
-  };
-
-  const handleConfirm = () => {
-    onConfirm(value);
   };
 
   // Listen to physical keyboard events
@@ -56,15 +45,12 @@ export const NumericKeyboardModal: React.FC<NumericKeyboardModalProps> = ({
       } else if (e.key === 'Escape') {
         onClose();
       } else if (e.key === 'Enter') {
-        handleConfirm();
+        onConfirm();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [value]);
-
-  // Convert decimal point '.' to comma ',' for local representation
-  const displayValue = value.replace('.', ',');
+  }, [value, onChange]);
 
   return (
     <div style={{
@@ -74,83 +60,34 @@ export const NumericKeyboardModal: React.FC<NumericKeyboardModalProps> = ({
       transform: 'translate(-50%, 0)',
       width: '100%',
       maxWidth: '480px',
-      background: 'rgba(10, 13, 11, 0.95)',
+      background: 'rgba(10, 13, 11, 0.96)',
       backdropFilter: 'blur(16px)',
       WebkitBackdropFilter: 'blur(16px)',
       borderTop: '2px solid var(--primary-color)',
       borderLeft: '1px solid var(--border-color)',
       borderRight: '1px solid var(--border-color)',
       borderRadius: '24px 24px 0 0',
-      padding: '20px 20px max(12px, env(safe-area-inset-bottom)) 20px',
+      padding: '16px 16px max(12px, env(safe-area-inset-bottom)) 16px',
       boxShadow: '0 -10px 40px rgba(0, 0, 0, 0.5)',
       display: 'flex',
       flexDirection: 'column',
-      gap: '16px',
+      gap: '12px',
       boxSizing: 'border-box',
       zIndex: 10000,
-      animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) both'
+      animation: 'slideUpNum 0.3s cubic-bezier(0.16, 1, 0.3, 1) both'
     }}>
       <style>{`
-        @keyframes slideUp {
+        @keyframes slideUpNum {
           from { transform: translate(-50%, 100%); }
           to { transform: translate(-50%, 0); }
         }
       `}</style>
 
-      {/* Header: Title and value display */}
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-        <span style={{ 
-          fontSize: '11px', 
-          textTransform: 'uppercase', 
-          letterSpacing: '2px', 
-          color: 'var(--text-muted)',
-          fontWeight: 'bold'
-        }}>{title}</span>
-        
-        {/* Display box */}
-        <div style={{
-          width: '100%',
-          background: 'rgba(0,0,0,0.4)',
-          border: '1px solid var(--border-color)',
-          borderRadius: '16px',
-          padding: '16px',
-          textAlign: 'center',
-          minHeight: '72px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          position: 'relative'
-        }}>
-          <span style={{ 
-            fontSize: '40px', 
-            fontWeight: '800', 
-            fontFamily: 'monospace',
-            color: value ? 'var(--primary-hover)' : 'rgba(255,255,255,0.15)',
-            letterSpacing: '1px'
-          }}>
-            {displayValue || '0,0'}
-          </span>
-          <span style={{
-            width: '3px',
-            height: '36px',
-            background: 'var(--primary-color)',
-            marginLeft: '4px',
-            animation: 'blink 1s step-end infinite'
-          }} />
-          <style>{`
-            @keyframes blink {
-              from, to { background-color: transparent }
-              50% { background-color: var(--primary-color) }
-            }
-          `}</style>
-        </div>
-      </div>
-
       {/* Grid Keypad */}
       <div style={{ 
         display: 'grid', 
         gridTemplateColumns: 'repeat(3, 1fr)', 
-        gap: '12px',
+        gap: '10px',
         width: '100%'
       }}>
         {/* Row 1 */}
@@ -176,39 +113,41 @@ export const NumericKeyboardModal: React.FC<NumericKeyboardModalProps> = ({
         {/* Row 5 */}
         <button type="button" className="btn btn-danger" style={dangerKeyStyle} onClick={() => handleKeyPress('⌫')}>⌫</button>
         <button type="button" className="btn btn-secondary" style={clearKeyStyle} onClick={() => handleKeyPress('C')}>Limpar</button>
-        <button type="button" className="btn btn-primary" style={confirmKeyStyle} onClick={handleConfirm}>OK</button>
+        <button type="button" className="btn btn-primary" style={confirmKeyStyle} onClick={onConfirm}>OK</button>
       </div>
 
-      {/* Footer Actions */}
+      {/* Footer Cancel Action */}
       <button 
         type="button"
         className="btn btn-secondary" 
         onClick={onClose}
         style={{ 
-          marginTop: '8px', 
-          padding: '12px', 
+          marginTop: '4px', 
+          padding: '8px', 
           borderColor: 'transparent',
           color: 'var(--text-muted)',
-          fontSize: '11px',
+          fontSize: '10px',
           letterSpacing: '2px',
-          textTransform: 'uppercase'
+          textTransform: 'uppercase',
+          cursor: 'pointer'
         }}
       >
-        Cancelar
+        Fechar Teclado
       </button>
     </div>
   );
 };
 
 const keyStyle: React.CSSProperties = {
-  height: '64px',
-  fontSize: '24px',
+  height: '56px',
+  fontSize: '22px',
   fontWeight: '600',
-  borderRadius: '12px',
+  borderRadius: '10px',
   background: 'rgba(255,255,255,0.03)',
   border: '1px solid var(--border-color)',
   color: 'white',
-  padding: 0
+  padding: 0,
+  cursor: 'pointer'
 };
 
 const specialKeyStyle: React.CSSProperties = {
@@ -218,30 +157,33 @@ const specialKeyStyle: React.CSSProperties = {
 };
 
 const dangerKeyStyle: React.CSSProperties = {
-  height: '64px',
-  fontSize: '20px',
-  borderRadius: '12px',
+  height: '56px',
+  fontSize: '18px',
+  borderRadius: '10px',
   border: '1px solid rgba(239, 35, 60, 0.3)',
   color: '#ef233c',
-  padding: 0
+  padding: 0,
+  cursor: 'pointer'
 };
 
 const clearKeyStyle: React.CSSProperties = {
-  height: '64px',
-  fontSize: '13px',
-  borderRadius: '12px',
+  height: '56px',
+  fontSize: '12px',
+  borderRadius: '10px',
   border: '1px solid var(--border-color)',
   color: 'var(--text-muted)',
-  padding: 0
+  padding: 0,
+  cursor: 'pointer'
 };
 
 const confirmKeyStyle: React.CSSProperties = {
-  height: '64px',
-  fontSize: '18px',
+  height: '56px',
+  fontSize: '16px',
   fontWeight: 'bold',
-  borderRadius: '12px',
+  borderRadius: '10px',
   background: 'var(--primary-color)',
   color: 'white',
   border: '1px solid var(--primary-color)',
-  padding: 0
+  padding: 0,
+  cursor: 'pointer'
 };
