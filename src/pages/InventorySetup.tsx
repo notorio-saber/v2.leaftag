@@ -21,7 +21,7 @@ const getNewCustomCol = () => ({ id: '', nome: '', tipo: 'text', checked: true }
 
 export const InventorySetup = () => {
   const navigate = useNavigate();
-  const { fieldWorkId } = useParams();
+  const { fieldWorkId, talhaoId } = useParams();
   const { setCurrentInventory, saveInventory } = useInventory();
   const [nome, setNome] = useState('');
   const [area, setArea] = useState('');
@@ -77,6 +77,7 @@ export const InventorySetup = () => {
     const newInv = {
       id: Date.now(),
       fieldWorkId,
+      talhaoId,
       nome,
       areaParcela: parseFloat(area) || 0,
       fatorExpansao: parseFloat(area) > 0 ? 10000 / parseFloat(area) : 1,

@@ -10,10 +10,11 @@ import { StatisticalDashboard } from '../components/StatisticalDashboard';
 export const InventoryDetail = () => {
   const navigate = useNavigate();
   const { id } = useParams();
-  const { inventories, deleteInventory, setCurrentInventory, fieldWorks, saveInventory } = useInventory();
+  const { inventories, deleteInventory, setCurrentInventory, fieldWorks, saveInventory, talhoes } = useInventory();
   
   const inventory = inventories.find(i => i.id.toString() === id);
   const fieldwork = fieldWorks.find(f => f.id === inventory?.fieldWorkId);
+  const talhao = talhoes.find(t => t.id === inventory?.talhaoId);
   
   const [fatorForma, setFatorForma] = useState('0.7');
   const [showExportOptions, setShowExportOptions] = useState(false);
@@ -186,10 +187,23 @@ export const InventoryDetail = () => {
 
   return (
     <div className="container" style={{ marginTop: '20px' }}>
+      {/* Breadcrumbs Navigation */}
+      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '16px', fontSize: '12px', color: 'var(--text-muted)' }}>
+        <span style={{ cursor: 'pointer', textDecoration: 'underline' }} onClick={() => navigate('/')}>Trabalhos</span>
+        <span>/</span>
+        <span style={{ cursor: 'pointer', textDecoration: 'underline' }} onClick={() => navigate(`/fieldwork/${inventory.fieldWorkId}`)}>{fieldwork?.nome || 'Trabalho'}</span>
+        <span>/</span>
+        <span>{talhao ? talhao.nome : 'Sem Talhão'}</span>
+        <span>/</span>
+        <span style={{ color: 'var(--primary-color)', fontWeight: 'bold' }}>{inventory.nome}</span>
+      </div>
+
       <div className="app-header">
         <div>
           <h2 style={{ color: 'var(--primary-color)' }}>{inventory.nome}</h2>
-          <span style={{ fontSize: '14px', color: 'var(--text-muted)' }}>{fieldwork?.nome || 'Trabalho Desconhecido'} • {inventory.areaParcela} m²</span>
+          <span style={{ fontSize: '14px', color: 'var(--text-muted)' }}>
+            📍 {fieldwork?.nome || 'Trabalho Desconhecido'} ➔ 🌳 {talhao ? talhao.nome : 'Sem Talhão'} • 📐 {inventory.areaParcela} m²
+          </span>
         </div>
         <button className="btn btn-secondary" style={{ width: 'auto' }} onClick={() => navigate(`/fieldwork/${inventory.fieldWorkId}`)}>Voltar</button>
       </div>

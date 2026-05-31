@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { MapContainer, TileLayer, CircleMarker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import type { Inventory, IndividualData } from '../types';
+import { useInventory } from '../context/InventoryContext';
 
 interface MapVisProps {
   inventories: Inventory[];
@@ -38,6 +39,7 @@ const AutoFitBounds = ({ points }: { points: PointData[] }) => {
 };
 
 export const MapVisualization: React.FC<MapVisProps> = ({ inventories, onClose }) => {
+  const { talhoes } = useInventory();
   // Map of inventory ID to its display state
   const [visibleInventories, setVisibleInventories] = useState<Record<number, boolean>>(
     inventories.reduce((acc, inv) => ({ ...acc, [inv.id]: true }), {})
@@ -152,6 +154,8 @@ export const MapVisualization: React.FC<MapVisProps> = ({ inventories, onClose }
             const hasPts = allPoints.some(p => p.inventoryId === inv.id);
             if (!hasPts) return null;
             
+            const associatedTalhao = talhoes.find(t => t.id === inv.talhaoId);
+            const displayName = associatedTalhao ? `[${associatedTalhao.nome}] ${inv.nome}` : inv.nome;
             const color = MAP_COLORS[idx % MAP_COLORS.length];
             return (
               <label key={inv.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', cursor: 'pointer' }}>
@@ -161,7 +165,7 @@ export const MapVisualization: React.FC<MapVisProps> = ({ inventories, onClose }
                   onChange={(e) => setVisibleInventories(prev => ({ ...prev, [inv.id]: e.target.checked }))}
                 />
                 <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: color }}></div>
-                <span style={{ fontSize: '14px', flex: 1, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{inv.nome}</span>
+                <span style={{ fontSize: '14px', flex: 1, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }} title={displayName}>{displayName}</span>
               </label>
             );
           })}

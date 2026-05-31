@@ -29,9 +29,16 @@ export interface FieldWork {
   status: string;
 }
 
+export interface Talhao {
+  id: string;
+  fieldWorkId: string;
+  nome: string;
+}
+
 export interface Inventory {
   id: number;
   fieldWorkId: string;
+  talhaoId?: string;
   nome: string;
   areaParcela: number;
   fatorExpansao: number;
