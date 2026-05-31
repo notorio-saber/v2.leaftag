@@ -2,9 +2,44 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useInventory } from '../context/InventoryContext';
 import { getCurrentPosition } from '../utils/gpsOperations';
-import { compressImage, savePhoto } from '../utils/photoStorage';
+import { compressImage, savePhoto, getPhotosForInventory } from '../utils/photoStorage';
 import { NumericKeyboardModal } from '../components/NumericKeyboardModal';
 import { TextKeyboardModal } from '../components/TextKeyboardModal';
+
+const PhotoThumbnails = ({ individualId, inventoryId }: { individualId: string; inventoryId: number }) => {
+  const [photoUrls, setPhotoUrls] = useState<string[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    const load = async () => {
+      try {
+        const allPhotos = await getPhotosForInventory(inventoryId);
+        const myPhotos = allPhotos.filter(p => p.individualId === individualId);
+        if (active) {
+          setPhotoUrls(myPhotos.map(p => p.base64Data));
+        }
+      } catch (err) {
+        console.error("Erro ao carregar miniaturas:", err);
+      }
+    };
+    load();
+    return () => { active = false; };
+  }, [individualId, inventoryId]);
+
+  if (photoUrls.length === 0) {
+    return <span style={{ color: 'rgba(255,255,255,0.25)', fontStyle: 'italic', fontSize: '13px' }}>Sem fotos</span>;
+  }
+
+  return (
+    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '6px' }}>
+      {photoUrls.map((url, i) => (
+        <div key={i} style={{ width: '80px', height: '80px', borderRadius: '8px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)' }}>
+          <img src={url} alt={`Foto ${i + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        </div>
+      ))}
+    </div>
+  );
+};
 
 export const CollectData = () => {
   const navigate = useNavigate();
@@ -15,6 +50,11 @@ export const CollectData = () => {
   const [isGpsLoading, setIsGpsLoading] = useState(false);
   const [multiStems, setMultiStems] = useState(false);
   const [stems, setStems] = useState([{ id: Date.now().toString(), cap: '', altura: '' }]);
+
+  // Previous individual review modal states
+  const [showPrevIndModal, setShowPrevIndModal] = useState(false);
+  const [editingPrevInd, setEditingPrevInd] = useState(false);
+  const [tempPrevIndData, setTempPrevIndData] = useState<any>(null);
 
   const [activeNumField, setActiveNumField] = useState<{
     title: string;
@@ -117,9 +157,44 @@ export const CollectData = () => {
   };
 
   const handlePrev = () => {
-    const prevIdx = getPrevStepIndex(stepIndex);
-    if (prevIdx >= 0) {
-      setStepIndex(prevIdx);
+    try {
+      const prevIdx = getPrevStepIndex(stepIndex);
+      if (prevIdx >= 0) {
+        setStepIndex(prevIdx);
+      } else if (stepIndex === 0) {
+        if (currentInventory?.dados && currentInventory.dados.length > 0) {
+          const prevInd = currentInventory.dados[currentInventory.dados.length - 1];
+          if (prevInd) {
+            setTempPrevIndData(JSON.parse(JSON.stringify(prevInd)));
+            setEditingPrevInd(false);
+            setShowPrevIndModal(true);
+          }
+        } else {
+          alert("Não há árvores coletadas anteriormente nesta parcela para revisar.");
+        }
+      }
+    } catch (err) {
+      console.error("Erro no handlePrev:", err);
+    }
+  };
+
+  const handleSavePrevInd = async () => {
+    try {
+      if (!tempPrevIndData) return;
+      const freshInv = JSON.parse(JSON.stringify(currentInventory));
+      if (freshInv?.dados) {
+        const targetIdx = freshInv.dados.findIndex((d: any) => d.id === tempPrevIndData.id);
+        if (targetIdx >= 0) {
+          freshInv.dados[targetIdx] = tempPrevIndData;
+          setCurrentInventory(freshInv);
+          await saveInventory(freshInv);
+        }
+      }
+      setShowPrevIndModal(false);
+      setEditingPrevInd(false);
+      setTempPrevIndData(null);
+    } catch (err) {
+      console.error("Erro no handleSavePrevInd:", err);
     }
   };
 
@@ -632,11 +707,10 @@ export const CollectData = () => {
           <div style={{ display: 'flex', gap: '10px' }}>
             <button 
               className="btn btn-secondary" 
-              style={{ width: '30%', padding: '12px 0' }} 
-              disabled={stepIndex === 0} 
+              style={{ width: '30%', padding: '12px 0', border: '1px solid rgba(46, 125, 50, 0.4)' }} 
               onClick={handlePrev}
             >
-              Anterior
+              Anterior •
             </button>
             <button 
               className="btn btn-primary" 
@@ -648,6 +722,202 @@ export const CollectData = () => {
           </div>
         </div>
       </div>
+
+      {/* Modal de Revisão do Indivíduo Anterior */}
+      {showPrevIndModal && tempPrevIndData && (
+        <div style={{ 
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
+          background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', 
+          zIndex: 1000, padding: '20px', overflowY: 'auto', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' 
+        }}>
+          <div className="glass-card" style={{ width: '100%', maxWidth: '440px', marginTop: '30px', marginBottom: '30px', padding: '24px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <h3 style={{ fontSize: '18px', fontWeight: '800', color: '#ffffff', margin: 0 }}>
+                Revisar Árvore #{tempPrevIndData.numeroIndividuo}
+              </h3>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <button 
+                  onClick={() => setEditingPrevInd(!editingPrevInd)}
+                  style={{
+                    background: editingPrevInd ? 'rgba(46, 125, 50, 0.25)' : 'transparent',
+                    border: editingPrevInd ? '1px solid var(--primary-hover)' : '1px solid rgba(255, 255, 255, 0.15)',
+                    color: editingPrevInd ? 'var(--primary-hover)' : 'white',
+                    borderRadius: '8px',
+                    width: '36px',
+                    height: '36px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    padding: 0,
+                    outline: 'none'
+                  }}
+                  title="Editar dados"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 20h9"></path>
+                    <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+                  </svg>
+                </button>
+                <button 
+                  onClick={() => {
+                    setShowPrevIndModal(false);
+                    setEditingPrevInd(false);
+                    setTempPrevIndData(null);
+                  }} 
+                  style={{ 
+                    background: 'transparent', 
+                    color: 'rgba(255,255,255,0.6)', 
+                    border: 'none', 
+                    fontSize: '24px', 
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '32px',
+                    height: '32px',
+                    padding: 0,
+                    lineHeight: 1
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {columns.map(col => {
+                if (tempPrevIndData.multipleStems && ['cap', 'hc', 'ht'].includes(col.id)) return null;
+
+                const value = tempPrevIndData[col.id];
+                
+                return (
+                  <div key={col.id}>
+                    <label className="input-label" style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{col.nome}</label>
+                    {editingPrevInd ? (
+                      col.tipo === 'photo' ? (
+                        <div style={{ padding: '12px 16px', background: 'rgba(0,0,0,0.2)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.06)', fontSize: '14px', color: 'var(--text-muted)' }}>
+                          {value || 'Sem fotos'}
+                        </div>
+                      ) : (
+                        <input 
+                          type={col.tipo === 'number' ? 'number' : 'text'} 
+                          className="input-field" 
+                          style={{ marginBottom: 0, marginTop: '4px' }}
+                          value={value || ''} 
+                          onChange={e => setTempPrevIndData({ ...tempPrevIndData, [col.id]: e.target.value })} 
+                        />
+                      )
+                    ) : (
+                      <div style={{ 
+                        padding: '12px 16px', 
+                        background: 'rgba(255, 255, 255, 0.02)', 
+                        borderRadius: '12px', 
+                        border: '1px solid rgba(255,255,255,0.05)',
+                        fontSize: '15px',
+                        color: '#ffffff',
+                        wordBreak: 'break-all'
+                      }}>
+                        {col.tipo === 'photo' ? (
+                          <PhotoThumbnails individualId={tempPrevIndData.id} inventoryId={currentInventory.id} />
+                        ) : (
+                          value || <span style={{ color: 'rgba(255,255,255,0.25)', fontStyle: 'italic' }}>Não preenchido</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+
+              {/* Se a árvore anterior for bifurcada, exibe fustes */}
+              {tempPrevIndData.multipleStems && tempPrevIndData.stems && (
+                <div style={{ 
+                  background: 'rgba(0,0,0,0.25)', 
+                  padding: '16px', 
+                  borderRadius: '12px', 
+                  marginTop: '16px',
+                  border: '1px solid rgba(255,255,255,0.06)'
+                }}>
+                  <h4 style={{ marginBottom: '10px', fontSize: '12px', color: 'var(--primary-hover)', textTransform: 'uppercase', fontWeight: 'bold' }}>Fustes de Ramificação</h4>
+                  {tempPrevIndData.stems.map((stem: any, i: number) => (
+                    <div key={stem.id} style={{ marginBottom: '12px' }}>
+                      <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Fuste #{i + 1}</span>
+                      {editingPrevInd ? (
+                        <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
+                          <div style={{ flex: 1 }}>
+                            <label className="input-label" style={{ fontSize: '9px' }}>CAP</label>
+                            <input 
+                              type="number" 
+                              className="input-field" 
+                              placeholder="CAP" 
+                              value={stem.cap || ''} 
+                              onChange={e => {
+                                const s = [...tempPrevIndData.stems]; 
+                                s[i].cap = e.target.value; 
+                                setTempPrevIndData({ ...tempPrevIndData, stems: s });
+                              }} 
+                              style={{ marginBottom: 0 }} 
+                            />
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <label className="input-label" style={{ fontSize: '9px' }}>Altura (m)</label>
+                            <input 
+                              type="number" 
+                              className="input-field" 
+                              placeholder="Alt" 
+                              value={stem.altura || ''} 
+                              onChange={e => {
+                                const s = [...tempPrevIndData.stems]; 
+                                s[i].altura = e.target.value; 
+                                setTempPrevIndData({ ...tempPrevIndData, stems: s });
+                              }} 
+                              style={{ marginBottom: 0 }} 
+                            />
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{ 
+                          display: 'flex', 
+                          gap: '12px', 
+                          marginTop: '4px',
+                          padding: '8px 12px', 
+                          background: 'rgba(255, 255, 255, 0.01)', 
+                          borderRadius: '8px', 
+                          border: '1px solid rgba(255,255,255,0.03)',
+                          fontSize: '14px' 
+                        }}>
+                          <div><strong style={{ color: 'var(--text-muted)' }}>CAP:</strong> {stem.cap?.toString().replace('.', ',') || '-'}</div>
+                          <div><strong style={{ color: 'var(--text-muted)' }}>Altura:</strong> {stem.altura?.toString().replace('.', ',') || '-'}m</div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
+              <button 
+                className="btn btn-secondary" 
+                onClick={() => {
+                  setShowPrevIndModal(false);
+                  setEditingPrevInd(false);
+                  setTempPrevIndData(null);
+                }}
+              >
+                Fechar
+              </button>
+              {editingPrevInd && (
+                <button className="btn btn-primary" onClick={handleSavePrevInd}>
+                  Salvar
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 };
+
