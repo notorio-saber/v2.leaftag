@@ -12,6 +12,7 @@ import { useInventory } from './context/InventoryContext';
 import { useAuth } from './context/AuthContext';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from './lib/firebase';
+import { OfficeDashboard } from './pages/OfficeDashboard';
 
 // Permite apenas admin e active
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -166,6 +167,15 @@ const Home = () => {
                onClick={() => setShowTeamModal(true)}
              >
                Minha Equipe
+             </button>
+          )}
+          {(status === 'active' || status === 'admin') && (
+             <button 
+               className="btn btn-secondary" 
+               style={{ width: 'auto', padding: '8px 16px', borderColor: '#4fc3f7', color: '#4fc3f7', background: 'rgba(79, 195, 247, 0.08)' }} 
+               onClick={() => navigate('/office')}
+             >
+               Painel do Escritório
              </button>
           )}
           <button className="btn btn-secondary" style={{ width: 'auto', padding: '8px 16px' }} onClick={signOut}>
@@ -472,6 +482,7 @@ function App() {
         <Route path="/collect" element={<ProtectedRoute><CollectData /></ProtectedRoute>} />
         <Route path="/detail/:id" element={<ProtectedRoute><InventoryDetail /></ProtectedRoute>} />
         <Route path="/admin" element={<ProtectedRoute><AdminAccounts /></ProtectedRoute>} />
+        <Route path="/office" element={<ProtectedRoute><OfficeDashboard /></ProtectedRoute>} />
       </Routes>
     </BrowserRouter>
   );
