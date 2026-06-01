@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useInventory } from '../context/InventoryContext';
 import { useAuth } from '../context/AuthContext';
@@ -15,7 +15,7 @@ import {
 export const OfficeDashboard = () => {
   const navigate = useNavigate();
   const { fieldWorks, talhoes, inventories } = useInventory();
-  const { currentUser, status, signOut, uidToUse } = useAuth();
+  const { currentUser, signOut } = useAuth();
 
   const [activeFwId, setActiveFwId] = useState<string>('');
   const [searchProjectQuery, setSearchProjectQuery] = useState('');
@@ -239,7 +239,7 @@ export const OfficeDashboard = () => {
         <div style={{ padding: '24px', display: 'flex', alignItems: 'center', gap: '12px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
           <img src="/logo.png" alt="Logo" style={{ width: '40px', height: '40px' }} />
           <div>
-            <h1 style={{ color: 'var(--primary-color)', fontSize: '18px', fontWeight: '800', margin: 0, trackingLetter: '0.5px' }}>LeafTag</h1>
+            <h1 style={{ color: 'var(--primary-color)', fontSize: '18px', fontWeight: '800', margin: 0, letterSpacing: '0.5px' }}>LeafTag</h1>
             <span style={{ fontSize: '11px', color: '#00e676', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '1px' }}>Painel Escritório</span>
           </div>
         </div>
@@ -427,7 +427,7 @@ export const OfficeDashboard = () => {
             {activeTab === 'talhoes' ? (
               <div className="glass-card" style={{ padding: 0, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.05)' }}>
                 {activeTalhoes.length === 0 ? (
-                  <div style={{ padding: '48px', textAlgin: 'center', color: 'var(--text-muted)' }}>
+                  <div style={{ padding: '48px', textAlign: 'center', color: 'var(--text-muted)' }}>
                     Nenhum talhão cadastrado neste projeto.
                   </div>
                 ) : (
