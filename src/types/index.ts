@@ -34,6 +34,7 @@ export interface Talhao {
   id: string;
   fieldWorkId: string;
   nome: string;
+  observacoes?: string;
 }
 
 export interface Inventory {
@@ -50,4 +51,6 @@ export interface Inventory {
   dados: IndividualData[];
   template: string;
   formatoParcela?: string;
+  coordenadas?: string;
+  observacoes?: string;
 }

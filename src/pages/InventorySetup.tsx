@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useInventory } from '../context/InventoryContext';
 import type { InventoryColumn, ColumnType } from '../types';
+import { getCurrentPosition } from '../utils/gpsOperations';
 
 const columnsBase = [
   { id: 'nomePopular', nome: 'Nome Popular', checked: true },
@@ -26,6 +27,10 @@ export const InventorySetup = () => {
   const [nome, setNome] = useState('');
   const [area, setArea] = useState('');
   
+  const [coordenadas, setCoordenadas] = useState('');
+  const [observacoes, setObservacoes] = useState('');
+  const [isGpsLoading, setIsGpsLoading] = useState(false);
+
   // Calculadora de área
   const [formatoParcela, setFormatoParcela] = useState<'retangular' | 'circular'>('retangular');
   const [comprimento, setComprimento] = useState('');
@@ -46,6 +51,21 @@ export const InventorySetup = () => {
     if (tpl === 'basico') setChecked(['nomePopular', 'cap', 'dap']);
     else if (tpl === 'completo') setChecked(cols.map(c => c.id));
     else if (tpl === 'rapido') setChecked(['nomePopular', 'cap', 'observacoes']);
+  };
+
+  const getGps = async () => {
+    setIsGpsLoading(true);
+    try {
+      const pos = await getCurrentPosition();
+      setCoordenadas(`${pos.latitude.toFixed(6)}, ${pos.longitude.toFixed(6)}`);
+    } catch (e: any) {
+      if (e.message.includes('Permissão')) {
+        alert('Permissão de localização negada. Por favor, permita o acesso ao GPS no navegador para coletar coordenadas.');
+      } else {
+        alert(e.message || 'Erro ao obter GPS.');
+      }
+    }
+    setIsGpsLoading(false);
   };
 
   const getColType = (id: string): ColumnType => {
@@ -94,7 +114,9 @@ export const InventorySetup = () => {
       status: 'Novo',
       colunas: finalCols,
       dados: [],
-      template: selectedTemplate
+      template: selectedTemplate,
+      coordenadas: coordenadas.trim() || undefined,
+      observacoes: observacoes.trim() || undefined
     };
 
     saveInventory(newInv);
@@ -207,6 +229,35 @@ export const InventorySetup = () => {
         )}
 
         <input type="number" className="input-field" value={area} onChange={e => setArea(e.target.value)} placeholder="Área em m² (Ex: 400)" />
+
+        <label className="input-label" style={{ marginTop: '12px' }}>Coordenadas GPS da Parcela (Opcional)</label>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '12px' }}>
+          <input 
+            className="input-field" 
+            placeholder="Aguardando captura ou digite (Ex: -25.4, -49.2)" 
+            value={coordenadas} 
+            onChange={e => setCoordenadas(e.target.value)}
+            style={{ marginBottom: 0 }}
+          />
+          <button 
+            type="button" 
+            className="btn btn-secondary" 
+            style={{ width: 'auto', padding: '12px 16px', height: '42px', fontSize: '11px', whiteSpace: 'nowrap' }} 
+            onClick={getGps} 
+            disabled={isGpsLoading}
+          >
+            {isGpsLoading ? 'Buscando...' : 'Obter GPS'}
+          </button>
+        </div>
+
+        <label className="input-label">Observações da Parcela (Opcional)</label>
+        <textarea 
+          className="input-field" 
+          placeholder="Ex: Parcela próxima à estrada, relevo inclinado..." 
+          value={observacoes} 
+          onChange={e => setObservacoes(e.target.value)}
+          style={{ minHeight: '80px', fontFamily: 'inherit' }}
+        />
 
         <h3 style={{ margin: '20px 0 10px', color: 'var(--primary-hover)', fontSize: '16px', fontWeight: '800' }}>Modelo de Parcela</h3>
         <select 

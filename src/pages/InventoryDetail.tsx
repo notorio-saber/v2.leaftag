@@ -6,6 +6,7 @@ import JSZip from 'jszip';
 import { calculateBasalArea, calculateVolume } from '../utils/forestryCalculations';
 import { getPhotosForInventory, deletePhotosForIndividual } from '../utils/photoStorage';
 import { StatisticalDashboard } from '../components/StatisticalDashboard';
+import { getCurrentPosition } from '../utils/gpsOperations';
 
 export const InventoryDetail = () => {
   const navigate = useNavigate();
@@ -26,6 +27,57 @@ export const InventoryDetail = () => {
   });
   const [isZipping, setIsZipping] = useState(false);
   const [showDashboard, setShowDashboard] = useState(false);
+
+  const [showEditParcelModal, setShowEditParcelModal] = useState(false);
+  const [editParcelName, setEditParcelName] = useState('');
+  const [editParcelArea, setEditParcelArea] = useState('');
+  const [editParcelCoords, setEditParcelCoords] = useState('');
+  const [editParcelObs, setEditParcelObs] = useState('');
+  const [isParcelGpsLoading, setIsParcelGpsLoading] = useState(false);
+
+  const handleEditParcelDetails = () => {
+    if (!inventory) return;
+    setEditParcelName(inventory.nome);
+    setEditParcelArea(inventory.areaParcela.toString());
+    setEditParcelCoords(inventory.coordenadas || '');
+    setEditParcelObs(inventory.observacoes || '');
+    setShowEditParcelModal(true);
+  };
+
+  const getParcelGps = async () => {
+    setIsParcelGpsLoading(true);
+    try {
+      const pos = await getCurrentPosition();
+      setEditParcelCoords(`${pos.latitude.toFixed(6)}, ${pos.longitude.toFixed(6)}`);
+    } catch (error) {
+      alert('Permissão de localização negada. Por favor, permita o acesso ao GPS no navegador para coletar coordenadas.');
+    } finally {
+      setIsParcelGpsLoading(false);
+    }
+  };
+
+  const handleSaveParcelDetails = () => {
+    if (!inventory) return;
+    if (!editParcelName.trim()) {
+      alert('Por favor, informe o nome da parcela.');
+      return;
+    }
+    const areaNum = parseFloat(editParcelArea) || 0;
+    if (areaNum <= 0) {
+      alert('Por favor, insira uma área válida maior que 0.');
+      return;
+    }
+    const freshInv = {
+      ...inventory,
+      nome: editParcelName.trim(),
+      areaParcela: areaNum,
+      fatorExpansao: areaNum > 0 ? 10000 / areaNum : 1,
+      coordenadas: editParcelCoords.trim() || undefined,
+      observacoes: editParcelObs.trim() || undefined
+    };
+    saveInventory(freshInv);
+    setShowEditParcelModal(false);
+  };
 
   // Sampling Sufficiency Logic (Assíntota)
   const isSufficiencyReached = (() => {
@@ -124,6 +176,11 @@ export const InventoryDetail = () => {
   const handleExportRaw = () => {
     const data = inventory.dados.map(ind => {
       let baseData: any = {
+        'Talhão': talhao ? talhao.nome : 'Sem Talhão',
+        'Talhão Observações': talhao?.observacoes || '',
+        'Parcela': inventory.nome,
+        'Parcela Coordenadas': inventory.coordenadas || '',
+        'Parcela Observações': inventory.observacoes || '',
         'Número': ind.numeroIndividuo,
         'Data / Hora': ind.timestamp,
       };
@@ -150,6 +207,11 @@ export const InventoryDetail = () => {
   const handleExportProcessed = () => {
     const data = inventory.dados.map(ind => {
       let baseData: any = {
+        'Talhão': talhao ? talhao.nome : 'Sem Talhão',
+        'Talhão Observações': talhao?.observacoes || '',
+        'Parcela': inventory.nome,
+        'Parcela Coordenadas': inventory.coordenadas || '',
+        'Parcela Observações': inventory.observacoes || '',
         'Número': ind.numeroIndividuo,
         'Data / Hora': ind.timestamp,
         ...ind,
@@ -257,7 +319,16 @@ export const InventoryDetail = () => {
       {/* Header */}
       <div className="app-header">
         <div>
-          <h2 style={{ color: 'var(--primary-hover)', fontSize: '24px', fontWeight: '800' }}>{inventory.nome}</h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <h2 style={{ color: 'var(--primary-hover)', fontSize: '24px', fontWeight: '800', margin: 0 }}>{inventory.nome}</h2>
+            <button 
+              className="btn btn-secondary" 
+              style={{ width: 'auto', padding: '4px 10px', fontSize: '11px', height: 'auto', border: '1px solid rgba(255,255,255,0.15)' }} 
+              onClick={handleEditParcelDetails}
+            >
+              Editar Parcela
+            </button>
+          </div>
           <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
             Manejo: {fieldwork?.nome || 'Sem Projeto'} | Talhão: {talhao ? talhao.nome : 'Sem Talhão'} | Área: {inventory.areaParcela} m²
           </span>
@@ -266,6 +337,40 @@ export const InventoryDetail = () => {
           Voltar
         </button>
       </div>
+
+      {/* Parcela Info Card (GPS and Obs) */}
+      {(inventory.coordenadas || inventory.observacoes) && (
+        <div className="glass-card" style={{ 
+          marginTop: '12px', 
+          marginBottom: '12px', 
+          padding: '16px 20px',
+          background: 'rgba(255, 255, 255, 0.02)',
+          border: '1px solid rgba(255, 255, 255, 0.06)'
+        }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '24px' }}>
+            {inventory.coordenadas && (
+              <div style={{ flex: '1 1 200px' }}>
+                <span style={{ fontSize: '11px', color: 'var(--primary-hover)', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '0.5px', display: 'block', marginBottom: '4px' }}>
+                  Coordenadas GPS
+                </span>
+                <span style={{ fontSize: '13px', color: '#fff', fontFamily: 'monospace' }}>
+                  {inventory.coordenadas}
+                </span>
+              </div>
+            )}
+            {inventory.observacoes && (
+              <div style={{ flex: '2 1 300px' }}>
+                <span style={{ fontSize: '11px', color: 'var(--primary-hover)', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '0.5px', display: 'block', marginBottom: '4px' }}>
+                  Observações
+                </span>
+                <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: 0, whiteSpace: 'pre-wrap' }}>
+                  {inventory.observacoes}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Data Export Options & Actions */}
       <div className="glass-card">
@@ -556,6 +661,95 @@ export const InventoryDetail = () => {
               <div style={{ display: 'flex', gap: '12px', marginTop: '28px' }}>
                 <button className="btn btn-secondary" onClick={() => setEditingInd(null)}>Cancelar</button>
                 <button className="btn btn-primary" onClick={handleSaveEdit}>Salvar</button>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {showEditParcelModal && (
+        <div style={{ 
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
+          background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', 
+          zIndex: 1000, padding: '20px', overflowY: 'auto', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' 
+        }}>
+           <div className="glass-card" style={{ width: '100%', maxWidth: '540px', marginTop: '30px', marginBottom: '30px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                <h3 style={{ fontSize: '18px', fontWeight: '800' }}>Editar Parcela</h3>
+                <button onClick={() => setShowEditParcelModal(false)} style={{ background: 'transparent', color: 'white', border: 'none', fontSize: '20px', cursor: 'pointer' }}>×</button>
+              </div>
+
+              <div style={{ marginBottom: '14px' }}>
+                <label className="input-label">Nome da Parcela</label>
+                <input 
+                  type="text" 
+                  className="input-field" 
+                  style={{ marginBottom: 0, marginTop: '4px' }}
+                  value={editParcelName} 
+                  onChange={e => setEditParcelName(e.target.value)} 
+                />
+              </div>
+
+              <div style={{ marginBottom: '14px' }}>
+                <label className="input-label">Área da Parcela (m²)</label>
+                <input 
+                  type="number" 
+                  className="input-field" 
+                  style={{ marginBottom: 0, marginTop: '4px' }}
+                  value={editParcelArea} 
+                  onChange={e => setEditParcelArea(e.target.value)} 
+                />
+              </div>
+
+              <div style={{ marginBottom: '14px' }}>
+                <label className="input-label">Coordenadas GPS da Parcela (Opcional)</label>
+                <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                  <input 
+                    type="text" 
+                    className="input-field" 
+                    placeholder="Ex: -23.550520, -46.633308"
+                    style={{ marginBottom: 0, flex: 1 }}
+                    value={editParcelCoords} 
+                    onChange={e => setEditParcelCoords(e.target.value)} 
+                  />
+                  <button 
+                    type="button" 
+                    className="btn btn-secondary" 
+                    style={{ 
+                      width: 'auto', 
+                      whiteSpace: 'nowrap', 
+                      padding: '12px 16px',
+                      height: '42px',
+                      fontSize: '11px'
+                    }} 
+                    onClick={getParcelGps}
+                    disabled={isParcelGpsLoading}
+                  >
+                    {isParcelGpsLoading ? 'Buscando...' : 'Obter GPS'}
+                  </button>
+                </div>
+              </div>
+
+              <div style={{ marginBottom: '14px' }}>
+                <label className="input-label">Observações da Parcela (Opcional)</label>
+                <textarea 
+                  className="input-field" 
+                  style={{ 
+                    marginBottom: 0, 
+                    marginTop: '4px', 
+                    minHeight: '100px', 
+                    resize: 'vertical',
+                    fontFamily: 'inherit',
+                    padding: '12px'
+                  }}
+                  placeholder="Observações ou notas de campo sobre a parcela..."
+                  value={editParcelObs} 
+                  onChange={e => setEditParcelObs(e.target.value)} 
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px', marginTop: '28px' }}>
+                <button className="btn btn-secondary" onClick={() => setShowEditParcelModal(false)}>Cancelar</button>
+                <button className="btn btn-primary" onClick={handleSaveParcelDetails}>Salvar Alterações</button>
               </div>
            </div>
         </div>

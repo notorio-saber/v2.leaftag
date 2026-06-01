@@ -15,6 +15,11 @@ export const FieldWorkDetail = () => {
   const [showDashboard, setShowDashboard] = useState(false);
   const [showTalhaoModal, setShowTalhaoModal] = useState(false);
   const [newTalhaoName, setNewTalhaoName] = useState('');
+  const [newTalhaoObs, setNewTalhaoObs] = useState('');
+
+  const [editingTalhao, setEditingTalhao] = useState<any>(null);
+  const [editTalhaoName, setEditTalhaoName] = useState('');
+  const [editTalhaoObs, setEditTalhaoObs] = useState('');
 
   const fw = fieldWorks.find(f => f.id === id);
   if (!fw) {
@@ -28,7 +33,7 @@ export const FieldWorkDetail = () => {
     );
   }
 
-  // Filter talhões and parcelas belonging to this field work
+  // Filter talões and parcelas belonging to this field work
   const fwTalhoes = talhoes.filter(t => t.fieldWorkId === id);
   const parcels = inventories.filter(i => i.fieldWorkId === id);
 
@@ -55,11 +60,34 @@ export const FieldWorkDetail = () => {
     createTalhao({
       id: generateId(),
       fieldWorkId: fw.id,
-      nome: newTalhaoName.trim()
+      nome: newTalhaoName.trim(),
+      observacoes: newTalhaoObs.trim()
     });
 
     setShowTalhaoModal(false);
     setNewTalhaoName('');
+    setNewTalhaoObs('');
+  };
+
+  const handleEditTalhao = (talhao: any) => {
+    setEditingTalhao(talhao);
+    setEditTalhaoName(talhao.nome);
+    setEditTalhaoObs(talhao.observacoes || '');
+  };
+
+  const handleSaveTalhaoEdit = () => {
+    if (!editTalhaoName.trim()) return alert('Por favor, dê um nome ao talhão.');
+    if (!editingTalhao) return;
+
+    createTalhao({
+      ...editingTalhao,
+      nome: editTalhaoName.trim(),
+      observacoes: editTalhaoObs.trim()
+    });
+
+    setEditingTalhao(null);
+    setEditTalhaoName('');
+    setEditTalhaoObs('');
   };
 
   const handleExportAll = () => {
@@ -69,7 +97,10 @@ export const FieldWorkDetail = () => {
       inv.dados.forEach(ind => {
         const baseData: any = {
            'Talhão': currentTal ? currentTal.nome : 'Sem Talhão',
+           'Talhão Observações': currentTal?.observacoes || '',
            'Parcela': inv.nome,
+           'Parcela Coordenadas': inv.coordenadas || '',
+           'Parcela Observações': inv.observacoes || '',
            'Número': ind.numeroIndividuo,
            'Data / Hora': ind.timestamp,
         };
@@ -194,6 +225,11 @@ export const FieldWorkDetail = () => {
                   <div>
                     <h3 style={{ color: '#ffffff', fontSize: '18px', fontWeight: '800' }}>{talhao.nome}</h3>
                     <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{talhaoParcels.length} parcelas cadastradas</span>
+                    {talhao.observacoes && (
+                      <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: '6px 0 0 0', fontStyle: 'italic', wordBreak: 'break-all' }}>
+                        Obs: {talhao.observacoes}
+                      </p>
+                    )}
                   </div>
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <button 
@@ -202,6 +238,13 @@ export const FieldWorkDetail = () => {
                       onClick={() => navigate(`/setup/${fw.id}/${talhao.id}`)}
                     >
                       + Nova Parcela
+                    </button>
+                    <button 
+                      className="btn btn-secondary" 
+                      style={{ width: 'auto', padding: '6px 12px', fontSize: '10px', borderColor: 'var(--primary-hover)', color: 'var(--primary-hover)' }}
+                      onClick={() => handleEditTalhao(talhao)}
+                    >
+                      Editar
                     </button>
                     <button 
                       className="btn btn-danger" 
@@ -277,9 +320,46 @@ export const FieldWorkDetail = () => {
                 onChange={e => setNewTalhaoName(e.target.value)} 
                 style={{ marginTop: '20px' }} 
               />
+              <textarea 
+                className="input-field" 
+                placeholder="Observações do talhão (Opcional)" 
+                value={newTalhaoObs} 
+                onChange={e => setNewTalhaoObs(e.target.value)} 
+                style={{ marginTop: '8px', minHeight: '80px', fontFamily: 'inherit' }} 
+              />
               <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
-                <button className="btn btn-secondary" onClick={() => { setShowTalhaoModal(false); setNewTalhaoName(''); }}>Cancelar</button>
+                <button className="btn btn-secondary" onClick={() => { setShowTalhaoModal(false); setNewTalhaoName(''); setNewTalhaoObs(''); }}>Cancelar</button>
                 <button className="btn btn-primary" onClick={handleCreateTalhao}>Criar</button>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {/* Talhao Edit Modal (Rounded 24px) */}
+      {editingTalhao && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.82)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
+           <div className="glass-card" style={{ width: '100%', maxWidth: '400px', marginBottom: 0 }}>
+              <h3 style={{ color: 'var(--primary-hover)', fontSize: '20px', fontWeight: '800' }}>Editar Talhão</h3>
+              <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginTop: '6px' }}>
+                Edite o nome ou observações do talhão.
+              </p>
+              <input 
+                className="input-field" 
+                placeholder="Ex: Talhão Leste, Quadra B" 
+                value={editTalhaoName} 
+                onChange={e => setEditTalhaoName(e.target.value)} 
+                style={{ marginTop: '20px' }} 
+              />
+              <textarea 
+                className="input-field" 
+                placeholder="Observações do talhão (Opcional)" 
+                value={editTalhaoObs} 
+                onChange={e => setEditTalhaoObs(e.target.value)} 
+                style={{ marginTop: '8px', minHeight: '80px', fontFamily: 'inherit' }} 
+              />
+              <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
+                <button className="btn btn-secondary" onClick={() => { setEditingTalhao(null); setEditTalhaoName(''); setEditTalhaoObs(''); }}>Cancelar</button>
+                <button className="btn btn-primary" onClick={handleSaveTalhaoEdit}>Salvar</button>
               </div>
            </div>
         </div>
