@@ -13,6 +13,7 @@ export const FieldWorkDetail = () => {
   const { fieldWorks, talhoes, inventories, setCurrentInventory, deleteFieldWork, createTalhao, deleteTalhao } = useInventory();
   const [showMap, setShowMap] = useState(false);
   const [showDashboard, setShowDashboard] = useState(false);
+  const [talhaoDashboardId, setTalhaoDashboardId] = useState<string | null>(null);
   const [showTalhaoModal, setShowTalhaoModal] = useState(false);
   const [newTalhaoName, setNewTalhaoName] = useState('');
   const [newTalhaoObs, setNewTalhaoObs] = useState('');
@@ -125,6 +126,41 @@ export const FieldWorkDetail = () => {
     XLSX.writeFile(workbook, `Projeto_${fw.nome.replace(/\s+/g, '_')}_Completo.xlsx`);
   };
 
+  const handleExportTalhao = (talhaoId: string, talhaoNome: string) => {
+    const talhaoParcels = parcels.filter(p => p.talhaoId === talhaoId);
+    const allData: any[] = [];
+    talhaoParcels.forEach(inv => {
+      inv.dados.forEach(ind => {
+        const baseData: any = {
+           'Talhão': talhaoNome,
+           'Talhão Observações': talhoes.find(t => t.id === talhaoId)?.observacoes || '',
+           'Parcela': inv.nome,
+           'Parcela Coordenadas': inv.coordenadas || '',
+           'Parcela Observações': inv.observacoes || '',
+           'Número': ind.numeroIndividuo,
+           'Data / Hora': ind.timestamp,
+        };
+        inv.colunas.forEach(col => {
+           baseData[col.nome] = ind[col.id] || '';
+        });
+        if (ind.multipleStems && ind.stems) {
+           ind.stems.forEach((stem: any, i: number) => {
+             baseData[`Fuste_${i+1}_CAP`] = stem.cap;
+             baseData[`Fuste_${i+1}_Altura`] = stem.altura;
+           });
+        }
+        allData.push(baseData);
+      });
+    });
+
+    if (allData.length === 0) return alert("Nenhum dado encontrado nas parcelas deste talhão.");
+    
+    const worksheet = XLSX.utils.json_to_sheet(allData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Dados Talhão");
+    XLSX.writeFile(workbook, `Talhao_${talhaoNome.replace(/\s+/g, '_')}.xlsx`);
+  };
+
   const renderParcelCard = (inv: any) => (
     <div 
       key={inv.id} 
@@ -172,7 +208,7 @@ export const FieldWorkDetail = () => {
         <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
           {parcels.length > 0 && (
             <button className="btn btn-secondary" style={{ width: 'auto', padding: '10px 18px' }} onClick={handleExportAll}>
-               Baixar Projeto
+               Exportar Projeto Completo
             </button>
           )}
           <button className="btn btn-primary" style={{ width: 'auto', padding: '10px 18px' }} onClick={() => setShowTalhaoModal(true)}>
@@ -231,24 +267,42 @@ export const FieldWorkDetail = () => {
                       </p>
                     )}
                   </div>
-                  <div style={{ display: 'flex', gap: '8px' }}>
+                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                     <button 
                       className="btn btn-secondary" 
-                      style={{ width: 'auto', padding: '6px 12px', fontSize: '10px' }}
+                      style={{ width: 'auto', padding: '6px 12px', fontSize: '10.5px' }}
                       onClick={() => navigate(`/setup/${fw.id}/${talhao.id}`)}
                     >
                       + Nova Parcela
                     </button>
+                    {talhaoParcels.length > 0 && (
+                      <>
+                        <button 
+                          className="btn btn-secondary" 
+                          style={{ width: 'auto', padding: '6px 12px', fontSize: '10.5px', borderColor: '#2e7d32', color: '#a5d6a7', background: 'rgba(46, 125, 50, 0.08)' }}
+                          onClick={() => setTalhaoDashboardId(talhao.id)}
+                        >
+                          Dashboard
+                        </button>
+                        <button 
+                          className="btn btn-secondary" 
+                          style={{ width: 'auto', padding: '6px 12px', fontSize: '10.5px', borderColor: '#00838f', color: '#80deea', background: 'rgba(0, 131, 143, 0.08)' }}
+                          onClick={() => handleExportTalhao(talhao.id, talhao.nome)}
+                        >
+                          Exportar Excel
+                        </button>
+                      </>
+                    )}
                     <button 
                       className="btn btn-secondary" 
-                      style={{ width: 'auto', padding: '6px 12px', fontSize: '10px', borderColor: 'var(--primary-hover)', color: 'var(--primary-hover)' }}
+                      style={{ width: 'auto', padding: '6px 12px', fontSize: '10.5px', borderColor: 'var(--primary-hover)', color: 'var(--primary-hover)' }}
                       onClick={() => handleEditTalhao(talhao)}
                     >
                       Editar
                     </button>
                     <button 
                       className="btn btn-danger" 
-                      style={{ width: 'auto', padding: '6px 12px', fontSize: '10px' }}
+                      style={{ width: 'auto', padding: '6px 12px', fontSize: '10.5px' }}
                       onClick={() => handleDeleteTalhao(talhao.id, talhao.nome)}
                     >
                       Excluir
@@ -367,6 +421,12 @@ export const FieldWorkDetail = () => {
 
       {showMap && <MapVisualization inventories={parcels} onClose={() => setShowMap(false)} />}
       {showDashboard && <StatisticalDashboard inventories={parcels} onClose={() => setShowDashboard(false)} />}
+      {talhaoDashboardId && (
+        <StatisticalDashboard 
+          inventories={parcels.filter(p => p.talhaoId === talhaoDashboardId)} 
+          onClose={() => setTalhaoDashboardId(null)} 
+        />
+      )}
     </div>
   );
 };
