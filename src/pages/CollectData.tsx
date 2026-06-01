@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useInventory } from '../context/InventoryContext';
 import { getCurrentPosition } from '../utils/gpsOperations';
@@ -47,6 +47,11 @@ export const CollectData = () => {
   
   const [stepIndex, setStepIndex] = useState(0);
   const [formData, setFormData] = useState<any>({});
+  
+  // Ref para contornar captura assíncrona/closures no setTimeout do selectOptionValue
+  const formDataRef = useRef(formData);
+  formDataRef.current = formData;
+
   const [isGpsLoading, setIsGpsLoading] = useState(false);
   const [multiStems, setMultiStems] = useState(false);
   const [stems, setStems] = useState([{ id: Date.now().toString(), cap: '', altura: '' }]);
@@ -134,21 +139,18 @@ export const CollectData = () => {
     return nextIdx;
   };
 
-  const handleNext = () => {
+  const handleNext = (updatedFormData?: any) => {
     const nextIdx = getNextStepIndex(stepIndex);
     if (nextIdx < columns.length) {
       setStepIndex(nextIdx);
     } else {
-      saveIndividual();
+      saveIndividual(updatedFormData);
     }
   };
 
-  // Função para salvar seleção de múltipla escolha e avançar suavemente no campo
+  // Função para salvar seleção de múltipla escolha sem avançar automaticamente
   const selectOptionValue = (val: string) => {
     setFormData((prev: any) => ({ ...prev, [currentCol.id]: val }));
-    setTimeout(() => {
-      handleNext();
-    }, 120);
   };
 
   const getPrevStepIndex = (currentIndex: number): number => {
@@ -251,12 +253,16 @@ export const CollectData = () => {
     setFormData((prev: any) => ({ ...prev, [currentCol.id]: newFiles }));
   };
 
-  const saveIndividual = async () => {
+  const saveIndividual = async (currentFormData?: any) => {
     const freshInv = JSON.parse(JSON.stringify(currentInventory)); 
     const individualId = Date.now().toString();
 
+    // Evita que o evento de clique do React (SyntheticEvent) seja tratado como dados do formulário
+    const isEvent = currentFormData && (currentFormData.nativeEvent || currentFormData.target || currentFormData.type === 'click');
+    const dataToSave = (currentFormData && !isEvent) ? currentFormData : formDataRef.current;
+
     // Process photo fields securely in memory
-    const processedFormData = { ...formData };
+    const processedFormData = { ...dataToSave };
     
     for (const col of columns) {
       if (col.tipo === 'photo' && processedFormData[col.id]) {
@@ -811,7 +817,7 @@ export const CollectData = () => {
             <button 
               className="btn btn-primary" 
               style={{ width: '70%', padding: '12px 0', fontSize: '12px' }} 
-              onClick={handleNext}
+              onClick={() => handleNext()}
             >
               {isLastStep ? 'Salvar Árvore' : 'Próximo'}
             </button>
