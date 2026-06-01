@@ -12,13 +12,13 @@ export const PendingAccess = () => {
     <div className="container" style={{ display: 'flex', flexDirection: 'column', height: '90vh', justifyContent: 'center', alignItems: 'center' }}>
       <div className="glass-card" style={{ textAlign: 'center', width: '100%', maxWidth: '420px', padding: '36px 28px' }}>
         <div style={{ height: '3px', background: 'var(--primary-color)', width: '48px', margin: '0 auto 24px', borderRadius: '4px' }}></div>
-        <h2 style={{ color: 'var(--primary-hover)', marginBottom: '12px', fontSize: '22px', fontWeight: '800' }}>Acesso Pendente</h2>
-        <p style={{ color: 'var(--text-muted)', fontSize: '14px', lineHeight: 1.6, marginBottom: '24px' }}>
-          Sua conta foi criada no sistema, mas você precisa de aprovação de um administrador para visualizar e coletar os dados florestais.
+        <h2 style={{ color: 'var(--primary-hover)', marginBottom: '12px', fontSize: '22px', fontWeight: '800' }}>Ativar Conta</h2>
+        <p style={{ color: 'var(--text-muted)', fontSize: '14.5px', lineHeight: 1.6, marginBottom: '24px' }}>
+          Para começar a coletar e gerenciar seus inventários florestais, por favor ative sua conta. Clique no botão abaixo para falar conosco diretamente pelo WhatsApp.
         </p>
 
         <a 
-          href="https://wa.me/5511999999999?text=Olá%2C%20acabei%20de%20criar%20uma%20conta%20no%20LeafTag%20e%20gostaria%20de%20solicitar%20a%20liberação%20de%20acesso."
+          href="https://wa.me/5547920022746?text=Olá!%20Acabei%20de%20criar%20uma%20conta%20no%20LeafTag%20e%20gostaria%20de%20solicitar%20a%20ativação."
           target="_blank"
           rel="noopener noreferrer"
           className="btn"
@@ -29,10 +29,11 @@ export const PendingAccess = () => {
             backgroundColor: 'rgba(37, 211, 102, 0.15)', 
             border: '1px solid rgba(37, 211, 102, 0.45)', 
             color: '#25D366',
-            boxShadow: '0 4px 15px rgba(37, 211, 102, 0.1)'
+            boxShadow: '0 4px 15px rgba(37, 211, 102, 0.1)',
+            fontWeight: 'bold'
           }}
         >
-          Solicitar Liberação no WhatsApp
+          Ativar pelo WhatsApp
         </a>
 
         <button className="btn btn-secondary" style={{ marginTop: '16px' }} onClick={signOut}>

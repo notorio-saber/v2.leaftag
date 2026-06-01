@@ -22,7 +22,7 @@ interface InventoryContextType {
 const InventoryContext = createContext<InventoryContextType | undefined>(undefined);
 
 export const InventoryProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const { currentUser } = useAuth();
+  const { currentUser, uidToUse } = useAuth();
   const [fieldWorks, setFieldWorks] = useState<FieldWork[]>([]);
   const [talhoes, setTalhoes] = useState<Talhao[]>([]);
   const [inventories, setInventories] = useState<Inventory[]>([]);
@@ -30,14 +30,14 @@ export const InventoryProvider: React.FC<{ children: ReactNode }> = ({ children 
 
   // Firestore Snapshot (Realtime + Offline IndexedDB)
   useEffect(() => {
-    if (!currentUser) {
+    if (!currentUser || !uidToUse) {
       setFieldWorks([]);
       setTalhoes([]);
       setInventories([]);
       return;
     }
 
-    const fwRef = collection(db, `users/${currentUser.uid}/fieldWorks`);
+    const fwRef = collection(db, `users/${uidToUse}/fieldWorks`);
     const unsubscribeFw = onSnapshot(fwRef, (snapshot) => {
       const data: FieldWork[] = [];
       snapshot.forEach(doc => {
@@ -49,7 +49,7 @@ export const InventoryProvider: React.FC<{ children: ReactNode }> = ({ children 
       console.error("Erro no Sync do FieldWorks Firestore:", error);
     });
 
-    const talRef = collection(db, `users/${currentUser.uid}/talhoes`);
+    const talRef = collection(db, `users/${uidToUse}/talhoes`);
     const unsubscribeTal = onSnapshot(talRef, (snapshot) => {
       const data: Talhao[] = [];
       snapshot.forEach(doc => {
@@ -61,7 +61,7 @@ export const InventoryProvider: React.FC<{ children: ReactNode }> = ({ children 
       console.error("Erro no Sync do Talhoes Firestore:", error);
     });
 
-    const invRef = collection(db, `users/${currentUser.uid}/inventories`);
+    const invRef = collection(db, `users/${uidToUse}/inventories`);
     const unsubscribeInv = onSnapshot(invRef, (snapshot) => {
       const data: Inventory[] = [];
       snapshot.forEach(doc => {
@@ -78,7 +78,7 @@ export const InventoryProvider: React.FC<{ children: ReactNode }> = ({ children 
       unsubscribeTal();
       unsubscribeInv();
     };
-  }, [currentUser]);
+  }, [currentUser, uidToUse]);
 
   // Atualizar reativamente a view caso currentInventory seja modificado por outra aba
   useEffect(() => {
@@ -89,14 +89,14 @@ export const InventoryProvider: React.FC<{ children: ReactNode }> = ({ children 
   }, [inventories]);
 
   const saveInventory = async (newInv: Inventory) => {
-    if (!currentUser) return;
-    const docRef = doc(db, `users/${currentUser.uid}/inventories`, newInv.id.toString());
+    if (!currentUser || !uidToUse) return;
+    const docRef = doc(db, `users/${uidToUse}/inventories`, newInv.id.toString());
     await setDoc(docRef, newInv);
   };
 
   const deleteInventory = async (id: number) => {
-    if (!currentUser) return;
-    const docRef = doc(db, `users/${currentUser.uid}/inventories`, id.toString());
+    if (!currentUser || !uidToUse) return;
+    const docRef = doc(db, `users/${uidToUse}/inventories`, id.toString());
     await deleteDoc(docRef);
 
     if (currentInventory?.id === id) {
@@ -105,26 +105,26 @@ export const InventoryProvider: React.FC<{ children: ReactNode }> = ({ children 
   };
 
   const createFieldWork = async (fw: FieldWork) => {
-    if (!currentUser) return;
-    const docRef = doc(db, `users/${currentUser.uid}/fieldWorks`, fw.id);
+    if (!currentUser || !uidToUse) return;
+    const docRef = doc(db, `users/${uidToUse}/fieldWorks`, fw.id);
     await setDoc(docRef, fw);
   };
 
   const deleteFieldWork = async (id: string) => {
-    if (!currentUser) return;
-    const docRef = doc(db, `users/${currentUser.uid}/fieldWorks`, id);
+    if (!currentUser || !uidToUse) return;
+    const docRef = doc(db, `users/${uidToUse}/fieldWorks`, id);
     await deleteDoc(docRef);
     
     // Deletar os talhões atrelados a esse FieldWork
     const linkedTalhoes = talhoes.filter(t => t.fieldWorkId === id);
     for (const talhao of linkedTalhoes) {
-      await deleteDoc(doc(db, `users/${currentUser.uid}/talhoes`, talhao.id));
+      await deleteDoc(doc(db, `users/${uidToUse}/talhoes`, talhao.id));
     }
     
     // Deletar as parcelas atreladas a esse FieldWork
     const linkedInvs = inventories.filter(i => i.fieldWorkId === id);
     for (const inv of linkedInvs) {
-      await deleteDoc(doc(db, `users/${currentUser.uid}/inventories`, inv.id.toString()));
+      await deleteDoc(doc(db, `users/${uidToUse}/inventories`, inv.id.toString()));
     }
 
     if (currentInventory?.fieldWorkId === id) {
@@ -133,20 +133,20 @@ export const InventoryProvider: React.FC<{ children: ReactNode }> = ({ children 
   };
 
   const createTalhao = async (t: Talhao) => {
-    if (!currentUser) return;
-    const docRef = doc(db, `users/${currentUser.uid}/talhoes`, t.id);
+    if (!currentUser || !uidToUse) return;
+    const docRef = doc(db, `users/${uidToUse}/talhoes`, t.id);
     await setDoc(docRef, t);
   };
 
   const deleteTalhao = async (id: string) => {
-    if (!currentUser) return;
-    const docRef = doc(db, `users/${currentUser.uid}/talhoes`, id);
+    if (!currentUser || !uidToUse) return;
+    const docRef = doc(db, `users/${uidToUse}/talhoes`, id);
     await deleteDoc(docRef);
 
     // Deletar as parcelas atreladas a esse Talhão
     const linkedInvs = inventories.filter(i => i.talhaoId === id);
     for (const inv of linkedInvs) {
-      await deleteDoc(doc(db, `users/${currentUser.uid}/inventories`, inv.id.toString()));
+      await deleteDoc(doc(db, `users/${uidToUse}/inventories`, inv.id.toString()));
     }
 
     if (currentInventory?.talhaoId === id) {

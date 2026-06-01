@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, useNavigate, Navigate } from 'react-router-dom';
 import { InventorySetup } from './pages/InventorySetup';
 import { CollectData } from './pages/CollectData';
@@ -10,6 +10,8 @@ import { AdminAccounts } from './pages/AdminAccounts';
 import './App.css';
 import { useInventory } from './context/InventoryContext';
 import { useAuth } from './context/AuthContext';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { db } from './lib/firebase';
 
 // Permite apenas admin e active
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -22,7 +24,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
 const Home = () => {
   const { fieldWorks, createFieldWork, talhoes, inventories } = useInventory();
-  const { signOut, status } = useAuth();
+  const { currentUser, signOut, status, uidToUse } = useAuth();
   const navigate = useNavigate();
   const [showModal, setShowModal] = useState(false);
   const [newFwName, setNewFwName] = useState('');
@@ -30,6 +32,77 @@ const Home = () => {
   // Utilizando formato YYYY-MM-DD para o input type="date"
   const [newFwDate, setNewFwDate] = useState(new Date().toISOString().split('T')[0]);
   const [searchQuery, setSearchQuery] = useState('');
+
+  const [showTeamModal, setShowTeamModal] = useState(false);
+  const [collaborators, setCollaborators] = useState<string[]>([]);
+  const [newEmail, setNewEmail] = useState('');
+  const [isTeamLoading, setIsTeamLoading] = useState(false);
+
+  useEffect(() => {
+    if (!currentUser || (status !== 'active' && status !== 'admin')) return;
+    if (currentUser.uid !== uidToUse) return;
+
+    const loadCollaborators = async () => {
+      try {
+        const docRef = doc(db, 'users', currentUser.uid);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          setCollaborators(docSnap.data().collaborators || []);
+        }
+      } catch (e) {
+        console.error("Erro ao carregar colaboradores:", e);
+      }
+    };
+    loadCollaborators();
+  }, [currentUser, showTeamModal, uidToUse, status]);
+
+  const handleAddCollaborator = async () => {
+    if (!currentUser) return;
+    const emailToTrim = newEmail.trim().toLowerCase();
+    if (!emailToTrim) return alert("Digite um e-mail válido.");
+    
+    if (collaborators.includes(emailToTrim)) {
+      return alert("Este e-mail já faz parte do seu time.");
+    }
+    
+    if (collaborators.length >= 2) {
+      return alert("Você atingiu o limite máximo de 2 colaboradores no seu time.");
+    }
+
+    setIsTeamLoading(true);
+    const updatedCollaborators = [...collaborators, emailToTrim];
+    try {
+      const docRef = doc(db, 'users', currentUser.uid);
+      await updateDoc(docRef, { collaborators: updatedCollaborators });
+      setCollaborators(updatedCollaborators);
+      setNewEmail('');
+      alert("Colaborador adicionado com sucesso!");
+    } catch (e) {
+      console.error(e);
+      alert("Erro ao adicionar colaborador. Tente novamente.");
+    } finally {
+      setIsTeamLoading(false);
+    }
+  };
+
+  const handleRemoveCollaborator = async (emailToRemove: string) => {
+    if (!currentUser) return;
+    if (!confirm(`Deseja realmente remover o e-mail ${emailToRemove} do seu time?`)) return;
+
+    setIsTeamLoading(true);
+    const updatedCollaborators = collaborators.filter(email => email !== emailToRemove);
+    try {
+      const docRef = doc(db, 'users', currentUser.uid);
+      await updateDoc(docRef, { collaborators: updatedCollaborators });
+      setCollaborators(updatedCollaborators);
+      alert("Colaborador removido com sucesso!");
+    } catch (e) {
+      console.error(e);
+      alert("Erro ao remover colaborador. Tente novamente.");
+    } finally {
+      setIsTeamLoading(false);
+    }
+  };
 
   const handleCreateFw = () => {
     if (!newFwName) return alert('Dê um nome ao trabalho.');
@@ -84,6 +157,15 @@ const Home = () => {
           {status === 'admin' && (
              <button className="btn btn-secondary" style={{ width: 'auto', padding: '8px 16px' }} onClick={() => navigate('/admin')}>
                Admin
+             </button>
+          )}
+          {currentUser && currentUser.uid === uidToUse && (status === 'active' || status === 'admin') && (
+             <button 
+               className="btn btn-secondary" 
+               style={{ width: 'auto', padding: '8px 16px', borderColor: 'var(--primary-color)', color: 'var(--primary-color)' }} 
+               onClick={() => setShowTeamModal(true)}
+             >
+               Minha Equipe
              </button>
           )}
           <button className="btn btn-secondary" style={{ width: 'auto', padding: '8px 16px' }} onClick={signOut}>
@@ -299,6 +381,75 @@ const Home = () => {
               <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
                 <button className="btn btn-secondary" onClick={() => setShowModal(false)}>Cancelar</button>
                 <button className="btn btn-primary" onClick={handleCreateFw}>Criar</button>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {showTeamModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
+           <div className="glass-card" style={{ width: '100%', maxWidth: '460px', marginBottom: 0 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <h3 style={{ color: 'var(--primary-hover)', fontSize: '20px', fontWeight: '800', margin: 0 }}>Minha Equipe</h3>
+                <button onClick={() => setShowTeamModal(false)} style={{ background: 'transparent', color: 'white', border: 'none', fontSize: '24px', cursor: 'pointer' }}>×</button>
+              </div>
+              <p style={{ color: 'var(--text-muted)', fontSize: '13px', lineHeight: 1.5, marginBottom: '20px' }}>
+                Adicione até 2 colaboradores pelo e-mail do Google. Eles terão acesso completo para visualizar, criar e coletar dados na sua mesma conta simultaneamente.
+              </p>
+
+              <div style={{ marginBottom: '20px' }}>
+                <span style={{ fontSize: '11px', color: 'var(--primary-hover)', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '0.8px', display: 'block', marginBottom: '8px' }}>
+                  Colaboradores Adicionados ({collaborators.length}/2)
+                </span>
+                {collaborators.length === 0 ? (
+                  <p style={{ color: 'var(--text-muted)', fontSize: '13px', fontStyle: 'italic', margin: '4px 0' }}>
+                    Nenhum colaborador adicionado ainda.
+                  </p>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {collaborators.map(email => (
+                      <div key={email} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '10px 14px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                        <span style={{ fontSize: '13.5px', color: '#fff' }}>{email}</span>
+                        <button 
+                          className="btn btn-danger" 
+                          style={{ width: 'auto', padding: '4px 10px', fontSize: '10px', height: 'auto' }}
+                          onClick={() => handleRemoveCollaborator(email)}
+                          disabled={isTeamLoading}
+                        >
+                          Remover
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {collaborators.length < 2 && (
+                <div style={{ marginBottom: '16px' }}>
+                  <label className="input-label">Adicionar Colaborador (E-mail Google)</label>
+                  <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
+                    <input 
+                      type="email"
+                      className="input-field" 
+                      placeholder="Ex: joao.silva@gmail.com" 
+                      value={newEmail} 
+                      onChange={e => setNewEmail(e.target.value)} 
+                      style={{ marginBottom: 0, flex: 1 }} 
+                    />
+                    <button 
+                      className="btn btn-primary" 
+                      style={{ width: 'auto', padding: '0 18px', height: '42px', fontSize: '12px' }}
+                      onClick={handleAddCollaborator}
+                      disabled={isTeamLoading}
+                    >
+                      Adicionar
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '24px' }}>
+                <button className="btn btn-secondary" style={{ width: 'auto' }} onClick={() => setShowTeamModal(false)}>Fechar</button>
               </div>
            </div>
         </div>
