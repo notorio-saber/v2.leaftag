@@ -10,7 +10,7 @@ import { AdminAccounts } from './pages/AdminAccounts';
 import './App.css';
 import { useInventory } from './context/InventoryContext';
 import { useAuth } from './context/AuthContext';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, setDoc, deleteDoc } from 'firebase/firestore';
 import { db } from './lib/firebase';
 import { OfficeDashboard } from './pages/OfficeDashboard';
 
@@ -26,6 +26,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 const Home = () => {
   const { fieldWorks, createFieldWork, talhoes, inventories } = useInventory();
   const { currentUser, signOut, status, uidToUse } = useAuth();
+  const isOwner = currentUser && currentUser.uid === uidToUse && (status === 'active' || status === 'admin');
   const navigate = useNavigate();
   const [showModal, setShowModal] = useState(false);
   const [newFwName, setNewFwName] = useState('');
@@ -75,6 +76,10 @@ const Home = () => {
     try {
       const docRef = doc(db, 'users', currentUser.uid);
       await updateDoc(docRef, { collaborators: updatedCollaborators });
+      
+      // Salva mapeamento para login robusto e independente de regras de busca globais
+      await setDoc(doc(db, 'collaborators_mapping', emailToTrim), { ownerUid: currentUser.uid });
+
       setCollaborators(updatedCollaborators);
       setNewEmail('');
       alert("Colaborador adicionado com sucesso!");
@@ -95,6 +100,10 @@ const Home = () => {
     try {
       const docRef = doc(db, 'users', currentUser.uid);
       await updateDoc(docRef, { collaborators: updatedCollaborators });
+      
+      // Remove o mapeamento do banco
+      await deleteDoc(doc(db, 'collaborators_mapping', emailToRemove));
+
       setCollaborators(updatedCollaborators);
       alert("Colaborador removido com sucesso!");
     } catch (e) {
@@ -160,7 +169,7 @@ const Home = () => {
                Admin
              </button>
           )}
-          {currentUser && currentUser.uid === uidToUse && (status === 'active' || status === 'admin') && (
+          {currentUser && (
              <button 
                className="btn btn-secondary" 
                style={{ width: 'auto', padding: '8px 16px', borderColor: 'var(--primary-color)', color: 'var(--primary-color)' }} 
@@ -398,71 +407,115 @@ const Home = () => {
 
       {showTeamModal && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
-           <div className="glass-card" style={{ width: '100%', maxWidth: '460px', marginBottom: 0 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                <h3 style={{ color: 'var(--primary-hover)', fontSize: '20px', fontWeight: '800', margin: 0 }}>Minha Equipe</h3>
-                <button onClick={() => setShowTeamModal(false)} style={{ background: 'transparent', color: 'white', border: 'none', fontSize: '24px', cursor: 'pointer' }}>×</button>
-              </div>
-              <p style={{ color: 'var(--text-muted)', fontSize: '13px', lineHeight: 1.5, marginBottom: '20px' }}>
-                Adicione até 2 colaboradores pelo e-mail do Google. Eles terão acesso completo para visualizar, criar e coletar dados na sua mesma conta simultaneamente.
-              </p>
-
-              <div style={{ marginBottom: '20px' }}>
-                <span style={{ fontSize: '11px', color: 'var(--primary-hover)', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '0.8px', display: 'block', marginBottom: '8px' }}>
-                  Colaboradores Adicionados ({collaborators.length}/2)
-                </span>
-                {collaborators.length === 0 ? (
-                  <p style={{ color: 'var(--text-muted)', fontSize: '13px', fontStyle: 'italic', margin: '4px 0' }}>
-                    Nenhum colaborador adicionado ainda.
+            <div className="glass-card" style={{ width: '100%', maxWidth: '460px', marginBottom: 0 }}>
+              {isOwner ? (
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                    <h3 style={{ color: 'var(--primary-hover)', fontSize: '20px', fontWeight: '800', margin: 0 }}>Minha Equipe</h3>
+                    <button onClick={() => setShowTeamModal(false)} style={{ background: 'transparent', color: 'white', border: 'none', fontSize: '24px', cursor: 'pointer' }}>×</button>
+                  </div>
+                  <p style={{ color: 'var(--text-muted)', fontSize: '13px', lineHeight: 1.5, marginBottom: '20px' }}>
+                    Adicione até 2 colaboradores pelo e-mail do Google. Eles terão acesso completo para visualizar, criar e coletar dados na sua mesma conta simultaneamente.
                   </p>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {collaborators.map(email => (
-                      <div key={email} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '10px 14px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.06)' }}>
-                        <span style={{ fontSize: '13.5px', color: '#fff' }}>{email}</span>
+
+                  <div style={{ marginBottom: '20px' }}>
+                    <span style={{ fontSize: '11px', color: 'var(--primary-hover)', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '0.8px', display: 'block', marginBottom: '8px' }}>
+                      Colaboradores Adicionados ({collaborators.length}/2)
+                    </span>
+                    {collaborators.length === 0 ? (
+                      <p style={{ color: 'var(--text-muted)', fontSize: '13px', fontStyle: 'italic', margin: '4px 0' }}>
+                        Nenhum colaborador adicionado ainda.
+                      </p>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {collaborators.map(email => (
+                          <div key={email} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '10px 14px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                            <span style={{ fontSize: '13.5px', color: '#fff' }}>{email}</span>
+                            <button 
+                              className="btn btn-danger" 
+                              style={{ width: 'auto', padding: '4px 10px', fontSize: '10px', height: 'auto' }}
+                              onClick={() => handleRemoveCollaborator(email)}
+                              disabled={isTeamLoading}
+                            >
+                              Remover
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {collaborators.length < 2 && (
+                    <div style={{ marginBottom: '16px' }}>
+                      <label className="input-label">Adicionar Colaborador (E-mail Google)</label>
+                      <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
+                        <input 
+                          type="email"
+                          className="input-field" 
+                          placeholder="Ex: joao.silva@gmail.com" 
+                          value={newEmail} 
+                          onChange={e => setNewEmail(e.target.value)} 
+                          style={{ marginBottom: 0, flex: 1 }} 
+                        />
                         <button 
-                          className="btn btn-danger" 
-                          style={{ width: 'auto', padding: '4px 10px', fontSize: '10px', height: 'auto' }}
-                          onClick={() => handleRemoveCollaborator(email)}
+                          className="btn btn-primary" 
+                          style={{ width: 'auto', padding: '0 18px', height: '42px', fontSize: '12px' }}
+                          onClick={handleAddCollaborator}
                           disabled={isTeamLoading}
                         >
-                          Remover
+                          Adicionar
                         </button>
                       </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+                    </div>
+                  )}
 
-              {collaborators.length < 2 && (
-                <div style={{ marginBottom: '16px' }}>
-                  <label className="input-label">Adicionar Colaborador (E-mail Google)</label>
-                  <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
-                    <input 
-                      type="email"
-                      className="input-field" 
-                      placeholder="Ex: joao.silva@gmail.com" 
-                      value={newEmail} 
-                      onChange={e => setNewEmail(e.target.value)} 
-                      style={{ marginBottom: 0, flex: 1 }} 
-                    />
-                    <button 
-                      className="btn btn-primary" 
-                      style={{ width: 'auto', padding: '0 18px', height: '42px', fontSize: '12px' }}
-                      onClick={handleAddCollaborator}
-                      disabled={isTeamLoading}
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '24px' }}>
+                    <button className="btn btn-secondary" style={{ width: 'auto' }} onClick={() => setShowTeamModal(false)}>Fechar</button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                    <h3 style={{ color: 'var(--primary-hover)', fontSize: '20px', fontWeight: '800', margin: 0 }}>Gerenciamento de Equipe</h3>
+                    <button onClick={() => setShowTeamModal(false)} style={{ background: 'transparent', color: 'white', border: 'none', fontSize: '24px', cursor: 'pointer' }}>×</button>
+                  </div>
+                  <div style={{ height: '3px', background: 'var(--primary-color)', width: '48px', marginBottom: '20px', borderRadius: '4px' }}></div>
+                  <p style={{ color: '#fff', fontSize: '14.5px', fontWeight: 'bold', lineHeight: 1.5, marginBottom: '12px' }}>
+                    Recurso Exclusivo para Contas Ativas
+                  </p>
+                  <p style={{ color: 'var(--text-muted)', fontSize: '13px', lineHeight: 1.5, marginBottom: '24px' }}>
+                    A funcionalidade de adicionar e gerenciar colaboradores é exclusiva para o administrador principal da equipe (contas ativas).
+                    <br/><br/>
+                    Como colaborador, você já tem acesso total aos talhões e dados da sua equipe, mas não pode gerenciar outros colaboradores.
+                    Se você deseja ativar uma conta própria para gerenciar sua equipe mestre, entre em contato conosco.
+                  </p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <a 
+                      href="https://wa.me/5547920022746?text=Olá!%20Gostaria%20de%20ativar%20uma%20conta%20mestre%20no%20LeafTag%20para%20gerenciar%20minha%20própria%20equipe."
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="btn"
+                      style={{ 
+                        textDecoration: 'none', 
+                        display: 'inline-flex', 
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        backgroundColor: 'rgba(37, 211, 102, 0.15)', 
+                        border: '1px solid rgba(37, 211, 102, 0.45)', 
+                        color: '#25D366',
+                        boxShadow: '0 4px 15px rgba(37, 211, 102, 0.1)',
+                        fontWeight: 'bold',
+                        padding: '12px 16px'
+                      }}
                     >
-                      Adicionar
-                    </button>
+                      Falar no WhatsApp
+                    </a>
+                    <button className="btn btn-secondary" style={{ width: '100%' }} onClick={() => setShowTeamModal(false)}>Fechar</button>
                   </div>
-                </div>
+                </>
               )}
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '24px' }}>
-                <button className="btn btn-secondary" style={{ width: 'auto' }} onClick={() => setShowTeamModal(false)}>Fechar</button>
-              </div>
-           </div>
-        </div>
+            </div>
+         </div>
       )}
     </div>
   );

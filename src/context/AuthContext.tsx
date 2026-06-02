@@ -38,21 +38,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         let isCollaborator = false;
         
         try {
-          const { collection, query, where, getDocs } = await import('firebase/firestore');
-          const usersRef = collection(db, 'users');
+          const { doc, getDoc } = await import('firebase/firestore');
           const emailToQuery = (user.email || '').toLowerCase();
-          const q = query(usersRef, where('collaborators', 'array-contains', emailToQuery));
-          const qSnap = await getDocs(q);
-          if (!qSnap.empty) {
-            const adminDoc = qSnap.docs[0];
-            const adminData = adminDoc.data();
-            if (adminData.status === 'active' || adminData.status === 'admin') {
-              teamOwnerUid = adminDoc.id;
-              isCollaborator = true;
+          const mappingRef = doc(db, 'collaborators_mapping', emailToQuery);
+          const mappingSnap = await getDoc(mappingRef);
+          
+          if (mappingSnap.exists()) {
+            const mappingData = mappingSnap.data();
+            const ownerUid = mappingData.ownerUid;
+            
+            // Verifica se a conta mestre (dona) está ativa ou admin
+            const ownerRef = doc(db, 'users', ownerUid);
+            const ownerSnap = await getDoc(ownerRef);
+            if (ownerSnap.exists()) {
+              const ownerData = ownerSnap.data();
+              if (ownerData.status === 'active' || ownerData.status === 'admin') {
+                teamOwnerUid = ownerUid;
+                isCollaborator = true;
+              }
             }
           }
         } catch (e) {
-          console.error("Erro ao verificar equipe no Firestore. Isso costuma ocorrer devido às Regras de Segurança do Firebase que bloqueiam a consulta de colaboradores. Certifique-se de aplicar as regras recomendadas no Console.", e);
+          console.error("Erro ao verificar equipe via mapeamento:", e);
         }
 
         if (isCollaborator && teamOwnerUid) {
