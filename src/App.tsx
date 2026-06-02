@@ -42,6 +42,13 @@ const Home = () => {
   const [isTeamLoading, setIsTeamLoading] = useState(false);
 
   useEffect(() => {
+    // Se estiver no computador (tela >= 1024px) e não escolheu explicitamente o Modo Campo, vai para o Modo Escritório
+    if (window.innerWidth >= 1024 && localStorage.getItem('preferredMode') !== 'field') {
+      navigate('/office');
+    }
+  }, [navigate]);
+
+  useEffect(() => {
     if (!currentUser || (status !== 'active' && status !== 'admin')) return;
     if (currentUser.uid !== uidToUse) return;
 
@@ -183,7 +190,10 @@ const Home = () => {
              <button 
                className="btn btn-secondary desktop-only" 
                style={{ width: 'auto', padding: '8px 16px', borderColor: '#4fc3f7', color: '#4fc3f7', background: 'rgba(79, 195, 247, 0.08)' }} 
-               onClick={() => navigate('/office')}
+               onClick={() => {
+                 localStorage.setItem('preferredMode', 'office');
+                 navigate('/office');
+               }}
              >
                Painel do Escritório
              </button>

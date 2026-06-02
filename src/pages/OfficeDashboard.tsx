@@ -24,6 +24,8 @@ export const OfficeDashboard = () => {
   // States for sub-dashboards and audits
   const [auditParcelId, setAuditParcelId] = useState<number | null>(null);
   const [talhaoDashboardId, setTalhaoDashboardId] = useState<string | null>(null);
+  const [showParcelDashboardId, setShowParcelDashboardId] = useState<number | null>(null);
+  const [selectedTalhaoId, setSelectedTalhaoId] = useState<string | null>(null);
   const [showProjectDashboard, setShowProjectDashboard] = useState(false);
 
   // Filter projects by search
@@ -34,11 +36,12 @@ export const OfficeDashboard = () => {
     );
   }, [fieldWorks, searchProjectQuery]);
 
-  // Set first fieldwork as active by default on load
+  // Set first fieldwork as active by default on load, and reset filters on change
   useEffect(() => {
     if (fieldWorks.length > 0 && !activeFwId) {
       setActiveFwId(fieldWorks[0].id);
     }
+    setSelectedTalhaoId(null);
   }, [fieldWorks, activeFwId]);
 
   const activeFw = useMemo(() => {
@@ -53,8 +56,8 @@ export const OfficeDashboard = () => {
     return talhoes.filter(t => t.fieldWorkId === activeFwId);
   }, [talhoes, activeFwId]);
 
-  // Calculations for general KPIs
-  const kpis = useMemo(() => {
+  // Helper to calculate KPIs for any list of parcels
+  const getKpisForParcels = (parcelsList: typeof activeParcels) => {
     let totalTrees = 0;
     let totalArea = 0;
     let totalG = 0;
@@ -70,7 +73,7 @@ export const OfficeDashboard = () => {
        return isNaN(d) ? 0 : d;
     };
 
-    activeParcels.forEach(p => {
+    parcelsList.forEach(p => {
       totalTrees += p.dados.length;
       totalArea += p.areaParcela;
 
@@ -120,7 +123,19 @@ export const OfficeDashboard = () => {
       simpson,
       pielou
     };
-  }, [activeParcels]);
+  };
+
+  // Calculations for general KPIs
+  const kpis = useMemo(() => getKpisForParcels(activeParcels), [activeParcels]);
+
+  const talhaoParcels = useMemo(() => {
+    if (!selectedTalhaoId) return [];
+    return activeParcels.filter(p => p.talhaoId === selectedTalhaoId);
+  }, [activeParcels, selectedTalhaoId]);
+
+  const talhaoKpis = useMemo(() => {
+    return getKpisForParcels(talhaoParcels);
+  }, [talhaoParcels]);
 
   // Projects level Excel Consolidated Export
   const handleExportAll = () => {
@@ -229,6 +244,11 @@ export const OfficeDashboard = () => {
     return inventories.find(i => i.id === auditParcelId);
   }, [inventories, auditParcelId]);
 
+  const auditParcelKpis = useMemo(() => {
+    if (!auditParcel) return null;
+    return getKpisForParcels([auditParcel]);
+  }, [auditParcel]);
+
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: '#020503', color: '#fff', fontFamily: "'Plus Jakarta Sans', sans-serif", overflowX: 'hidden' }}>
       
@@ -236,23 +256,46 @@ export const OfficeDashboard = () => {
       <div style={{ width: '320px', background: 'rgba(5, 13, 8, 0.4)', backdropFilter: 'blur(30px)', borderRight: '1px solid rgba(255, 255, 255, 0.05)', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
         
         {/* Brand Header */}
-        <div style={{ padding: '24px', display: 'flex', alignItems: 'center', gap: '12px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-          <img src="/logo.png" alt="Logo" style={{ width: '40px', height: '40px' }} />
-          <div>
-            <h1 style={{ color: 'var(--primary-color)', fontSize: '18px', fontWeight: '800', margin: 0, letterSpacing: '0.5px' }}>LeafTag</h1>
-            <span style={{ fontSize: '11px', color: '#00e676', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '1px' }}>Painel Escritório</span>
+        <div style={{ padding: '24px 24px 16px', display: 'flex', flexDirection: 'column', gap: '12px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <img src="/logo.png" alt="Logo" style={{ width: '40px', height: '40px' }} />
+            <div>
+              <h1 style={{ color: 'var(--primary-color)', fontSize: '18px', fontWeight: '800', margin: 0, letterSpacing: '0.5px' }}>LeafTag</h1>
+              <span style={{ fontSize: '11px', color: '#00e676', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '1px' }}>Painel Escritório</span>
+            </div>
           </div>
-        </div>
-
-        {/* Action button back to field */}
-        <div style={{ padding: '16px 24px 8px 24px' }}>
-          <button 
-            className="btn btn-secondary" 
-            style={{ width: '100%', padding: '10px', fontSize: '12px', borderColor: 'var(--primary-color)', color: 'var(--primary-color)' }}
-            onClick={() => navigate('/')}
-          >
-            ← Voltar ao Modo Campo
-          </button>
+          <div>
+            <button 
+              onClick={() => {
+                localStorage.setItem('preferredMode', 'field');
+                navigate('/');
+              }}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: 'rgba(255, 255, 255, 0.45)',
+                fontSize: '11px',
+                cursor: 'pointer',
+                padding: '4px 0',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                textDecoration: 'none',
+                transition: 'all 0.2s',
+                fontFamily: 'inherit',
+                fontWeight: '600'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.color = '#00e676';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color = 'rgba(255, 255, 255, 0.45)';
+              }}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
+              Ir para Modo Campo
+            </button>
+          </div>
         </div>
 
         {/* Project search */}
@@ -456,6 +499,16 @@ export const OfficeDashboard = () => {
                               <td style={{ padding: '18px 24px', textAlign: 'center', color: '#4fc3f7', fontWeight: 'bold' }}>{treesCount}</td>
                               <td style={{ padding: '18px 24px', textAlign: 'center' }}>
                                 <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                                  <button 
+                                    className="btn btn-secondary" 
+                                    style={{ width: 'auto', padding: '6px 12px', fontSize: '11px', borderColor: '#00e676', color: '#00e676', background: 'rgba(0, 230, 118, 0.08)' }} 
+                                    onClick={() => {
+                                      setSelectedTalhaoId(t.id);
+                                      setActiveTab('parcelas');
+                                    }}
+                                  >
+                                    Ver Parcelas
+                                  </button>
                                   {talParcels.length > 0 && (
                                     <>
                                       <button 
@@ -485,7 +538,79 @@ export const OfficeDashboard = () => {
                 )}
               </div>
             ) : (
-              <div className="glass-card" style={{ padding: 0, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.05)' }}>
+              <div className="glass-card" style={{ padding: 24, border: '1px solid rgba(255,255,255,0.05)' }}>
+                {selectedTalhaoId && (
+                  <div style={{ marginBottom: '20px' }}>
+                    {/* Filter Banner */}
+                    <div style={{
+                      background: 'rgba(0, 230, 118, 0.06)',
+                      border: '1px solid rgba(0, 230, 118, 0.15)',
+                      borderRadius: '12px',
+                      padding: '12px 20px',
+                      marginBottom: '16px',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center'
+                    }}>
+                      <span style={{ fontSize: '13px', color: '#a5d6a7', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+                        Filtrado pelo Talhão: <strong style={{ color: '#fff', fontSize: '14px' }}>{activeTalhoes.find(t => t.id === selectedTalhaoId)?.nome || 'Sem Nome'}</strong>
+                      </span>
+                      <button 
+                        onClick={() => setSelectedTalhaoId(null)}
+                        style={{
+                          background: 'rgba(255, 77, 109, 0.1)',
+                          border: '1px solid rgba(255, 77, 109, 0.25)',
+                          borderRadius: '8px',
+                          color: '#ff4d6d',
+                          fontSize: '11px',
+                          fontWeight: 'bold',
+                          cursor: 'pointer',
+                          padding: '6px 12px',
+                          transition: 'all 0.2s',
+                          borderStyle: 'solid'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = 'rgba(255, 77, 109, 0.2)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = 'rgba(255, 77, 109, 0.1)';
+                        }}
+                      >
+                        Remover Filtro
+                      </button>
+                    </div>
+
+                    {/* Talhão KPI Grid */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px', marginBottom: '16px' }}>
+                      <div style={{ padding: '12px 16px', background: 'rgba(79, 195, 247, 0.03)', border: '1px solid rgba(79, 195, 247, 0.08)', borderRadius: '12px' }}>
+                        <span style={{ fontSize: '10px', color: 'rgba(79, 195, 247, 0.7)', textTransform: 'uppercase', fontWeight: 'bold' }}>Árvores do Talhão</span>
+                        <span style={{ fontSize: '18px', color: '#4fc3f7', fontWeight: '800', display: 'block', marginTop: '4px' }}>
+                          {talhaoKpis.totalTrees}
+                        </span>
+                      </div>
+                      <div style={{ padding: '12px 16px', background: 'rgba(174, 213, 129, 0.03)', border: '1px solid rgba(174, 213, 129, 0.08)', borderRadius: '12px' }}>
+                        <span style={{ fontSize: '10px', color: 'rgba(174, 213, 129, 0.7)', textTransform: 'uppercase', fontWeight: 'bold' }}>Riqueza do Talhão</span>
+                        <span style={{ fontSize: '18px', color: '#aed581', fontWeight: '800', display: 'block', marginTop: '4px' }}>
+                          {talhaoKpis.speciesCount}
+                        </span>
+                      </div>
+                      <div style={{ padding: '12px 16px', background: 'rgba(186, 104, 200, 0.03)', border: '1px solid rgba(186, 104, 200, 0.08)', borderRadius: '12px' }}>
+                        <span style={{ fontSize: '10px', color: 'rgba(186, 104, 200, 0.7)', textTransform: 'uppercase', fontWeight: 'bold' }}>Volume do Talhão</span>
+                        <span style={{ fontSize: '18px', color: '#ba68c8', fontWeight: '800', display: 'block', marginTop: '4px' }}>
+                          {talhaoKpis.totalV.toFixed(2)} m³
+                        </span>
+                      </div>
+                      <div style={{ padding: '12px 16px', background: 'rgba(255, 183, 77, 0.03)', border: '1px solid rgba(255, 183, 77, 0.08)', borderRadius: '12px' }}>
+                        <span style={{ fontSize: '10px', color: 'rgba(255, 183, 77, 0.7)', textTransform: 'uppercase', fontWeight: 'bold' }}>Shannon do Talhão</span>
+                        <span style={{ fontSize: '18px', color: '#ffb74d', fontWeight: '800', display: 'block', marginTop: '4px' }}>
+                          {talhaoKpis.shannon.toFixed(3)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {activeParcels.length === 0 ? (
                   <div style={{ padding: '48px', textAlign: 'center', color: 'var(--text-muted)' }}>
                     Nenhuma parcela cadastrada neste projeto.
@@ -500,11 +625,11 @@ export const OfficeDashboard = () => {
                           <th style={{ padding: '16px 24px', textAlign: 'left', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Coordenadas GPS</th>
                           <th style={{ padding: '16px 24px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', width: '110px' }}>Área (m²)</th>
                           <th style={{ padding: '16px 24px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', width: '110px' }}>Árvores</th>
-                          <th style={{ padding: '16px 24px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', width: '280px' }}>Ações de Auditoria</th>
+                          <th style={{ padding: '16px 24px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', width: '320px' }}>Ações de Auditoria</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {activeParcels.map(p => {
+                        {(selectedTalhaoId ? activeParcels.filter(p => p.talhaoId === selectedTalhaoId) : activeParcels).map(p => {
                           const talName = activeTalhoes.find(t => t.id === p.talhaoId)?.nome || 'Sem Talhão';
                           return (
                             <tr key={p.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
@@ -523,13 +648,22 @@ export const OfficeDashboard = () => {
                                     Auditar Dados
                                   </button>
                                   {p.dados.length > 0 && (
-                                    <button 
-                                      className="btn btn-secondary" 
-                                      style={{ width: 'auto', padding: '6px 12px', fontSize: '11px', borderColor: 'var(--primary-color)', color: 'var(--primary-color)' }} 
-                                      onClick={() => handleExportParcelProcessed(p)}
-                                    >
-                                      Exportar Excel
-                                    </button>
+                                    <>
+                                      <button 
+                                        className="btn btn-secondary" 
+                                        style={{ width: 'auto', padding: '6px 12px', fontSize: '11px', borderColor: '#2e7d32', color: '#a5d6a7', background: 'rgba(46, 125, 50, 0.08)' }} 
+                                        onClick={() => setShowParcelDashboardId(p.id)}
+                                      >
+                                        Dashboard
+                                      </button>
+                                      <button 
+                                        className="btn btn-secondary" 
+                                        style={{ width: 'auto', padding: '6px 12px', fontSize: '11px', borderColor: 'var(--primary-color)', color: 'var(--primary-color)' }} 
+                                        onClick={() => handleExportParcelProcessed(p)}
+                                      >
+                                        Exportar Excel
+                                      </button>
+                                    </>
                                   )}
                                 </div>
                               </td>
@@ -567,10 +701,88 @@ export const OfficeDashboard = () => {
            <div className="glass-card" style={{ width: '100%', maxWidth: '840px', marginTop: '40px', marginBottom: '40px', padding: '24px 32px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                 <div>
-                  <span style={{ fontSize: '10px', color: 'var(--primary-hover)', textTransform: 'uppercase', fontWeight: 'bold' }}>Auditoria e Inspeção</span>
-                  <h3 style={{ fontSize: '20px', fontWeight: '800', color: '#fff', margin: '2px 0 0 0' }}>Parcela: {auditParcel.nome}</h3>
+                  <span style={{ fontSize: '10px', color: 'var(--primary-hover)', textTransform: 'uppercase', fontWeight: 'bold' }}>Visualização e Auditoria</span>
+                  <h3 style={{ fontSize: '20px', fontWeight: '800', color: '#fff', margin: '2px 0 0 0' }}>Inspeção da Parcela: {auditParcel.nome}</h3>
                 </div>
                 <button onClick={() => setAuditParcelId(null)} style={{ background: 'transparent', color: 'white', border: 'none', fontSize: '24px', cursor: 'pointer' }}>×</button>
+              </div>
+
+              {/* Parcela Info Details Grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+                <div style={{ padding: '12px 16px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px' }}>
+                  <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Talhão</span>
+                  <span style={{ fontSize: '14.5px', color: '#ff9800', fontWeight: 'bold', display: 'block', marginTop: '4px' }}>
+                    {activeTalhoes.find(t => t.id === auditParcel.talhaoId)?.nome || 'Sem Talhão'}
+                  </span>
+                </div>
+                <div style={{ padding: '12px 16px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px' }}>
+                  <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Área Amostral</span>
+                  <span style={{ fontSize: '14.5px', color: '#fff', fontWeight: 'bold', display: 'block', marginTop: '4px' }}>
+                    {auditParcel.areaParcela} m²
+                  </span>
+                </div>
+                <div style={{ padding: '12px 16px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px' }}>
+                  <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Coordenadas GPS</span>
+                  <span style={{ fontSize: '13px', color: '#fff', fontFamily: 'monospace', display: 'block', marginTop: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {auditParcel.coordenadas || 'Não Coletadas'}
+                  </span>
+                </div>
+                <div style={{ padding: '12px 16px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px' }}>
+                  <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Observações</span>
+                  <span style={{ fontSize: '13px', color: 'var(--text-muted)', display: 'block', marginTop: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {auditParcel.observacoes || 'Sem Observações'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Parcela KPI Summary Grid */}
+              {auditParcelKpis && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+                  <div style={{ padding: '12px 16px', background: 'rgba(79, 195, 247, 0.04)', border: '1px solid rgba(79, 195, 247, 0.15)', borderRadius: '12px' }}>
+                    <span style={{ fontSize: '10px', color: 'rgba(79, 195, 247, 0.8)', textTransform: 'uppercase', fontWeight: 'bold' }}>Árvores na Parcela</span>
+                    <span style={{ fontSize: '18px', color: '#4fc3f7', fontWeight: '800', display: 'block', marginTop: '4px' }}>
+                      {auditParcelKpis.totalTrees}
+                    </span>
+                  </div>
+                  <div style={{ padding: '12px 16px', background: 'rgba(174, 213, 129, 0.04)', border: '1px solid rgba(174, 213, 129, 0.15)', borderRadius: '12px' }}>
+                    <span style={{ fontSize: '10px', color: 'rgba(174, 213, 129, 0.8)', textTransform: 'uppercase', fontWeight: 'bold' }}>Riqueza (Espécies)</span>
+                    <span style={{ fontSize: '18px', color: '#aed581', fontWeight: '800', display: 'block', marginTop: '4px' }}>
+                      {auditParcelKpis.speciesCount}
+                    </span>
+                  </div>
+                  <div style={{ padding: '12px 16px', background: 'rgba(186, 104, 200, 0.04)', border: '1px solid rgba(186, 104, 200, 0.15)', borderRadius: '12px' }}>
+                    <span style={{ fontSize: '10px', color: 'rgba(186, 104, 200, 0.8)', textTransform: 'uppercase', fontWeight: 'bold' }}>Volume Parcela</span>
+                    <span style={{ fontSize: '18px', color: '#ba68c8', fontWeight: '800', display: 'block', marginTop: '4px' }}>
+                      {auditParcelKpis.totalV.toFixed(3)} m³
+                    </span>
+                  </div>
+                  <div style={{ padding: '12px 16px', background: 'rgba(255, 183, 77, 0.04)', border: '1px solid rgba(255, 183, 77, 0.15)', borderRadius: '12px' }}>
+                    <span style={{ fontSize: '10px', color: 'rgba(255, 183, 77, 0.8)', textTransform: 'uppercase', fontWeight: 'bold' }}>Shannon (H')</span>
+                    <span style={{ fontSize: '18px', color: '#ffb74d', fontWeight: '800', display: 'block', marginTop: '4px' }}>
+                      {auditParcelKpis.shannon.toFixed(3)}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Actions Row */}
+              <div style={{ display: 'flex', gap: '12px', marginBottom: '24px', flexWrap: 'wrap' }}>
+                <button
+                  className="btn btn-secondary"
+                  style={{ width: 'auto', padding: '8px 16px', fontSize: '12px', borderColor: '#2e7d32', color: '#a5d6a7', background: 'rgba(46, 125, 50, 0.08)' }}
+                  onClick={() => setShowParcelDashboardId(auditParcel.id)}
+                >
+                  📊 Ver Dashboard da Parcela
+                </button>
+                {auditParcel.dados.length > 0 && (
+                  <button
+                    className="btn btn-secondary"
+                    style={{ width: 'auto', padding: '8px 16px', fontSize: '12px', borderColor: 'var(--primary-color)', color: 'var(--primary-color)' }}
+                    onClick={() => handleExportParcelProcessed(auditParcel)}
+                  >
+                    📥 Exportar Excel da Parcela
+                  </button>
+                )}
               </div>
 
               <div style={{ background: 'rgba(0,230,118,0.04)', border: '1px solid rgba(0,230,118,0.2)', padding: '12px 18px', borderRadius: '12px', fontSize: '13px', color: '#a5d6a7', marginBottom: '20px' }}>
@@ -581,7 +793,7 @@ export const OfficeDashboard = () => {
               {auditParcel.dados.length === 0 ? (
                 <p style={{ color: 'var(--text-muted)', fontStyle: 'italic', padding: '20px 0' }}>Nenhuma árvore cadastrada nesta parcela ainda.</p>
               ) : (
-                <div style={{ overflowX: 'auto', maxHeight: '420px', overflowY: 'auto', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '12px' }}>
+                <div style={{ overflowX: 'auto', maxHeight: '320px', overflowY: 'auto', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '12px' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                     <thead>
                       <tr style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid rgba(255,255,255,0.06)', position: 'sticky', top: 0, zIndex: 1 }}>
@@ -629,6 +841,13 @@ export const OfficeDashboard = () => {
         <StatisticalDashboard 
           inventories={activeParcels.filter(p => p.talhaoId === talhaoDashboardId)} 
           onClose={() => setTalhaoDashboardId(null)} 
+        />
+      )}
+
+      {showParcelDashboardId && (
+        <StatisticalDashboard 
+          inventories={activeParcels.filter(p => p.id === showParcelDashboardId)} 
+          onClose={() => setShowParcelDashboardId(null)} 
         />
       )}
 
