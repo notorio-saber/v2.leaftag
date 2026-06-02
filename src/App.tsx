@@ -75,7 +75,7 @@ const Home = () => {
       return alert("Este e-mail já faz parte do seu time.");
     }
     
-    if (collaborators.length >= 2) {
+    if (status !== 'admin' && collaborators.length >= 2) {
       return alert("Você atingiu o limite máximo de 2 colaboradores no seu time.");
     }
 
@@ -426,12 +426,16 @@ const Home = () => {
                     <button onClick={() => setShowTeamModal(false)} style={{ background: 'transparent', color: 'white', border: 'none', fontSize: '24px', cursor: 'pointer' }}>×</button>
                   </div>
                   <p style={{ color: 'var(--text-muted)', fontSize: '13px', lineHeight: 1.5, marginBottom: '20px' }}>
-                    Adicione até 2 colaboradores pelo e-mail do Google. Eles terão acesso completo para visualizar, criar e coletar dados na sua mesma conta simultaneamente.
+                    {status === 'admin' 
+                      ? 'Adicione colaboradores pelo e-mail do Google. Eles terão acesso completo para visualizar, criar e coletar dados na sua mesma conta simultaneamente.'
+                      : 'Adicione até 2 colaboradores pelo e-mail do Google. Eles terão acesso completo para visualizar, criar e coletar dados na sua mesma conta simultaneamente.'}
                   </p>
 
                   <div style={{ marginBottom: '20px' }}>
                     <span style={{ fontSize: '11px', color: 'var(--primary-hover)', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '0.8px', display: 'block', marginBottom: '8px' }}>
-                      Colaboradores Adicionados ({collaborators.length}/2)
+                      {status === 'admin' 
+                        ? `Colaboradores Adicionados (${collaborators.length})`
+                        : `Colaboradores Adicionados (${collaborators.length}/2)`}
                     </span>
                     {collaborators.length === 0 ? (
                       <p style={{ color: 'var(--text-muted)', fontSize: '13px', fontStyle: 'italic', margin: '4px 0' }}>
@@ -456,7 +460,7 @@ const Home = () => {
                     )}
                   </div>
 
-                  {collaborators.length < 2 && (
+                  {(status === 'admin' || collaborators.length < 2) && (
                     <div style={{ marginBottom: '16px' }}>
                       <label className="input-label">Adicionar Colaborador (E-mail Google)</label>
                       <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
