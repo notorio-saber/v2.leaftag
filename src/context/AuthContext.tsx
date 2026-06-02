@@ -40,7 +40,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         try {
           const { collection, query, where, getDocs } = await import('firebase/firestore');
           const usersRef = collection(db, 'users');
-          const q = query(usersRef, where('collaborators', 'array-contains', user.email));
+          const emailToQuery = (user.email || '').toLowerCase();
+          const q = query(usersRef, where('collaborators', 'array-contains', emailToQuery));
           const qSnap = await getDocs(q);
           if (!qSnap.empty) {
             const adminDoc = qSnap.docs[0];
@@ -51,7 +52,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
           }
         } catch (e) {
-          console.error("Erro ao verificar time:", e);
+          console.error("Erro ao verificar equipe no Firestore. Isso costuma ocorrer devido às Regras de Segurança do Firebase que bloqueiam a consulta de colaboradores. Certifique-se de aplicar as regras recomendadas no Console.", e);
         }
 
         if (isCollaborator && teamOwnerUid) {
