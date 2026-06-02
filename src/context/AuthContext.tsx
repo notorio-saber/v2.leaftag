@@ -58,8 +58,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               }
             }
           }
-        } catch (e) {
+        } catch (e: any) {
           console.error("Erro ao verificar equipe via mapeamento:", e);
+          if (e.code === 'permission-denied' || e.message?.toLowerCase().includes('permission')) {
+            alert(
+              "ATENÇÃO - REGRA DO FIREBASE PENDENTE:\n\n" +
+              "Ocorreu um erro de permissão ao tentar verificar seu vínculo de equipe.\n\n" +
+              "Isso acontece porque as novas Regras de Segurança do Firestore ainda não foram publicadas no seu Console do Firebase.\n\n" +
+              "Por favor, peça ao Administrador para copiar as regras enviadas no chat e publicá-las na guia 'Rules' do Firestore Database no Console do Firebase."
+            );
+          }
         }
 
         if (isCollaborator && teamOwnerUid) {

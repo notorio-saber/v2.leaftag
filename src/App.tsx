@@ -27,6 +27,7 @@ const Home = () => {
   const { fieldWorks, createFieldWork, talhoes, inventories } = useInventory();
   const { currentUser, signOut, status, uidToUse } = useAuth();
   const isOwner = currentUser && currentUser.uid === uidToUse && (status === 'active' || status === 'admin');
+  const userName = currentUser?.displayName ? currentUser.displayName.split(' ')[0] : 'Usuário';
   const navigate = useNavigate();
   const [showModal, setShowModal] = useState(false);
   const [newFwName, setNewFwName] = useState('');
@@ -160,7 +161,7 @@ const Home = () => {
           <img src="/logo.png" alt="Logo" style={{ width: '48px', height: '48px', borderRadius: '0px' }} />
           <div>
             <h1 style={{ color: 'var(--primary-color)', fontSize: '20px', whiteSpace: 'nowrap', margin: 0 }}>Trabalhos de Campo</h1>
-            <p style={{ color: 'var(--text-muted)', fontSize: '14px', margin: 0 }}>Gerenciamento</p>
+            <p style={{ color: 'var(--text-muted)', fontSize: '14px', margin: 0 }}>Olá, {userName}!</p>
           </div>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
