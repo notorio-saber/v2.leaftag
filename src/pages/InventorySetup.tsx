@@ -23,9 +23,11 @@ const getNewCustomCol = () => ({ id: '', nome: '', tipo: 'text', checked: true, 
 export const InventorySetup = () => {
   const navigate = useNavigate();
   const { fieldWorkId, talhaoId } = useParams();
-  const { setCurrentInventory, saveInventory } = useInventory();
+  const { setCurrentInventory, saveInventory, strata } = useInventory();
+  const activeStrata = strata.filter(s => s.fieldWorkId === fieldWorkId);
   const [nome, setNome] = useState('');
   const [area, setArea] = useState('');
+  const [stratumId, setStratumId] = useState('');
   
   const [coordenadas, setCoordenadas] = useState('');
   const [observacoes, setObservacoes] = useState('');
@@ -105,6 +107,7 @@ export const InventorySetup = () => {
       id: Date.now(),
       fieldWorkId,
       talhaoId,
+      stratumId: stratumId || undefined,
       nome,
       formatoParcela,
       areaParcela: parseFloat(area) || 0,
@@ -137,6 +140,27 @@ export const InventorySetup = () => {
       <div className="glass-card" style={{ marginTop: '8px' }}>
         <label className="input-label">Nome ou Número da Parcela</label>
         <input className="input-field" value={nome} onChange={e => setNome(e.target.value)} placeholder="Ex: Parcela 01, P-04" />
+
+        {activeStrata.length > 0 && (
+          <>
+            <label className="input-label" style={{ marginTop: '12px' }}>Estrato Florestal</label>
+            <select 
+              className="input-field" 
+              value={stratumId} 
+              onChange={e => setStratumId(e.target.value)}
+              style={{ 
+                appearance: 'none',
+                background: 'rgba(0,0,0,0.25) url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'white\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'%3e%3cpolyline points=\'6 9 12 15 18 9\'%3e%3c/polyline%3e%3c/svg%3e") no-repeat right 12px center',
+                backgroundSize: '16px'
+              }}
+            >
+              <option value="" style={{ background: '#0a0f0d', color: '#fff' }}>-- Sem Estrato --</option>
+              {activeStrata.map(s => (
+                <option key={s.id} value={s.id} style={{ background: '#0a0f0d', color: '#fff' }}>{s.nome} ({s.area} ha)</option>
+              ))}
+            </select>
+          </>
+        )}
 
         <label className="input-label" style={{ marginTop: '12px' }}>Formato da Parcela</label>
         <div style={{ display: 'flex', gap: '12px', marginBottom: '20px' }}>

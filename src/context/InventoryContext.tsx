@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
-import type { Inventory, FieldWork, Talhao } from '../types';
+import type { Inventory, FieldWork, Talhao, Stratum } from '../types';
 import { db } from '../lib/firebase';
 import { collection, doc, onSnapshot, setDoc, deleteDoc } from 'firebase/firestore';
 import { useAuth } from './AuthContext';
@@ -9,6 +9,7 @@ interface InventoryContextType {
   fieldWorks: FieldWork[];
   talhoes: Talhao[];
   inventories: Inventory[];
+  strata: Stratum[];
   currentInventory: Inventory | null;
   setCurrentInventory: (inv: Inventory | null) => void;
   saveInventory: (inv: Inventory) => Promise<void>;
@@ -17,6 +18,8 @@ interface InventoryContextType {
   deleteFieldWork: (id: string) => Promise<void>;
   createTalhao: (t: Talhao) => Promise<void>;
   deleteTalhao: (id: string) => Promise<void>;
+  createStratum: (s: Stratum) => Promise<void>;
+  deleteStratum: (id: string) => Promise<void>;
 }
 
 const InventoryContext = createContext<InventoryContextType | undefined>(undefined);
@@ -26,6 +29,7 @@ export const InventoryProvider: React.FC<{ children: ReactNode }> = ({ children 
   const [fieldWorks, setFieldWorks] = useState<FieldWork[]>([]);
   const [talhoes, setTalhoes] = useState<Talhao[]>([]);
   const [inventories, setInventories] = useState<Inventory[]>([]);
+  const [strata, setStrata] = useState<Stratum[]>([]);
   const [currentInventory, setCurrentInventory] = useState<Inventory | null>(null);
 
   // Firestore Snapshot (Realtime + Offline IndexedDB)
@@ -34,6 +38,7 @@ export const InventoryProvider: React.FC<{ children: ReactNode }> = ({ children 
       setFieldWorks([]);
       setTalhoes([]);
       setInventories([]);
+      setStrata([]);
       return;
     }
 
@@ -73,10 +78,23 @@ export const InventoryProvider: React.FC<{ children: ReactNode }> = ({ children 
       console.error("Erro no Sync do Inventário Firestore:", error);
     });
 
+    const strataRef = collection(db, `users/${uidToUse}/strata`);
+    const unsubscribeStrata = onSnapshot(strataRef, (snapshot) => {
+      const data: Stratum[] = [];
+      snapshot.forEach(doc => {
+        data.push(doc.data() as Stratum);
+      });
+      data.sort((a,b) => b.id.localeCompare(a.id));
+      setStrata(data);
+    }, (error) => {
+      console.error("Erro no Sync do Strata Firestore:", error);
+    });
+
     return () => {
       unsubscribeFw();
       unsubscribeTal();
       unsubscribeInv();
+      unsubscribeStrata();
     };
   }, [currentUser, uidToUse]);
 
@@ -127,6 +145,12 @@ export const InventoryProvider: React.FC<{ children: ReactNode }> = ({ children 
       await deleteDoc(doc(db, `users/${uidToUse}/inventories`, inv.id.toString()));
     }
 
+    // Deletar os estratos atrelados a esse FieldWork
+    const linkedStrata = strata.filter(s => s.fieldWorkId === id);
+    for (const stratum of linkedStrata) {
+      await deleteDoc(doc(db, `users/${uidToUse}/strata`, stratum.id));
+    }
+
     if (currentInventory?.fieldWorkId === id) {
       setCurrentInventory(null);
     }
@@ -154,12 +178,33 @@ export const InventoryProvider: React.FC<{ children: ReactNode }> = ({ children 
     }
   };
 
+  const createStratum = async (s: Stratum) => {
+    if (!currentUser || !uidToUse) return;
+    const docRef = doc(db, `users/${uidToUse}/strata`, s.id);
+    await setDoc(docRef, s);
+  };
+
+  const deleteStratum = async (id: string) => {
+    if (!currentUser || !uidToUse) return;
+    const docRef = doc(db, `users/${uidToUse}/strata`, id);
+    await deleteDoc(docRef);
+
+    // Quando deletar o estrato, limpa o stratumId das parcelas vinculadas a ele
+    const linkedInvs = inventories.filter(i => i.stratumId === id);
+    for (const inv of linkedInvs) {
+      const updatedInv = { ...inv };
+      delete updatedInv.stratumId;
+      await saveInventory(updatedInv);
+    }
+  };
+
   return (
     <InventoryContext.Provider
       value={{
         fieldWorks,
         talhoes,
         inventories,
+        strata,
         currentInventory,
         setCurrentInventory,
         saveInventory,
@@ -168,6 +213,8 @@ export const InventoryProvider: React.FC<{ children: ReactNode }> = ({ children 
         deleteFieldWork,
         createTalhao,
         deleteTalhao,
+        createStratum,
+        deleteStratum,
       }}
     >
       {children}

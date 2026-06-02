@@ -37,10 +37,19 @@ export interface Talhao {
   observacoes?: string;
 }
 
+export interface Stratum {
+  id: string;
+  fieldWorkId: string;
+  nome: string;
+  area: number;
+  descricao?: string;
+}
+
 export interface Inventory {
   id: number;
   fieldWorkId: string;
   talhaoId?: string;
+  stratumId?: string;
   nome: string;
   areaParcela: number;
   fatorExpansao: number;

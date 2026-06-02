@@ -14,19 +14,26 @@ import {
 
 export const OfficeDashboard = () => {
   const navigate = useNavigate();
-  const { fieldWorks, talhoes, inventories } = useInventory();
+  const { fieldWorks, talhoes, inventories, strata, createStratum, deleteStratum, saveInventory } = useInventory();
   const { currentUser, signOut } = useAuth();
 
   const [activeFwId, setActiveFwId] = useState<string>('');
   const [searchProjectQuery, setSearchProjectQuery] = useState('');
-  const [activeTab, setActiveTab] = useState<'talhoes' | 'parcelas'>('talhoes');
+  const [activeTab, setActiveTab] = useState<'talhoes' | 'parcelas' | 'estratos'>('talhoes');
   
   // States for sub-dashboards and audits
   const [auditParcelId, setAuditParcelId] = useState<number | null>(null);
   const [talhaoDashboardId, setTalhaoDashboardId] = useState<string | null>(null);
+  const [stratumDashboardId, setStratumDashboardId] = useState<string | null>(null);
   const [showParcelDashboardId, setShowParcelDashboardId] = useState<number | null>(null);
   const [selectedTalhaoId, setSelectedTalhaoId] = useState<string | null>(null);
   const [showProjectDashboard, setShowProjectDashboard] = useState(false);
+
+  // States for Strata Creation Modal
+  const [showStratumModal, setShowStratumModal] = useState(false);
+  const [newStratumName, setNewStratumName] = useState('');
+  const [newStratumArea, setNewStratumArea] = useState('');
+  const [newStratumDesc, setNewStratumDesc] = useState('');
 
   // Filter projects by search
   const filteredFieldWorks = useMemo(() => {
@@ -55,6 +62,10 @@ export const OfficeDashboard = () => {
   const activeTalhoes = useMemo(() => {
     return talhoes.filter(t => t.fieldWorkId === activeFwId);
   }, [talhoes, activeFwId]);
+
+  const activeStrata = useMemo(() => {
+    return strata.filter(s => s.fieldWorkId === activeFwId);
+  }, [strata, activeFwId]);
 
   // Helper to calculate KPIs for any list of parcels
   const getKpisForParcels = (parcelsList: typeof activeParcels) => {
@@ -136,6 +147,117 @@ export const OfficeDashboard = () => {
   const talhaoKpis = useMemo(() => {
     return getKpisForParcels(talhaoParcels);
   }, [talhaoParcels]);
+
+  // Stratified inventory calculations
+  const stratifiedStats = useMemo(() => {
+    let totalForestArea = 0;
+    activeStrata.forEach(s => totalForestArea += s.area);
+
+    const strataDetails = activeStrata.map(s => {
+      const stratumParcels = activeParcels.filter(p => p.stratumId === s.id);
+      const nh = stratumParcels.length;
+
+      // Calculate volume per hectare for each parcel in this stratum
+      const volumesHa = stratumParcels.map(p => {
+        let vParcel = 0;
+        const factorForma = 0.7;
+
+        const processCapDap = (capVal?: any, dapVal?: any) => {
+           let d = 0;
+           if (dapVal) d = parseFloat(dapVal.toString());
+           else if (capVal) d = parseFloat(capVal.toString()) / Math.PI;
+           return isNaN(d) ? 0 : d;
+        };
+
+        p.dados.forEach(ind => {
+          let maxHtObj = ind.ht ? parseFloat(ind.ht.toString()) : 0;
+          let stemsProps: { cap: number, ht: number }[] = [];
+          
+          if (ind.multipleStems && ind.stems) {
+            ind.stems.forEach((st: any) => {
+              stemsProps.push({
+                cap: parseFloat((st.cap||'0').toString()),
+                ht: parseFloat((st.altura||'0').toString())
+              });
+            });
+          } else {
+            const mainDap = processCapDap(ind.cap, ind.dap);
+            const ht = parseFloat((ind.ht||'0').toString());
+            if (mainDap > 0) {
+              stemsProps.push({ cap: ind.cap ? parseFloat(ind.cap.toString()) : mainDap*Math.PI, ht: ht });
+            }
+          }
+          
+          stemsProps.forEach(stem => {
+            const g = calculateBasalArea(stem.cap);
+            const v = calculateVolume(g, stem.ht || maxHtObj, factorForma);
+            vParcel += v;
+          });
+        });
+
+        // Convert to per-hectare value
+        const areaHa = p.areaParcela / 10000;
+        return areaHa > 0 ? vParcel / areaHa : 0;
+      });
+
+      // Stratum mean (m³/ha)
+      const meanV = nh > 0 ? volumesHa.reduce((acc, val) => acc + val, 0) / nh : 0;
+
+      // Stratum variance (s²)
+      let varianceV = 0;
+      if (nh > 1) {
+        const sumSq = volumesHa.reduce((acc, val) => acc + Math.pow(val - meanV, 2), 0);
+        varianceV = sumSq / (nh - 1);
+      }
+
+      const Wh = totalForestArea > 0 ? s.area / totalForestArea : 0;
+
+      return {
+        stratum: s,
+        nh,
+        Wh,
+        meanV,
+        varianceV,
+        volumesHa
+      };
+    });
+
+    // Ponderated calculations
+    let meanSt = 0;
+    let varMeanSt = 0;
+    let totalN = 0;
+
+    strataDetails.forEach(d => {
+      meanSt += d.Wh * d.meanV;
+      totalN += d.nh;
+      if (d.nh > 0) {
+        // s2(mean_st) = sum(Wh^2 * sh^2 / nh)
+        varMeanSt += Math.pow(d.Wh, 2) * (d.varianceV / d.nh);
+      }
+    });
+
+    const errorStd = Math.sqrt(varMeanSt);
+    const tVal = 2.0; // Padrão prático adotado para nível de confiança ~95%
+    const errorAbs = tVal * errorStd;
+    const errorRel = meanSt > 0 ? (errorAbs / meanSt) * 100 : 0;
+
+    const totalVolumeForest = meanSt * totalForestArea;
+    const lowerVolumeForest = Math.max(0, (meanSt - errorAbs) * totalForestArea);
+    const upperVolumeForest = (meanSt + errorAbs) * totalForestArea;
+
+    return {
+      totalForestArea,
+      strataDetails,
+      meanSt,
+      errorStd,
+      errorAbs,
+      errorRel,
+      totalVolumeForest,
+      lowerVolumeForest,
+      upperVolumeForest,
+      totalN
+    };
+  }, [activeStrata, activeParcels]);
 
   // Projects level Excel Consolidated Export
   const handleExportAll = () => {
@@ -432,7 +554,7 @@ export const OfficeDashboard = () => {
 
             </div>
 
-            {/* Abas layout for Talhões / Parcelas */}
+            {/* Abas layout for Talhões / Parcelas / Estratos */}
             <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid rgba(255,255,255,0.05)', marginBottom: '20px' }}>
               <button 
                 onClick={() => setActiveTab('talhoes')}
@@ -463,6 +585,21 @@ export const OfficeDashboard = () => {
                 }}
               >
                 Parcelas ({activeParcels.length})
+              </button>
+              <button 
+                onClick={() => setActiveTab('estratos')}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  borderBottom: activeTab === 'estratos' ? '2px solid var(--primary-color)' : '2px solid transparent',
+                  color: activeTab === 'estratos' ? 'var(--primary-hover)' : 'var(--text-muted)',
+                  padding: '12px 20px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold',
+                  fontSize: '14.5px'
+                }}
+              >
+                Estratos ({activeStrata.length})
               </button>
             </div>
 
@@ -537,7 +674,7 @@ export const OfficeDashboard = () => {
                   </div>
                 )}
               </div>
-            ) : (
+            ) : activeTab === 'parcelas' ? (
               <div className="glass-card" style={{ padding: 24, border: '1px solid rgba(255,255,255,0.05)' }}>
                 {selectedTalhaoId && (
                   <div style={{ marginBottom: '20px' }}>
@@ -622,6 +759,9 @@ export const OfficeDashboard = () => {
                         <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                           <th style={{ padding: '16px 24px', textAlign: 'left', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Nome da Parcela</th>
                           <th style={{ padding: '16px 24px', textAlign: 'left', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Talhão</th>
+                          {activeStrata.length > 0 && (
+                            <th style={{ padding: '16px 24px', textAlign: 'left', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Estrato</th>
+                          )}
                           <th style={{ padding: '16px 24px', textAlign: 'left', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Coordenadas GPS</th>
                           <th style={{ padding: '16px 24px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', width: '110px' }}>Área (m²)</th>
                           <th style={{ padding: '16px 24px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', width: '110px' }}>Árvores</th>
@@ -635,6 +775,35 @@ export const OfficeDashboard = () => {
                             <tr key={p.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
                               <td style={{ padding: '18px 24px', fontWeight: 'bold' }}>{p.nome}</td>
                               <td style={{ padding: '18px 24px', color: '#ff9800', fontSize: '13.5px', fontWeight: 'bold' }}>{talName}</td>
+                              {activeStrata.length > 0 && (
+                                <td style={{ padding: '18px 24px' }}>
+                                  <select 
+                                    value={p.stratumId || ''} 
+                                    onChange={async (e) => {
+                                      const newStratumId = e.target.value;
+                                      const updatedInv = { ...p, stratumId: newStratumId || undefined };
+                                      if (!newStratumId) delete updatedInv.stratumId;
+                                      await saveInventory(updatedInv);
+                                    }}
+                                    style={{
+                                      background: 'rgba(0,0,0,0.3)',
+                                      border: '1px solid rgba(255,255,255,0.08)',
+                                      color: '#fff',
+                                      fontSize: '12.5px',
+                                      padding: '6px 10px',
+                                      borderRadius: '8px',
+                                      cursor: 'pointer',
+                                      outline: 'none',
+                                      fontFamily: 'inherit',
+                                    }}
+                                  >
+                                    <option value="">-- Sem Estrato --</option>
+                                    {activeStrata.map(s => (
+                                      <option key={s.id} value={s.id}>{s.nome}</option>
+                                    ))}
+                                  </select>
+                                </td>
+                              )}
                               <td style={{ padding: '18px 24px', fontFamily: 'monospace', fontSize: '12px', color: 'var(--text-muted)' }}>{p.coordenadas || 'Não coletada'}</td>
                               <td style={{ padding: '18px 24px', textAlign: 'center' }}>{p.areaParcela}</td>
                               <td style={{ padding: '18px 24px', textAlign: 'center', color: '#aed581', fontWeight: 'bold' }}>{p.dados.length}</td>
@@ -673,6 +842,120 @@ export const OfficeDashboard = () => {
                       </tbody>
                     </table>
                   </div>
+                )}
+              </div>
+            ) : (
+              /* ESTRATOS TAB VIEW */
+              <div className="glass-card" style={{ padding: 24, border: '1px solid rgba(255,255,255,0.05)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                  <h3 style={{ fontSize: '16px', fontWeight: '800', margin: 0 }}>Estratos Florestais</h3>
+                  <button className="btn btn-primary" style={{ width: 'auto', padding: '8px 16px', fontSize: '12px' }} onClick={() => setShowStratumModal(true)}>
+                    + Novo Estrato
+                  </button>
+                </div>
+
+                {activeStrata.length === 0 ? (
+                  <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="1.5" style={{ marginBottom: '16px' }}>
+                      <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                    </svg>
+                    <h4 style={{ margin: '0 0 8px 0', color: '#fff' }}>Nenhum estrato cadastrado neste projeto</h4>
+                    <p style={{ fontSize: '13px', color: '#666', maxWidth: '500px', margin: '0 auto', lineHeight: 1.5 }}>
+                      A estratificação é opcional. Se você trabalha com inventários mais simples, não precisa preencher esta aba. Use-a apenas se quiser agrupar parcelas semelhantes (por clone, idade ou sítio) para rodar o cálculo de suficiência e reduzir o erro de amostragem.
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <div style={{ overflowX: 'auto', marginBottom: '32px' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                        <thead>
+                          <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                            <th style={{ padding: '12px 20px', textAlign: 'left', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Nome do Estrato</th>
+                            <th style={{ padding: '12px 20px', textAlign: 'left', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Descrição</th>
+                            <th style={{ padding: '12px 20px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', width: '120px' }}>Área (ha)</th>
+                            <th style={{ padding: '12px 20px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', width: '120px' }}>Peso (Wh)</th>
+                            <th style={{ padding: '12px 20px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', width: '120px' }}>Nº Parcelas</th>
+                            <th style={{ padding: '12px 20px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', width: '220px' }}>Ações</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {stratifiedStats.strataDetails.map(d => (
+                            <tr key={d.stratum.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                              <td style={{ padding: '14px 20px', fontWeight: 'bold' }}>{d.stratum.nome}</td>
+                              <td style={{ padding: '14px 20px', color: 'var(--text-muted)', fontSize: '12.5px' }}>{d.stratum.descricao || 'Sem descrição'}</td>
+                              <td style={{ padding: '14px 20px', textAlign: 'center', fontWeight: 'bold' }}>{d.stratum.area} ha</td>
+                              <td style={{ padding: '14px 20px', textAlign: 'center', color: '#ffb74d', fontWeight: 'bold' }}>{(d.Wh * 100).toFixed(1)}%</td>
+                              <td style={{ padding: '14px 20px', textAlign: 'center', fontWeight: 'bold', color: '#4fc3f7' }}>{d.nh}</td>
+                              <td style={{ padding: '14px 20px', textAlign: 'center' }}>
+                                <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                                  {d.nh > 0 && (
+                                    <button 
+                                      className="btn btn-secondary" 
+                                      style={{ width: 'auto', padding: '6px 12px', fontSize: '11px', borderColor: '#2e7d32', color: '#a5d6a7', background: 'rgba(46, 125, 50, 0.08)' }} 
+                                      onClick={() => setStratumDashboardId(d.stratum.id)}
+                                    >
+                                      Dashboard
+                                    </button>
+                                  )}
+                                  <button 
+                                    className="btn btn-danger" 
+                                    style={{ width: 'auto', padding: '4px 10px', fontSize: '10px', height: 'auto' }} 
+                                    onClick={() => {
+                                      if (confirm(`Deseja deletar o estrato ${d.stratum.nome}? Todas as parcelas associadas a ele ficarão sem estrato.`)) {
+                                        deleteStratum(d.stratum.id);
+                                      }
+                                    }}
+                                  >
+                                    Excluir
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Calculations summary card */}
+                    <div className="glass-card" style={{ padding: '24px', border: '1px solid rgba(255,255,255,0.05)', background: 'rgba(0,230,118,0.02)', borderRadius: '16px', marginBottom: 0 }}>
+                      <h4 style={{ color: 'var(--primary-hover)', fontSize: '14px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '16px' }}>
+                        Relatório Estatístico: Amostragem Casual Estratificada
+                      </h4>
+                      
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '20px' }}>
+                        <div style={{ padding: '12px 16px', background: 'rgba(0,0,0,0.2)', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.03)' }}>
+                          <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Volume Médio Estratificado</span>
+                          <span style={{ fontSize: '18px', color: '#fff', fontWeight: '800', display: 'block', marginTop: '4px' }}>
+                            {stratifiedStats.meanSt.toFixed(2)} m³/ha
+                          </span>
+                        </div>
+                        <div style={{ padding: '12px 16px', background: 'rgba(0,0,0,0.2)', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.03)' }}>
+                          <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Erro de Amostragem Relativo</span>
+                          <span style={{ fontSize: '18px', color: stratifiedStats.errorRel <= 10 ? '#aed581' : '#ffb74d', fontWeight: '800', display: 'block', marginTop: '4px' }}>
+                            {stratifiedStats.errorRel.toFixed(2)}%
+                            <span style={{ fontSize: '10px', display: 'block', color: 'var(--text-muted)', fontWeight: 'normal', marginTop: '2px' }}>
+                              {stratifiedStats.errorRel <= 10 ? '✅ Dentro do limite (10%)' : '⚠️ Fora do limite (10%)'}
+                            </span>
+                          </span>
+                        </div>
+                        <div style={{ padding: '12px 16px', background: 'rgba(0,0,0,0.2)', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.03)' }}>
+                          <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Volume Total Floresta</span>
+                          <span style={{ fontSize: '18px', color: '#ba68c8', fontWeight: '800', display: 'block', marginTop: '4px' }}>
+                            {stratifiedStats.totalVolumeForest.toFixed(2)} m³
+                          </span>
+                        </div>
+                        <div style={{ padding: '12px 16px', background: 'rgba(0,0,0,0.2)', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.03)' }}>
+                          <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Intervalo de Confiança (95%)</span>
+                          <span style={{ fontSize: '13px', color: '#fff', display: 'block', marginTop: '4px', fontFamily: 'monospace' }}>
+                            [{stratifiedStats.lowerVolumeForest.toFixed(1)} - {stratifiedStats.upperVolumeForest.toFixed(1)}] m³
+                          </span>
+                        </div>
+                      </div>
+                      <div style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                        ℹ️ **Nota Silvicultural**: Os cálculos utilizam a metodologia oficial de Amostragem Casual Estratificada (Student t = {2.0} com 95% de confiança). Para resultados estatisticamente válidos, certifique-se de cadastrar pelo menos 2 parcelas em cada estrato.
+                      </div>
+                    </div>
+                  </>
                 )}
               </div>
             )}
@@ -715,6 +998,14 @@ export const OfficeDashboard = () => {
                     {activeTalhoes.find(t => t.id === auditParcel.talhaoId)?.nome || 'Sem Talhão'}
                   </span>
                 </div>
+                {activeStrata.length > 0 && (
+                  <div style={{ padding: '12px 16px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px' }}>
+                    <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Estrato Florestal</span>
+                    <span style={{ fontSize: '14px', color: '#00e676', fontWeight: 'bold', display: 'block', marginTop: '4px' }}>
+                      {activeStrata.find(s => s.id === auditParcel.stratumId)?.nome || 'Sem Estrato'}
+                    </span>
+                  </div>
+                )}
                 <div style={{ padding: '12px 16px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px' }}>
                   <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Área Amostral</span>
                   <span style={{ fontSize: '14.5px', color: '#fff', fontWeight: 'bold', display: 'block', marginTop: '4px' }}>
@@ -829,6 +1120,47 @@ export const OfficeDashboard = () => {
         </div>
       )}
 
+      {/* Strata Creation Modal */}
+      {showStratumModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100000, padding: '20px', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
+          <div className="glass-card" style={{ width: '100%', maxWidth: '400px', margin: 0 }}>
+            <h3 style={{ margin: 0, fontSize: '18px', color: 'var(--primary-hover)', fontWeight: '800' }}>Novo Estrato Florestal</h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: '12px', marginTop: '4px', marginBottom: '16px' }}>Crie uma nova subdivisão florestal homogênea.</p>
+            
+            <input className="input-field" placeholder="Nome (Ex: Eucalipto 5 anos - Argiloso)" value={newStratumName} onChange={e => setNewStratumName(e.target.value)} style={{ marginTop: '8px' }} />
+            <input type="number" step="0.01" className="input-field" placeholder="Área Total do Estrato (Hectares)" value={newStratumArea} onChange={e => setNewStratumArea(e.target.value)} />
+            <textarea className="input-field" placeholder="Descrição/Observações opcional" value={newStratumDesc} onChange={e => setNewStratumDesc(e.target.value)} style={{ minHeight: '80px', fontFamily: 'inherit' }} />
+            
+            <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
+              <button className="btn btn-secondary" onClick={() => {
+                setShowStratumModal(false);
+                setNewStratumName('');
+                setNewStratumArea('');
+                setNewStratumDesc('');
+              }}>Cancelar</button>
+              <button className="btn btn-primary" onClick={async () => {
+                if (!newStratumName) return alert('Dê um nome ao estrato.');
+                const areaNum = parseFloat(newStratumArea);
+                if (isNaN(areaNum) || areaNum <= 0) return alert('Digite uma área válida maior que zero.');
+
+                await createStratum({
+                  id: Date.now().toString(),
+                  fieldWorkId: activeFwId,
+                  nome: newStratumName,
+                  area: areaNum,
+                  descricao: newStratumDesc || undefined
+                });
+
+                setShowStratumModal(false);
+                setNewStratumName('');
+                setNewStratumArea('');
+                setNewStratumDesc('');
+              }}>Criar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Embedded Sub-dashboards */}
       {showProjectDashboard && activeParcels.length > 0 && (
         <StatisticalDashboard 
@@ -841,6 +1173,13 @@ export const OfficeDashboard = () => {
         <StatisticalDashboard 
           inventories={activeParcels.filter(p => p.talhaoId === talhaoDashboardId)} 
           onClose={() => setTalhaoDashboardId(null)} 
+        />
+      )}
+
+      {stratumDashboardId && (
+        <StatisticalDashboard 
+          inventories={activeParcels.filter(p => p.stratumId === stratumDashboardId)} 
+          onClose={() => setStratumDashboardId(null)} 
         />
       )}
 
