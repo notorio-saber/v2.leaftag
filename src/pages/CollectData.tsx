@@ -779,8 +779,8 @@ export const CollectData = () => {
 
         {/* Bottom Keyboard & Navigation Controls Stacked Inline */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {/* Inline Numeric Keyboard */}
-          {activeNumField && (
+           {/* Inline Numeric Keyboard */}
+          {activeNumField && !showPrevIndModal && (
             <NumericKeyboardModal
               value={activeNumField.value}
               onChange={(val) => {
@@ -793,7 +793,7 @@ export const CollectData = () => {
           )}
 
           {/* Inline Text Keyboard */}
-          {activeTextField && (
+          {activeTextField && !showPrevIndModal && (
             <TextKeyboardModal
               value={activeTextField.value}
               onChange={(val) => {
