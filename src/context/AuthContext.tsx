@@ -67,7 +67,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (docSnap.exists()) {
             const dbStatus = docSnap.data().status;
             if (user.uid === masterUID && dbStatus !== 'admin') {
-              await setDoc(docRef, { status: 'admin' }, { merge: true });
+              try {
+                await setDoc(docRef, { status: 'admin' }, { merge: true });
+              } catch (err) {
+                console.error("Erro ao atualizar admin status:", err);
+              }
               setStatus('admin');
             } else {
               setStatus(user.uid === masterUID ? 'admin' : dbStatus);
@@ -75,13 +79,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           } else {
             // Primeiro login, cria como pendente (ou admin se for a master)
             const newStatus = user.uid === masterUID ? 'admin' : 'pending';
-            await setDoc(docRef, {
-              displayName: user.displayName,
-              email: user.email,
-              photoURL: user.photoURL,
-              status: newStatus,
-              createdAt: new Date().toISOString()
-            });
+            try {
+              await setDoc(docRef, {
+                displayName: user.displayName || '',
+                email: user.email || '',
+                photoURL: user.photoURL || '',
+                status: newStatus,
+                createdAt: new Date().toISOString()
+              });
+            } catch (err) {
+              console.error("Erro ao registrar novo usuário no Firestore:", err);
+            }
             setStatus(newStatus);
           }
         }

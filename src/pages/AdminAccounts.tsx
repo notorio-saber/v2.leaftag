@@ -19,6 +19,13 @@ export const AdminAccounts = () => {
         usersData.push({ uid: doc.id, ...doc.data() });
       });
       setUsers(usersData);
+    }, (error) => {
+      console.error("Erro no onSnapshot do AdminAccounts:", error);
+      alert(
+        "Erro de permissão no Firebase ao carregar as contas:\n\n" +
+        "Isso ocorre se as Regras de Segurança do Firestore no seu Console do Firebase estiverem bloqueando o acesso de leitura para a coleção 'users'.\n\n" +
+        "Por favor, configure as regras de segurança no Console do Firebase para permitir o acesso do administrador."
+      );
     });
 
     return () => unsubscribe();
