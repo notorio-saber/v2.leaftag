@@ -195,7 +195,7 @@ const Home = () => {
             borderRadius: '12px',
             fontSize: '15px'
           }}
-          placeholder="Pesquisar trabalhos, talões ou parcelas..."
+          placeholder="Pesquisar trabalhos, talhões ou parcelas..."
           value={searchQuery}
           onChange={e => setSearchQuery(e.target.value)}
         />
