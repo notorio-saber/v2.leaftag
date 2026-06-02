@@ -171,7 +171,7 @@ const Home = () => {
           )}
           {(status === 'active' || status === 'admin') && (
              <button 
-               className="btn btn-secondary" 
+               className="btn btn-secondary desktop-only" 
                style={{ width: 'auto', padding: '8px 16px', borderColor: '#4fc3f7', color: '#4fc3f7', background: 'rgba(79, 195, 247, 0.08)' }} 
                onClick={() => navigate('/office')}
              >
