@@ -47,12 +47,6 @@ export const OfficeDashboard = () => {
   const [googleSheetsUrlInput, setGoogleSheetsUrlInput] = useState('');
   const [isSyncingSheets, setIsSyncingSheets] = useState(false);
 
-  useEffect(() => {
-    if (activeFw) {
-      setGoogleSheetsUrlInput(activeFw.googleSheetsUrl || '');
-    }
-  }, [activeFw]);
-
   // Filter projects by search
   const filteredFieldWorks = useMemo(() => {
     return fieldWorks.filter(fw => 
@@ -72,6 +66,12 @@ export const OfficeDashboard = () => {
   const activeFw = useMemo(() => {
     return fieldWorks.find(f => f.id === activeFwId);
   }, [fieldWorks, activeFwId]);
+
+  useEffect(() => {
+    if (activeFw) {
+      setGoogleSheetsUrlInput(activeFw.googleSheetsUrl || '');
+    }
+  }, [activeFw]);
 
   const activeParcels = useMemo(() => {
     return inventories.filter(i => i.fieldWorkId === activeFwId);
