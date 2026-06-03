@@ -20,6 +20,7 @@ interface InventoryContextType {
   deleteTalhao: (id: string) => Promise<void>;
   createStratum: (s: Stratum) => Promise<void>;
   deleteStratum: (id: string) => Promise<void>;
+  isSynced: boolean;
 }
 
 const InventoryContext = createContext<InventoryContextType | undefined>(undefined);
@@ -32,6 +33,13 @@ export const InventoryProvider: React.FC<{ children: ReactNode }> = ({ children 
   const [strata, setStrata] = useState<Stratum[]>([]);
   const [currentInventory, setCurrentInventory] = useState<Inventory | null>(null);
 
+  const [fwPending, setFwPending] = useState(false);
+  const [talPending, setTalPending] = useState(false);
+  const [invPending, setInvPending] = useState(false);
+  const [strataPending, setStrataPending] = useState(false);
+
+  const isSynced = !fwPending && !talPending && !invPending && !strataPending;
+
   // Firestore Snapshot (Realtime + Offline IndexedDB)
   useEffect(() => {
     if (!currentUser || !uidToUse) {
@@ -39,11 +47,16 @@ export const InventoryProvider: React.FC<{ children: ReactNode }> = ({ children 
       setTalhoes([]);
       setInventories([]);
       setStrata([]);
+      setFwPending(false);
+      setTalPending(false);
+      setInvPending(false);
+      setStrataPending(false);
       return;
     }
 
     const fwRef = collection(db, `users/${uidToUse}/fieldWorks`);
-    const unsubscribeFw = onSnapshot(fwRef, (snapshot) => {
+    const unsubscribeFw = onSnapshot(fwRef, { includeMetadataChanges: true }, (snapshot) => {
+      setFwPending(snapshot.metadata.hasPendingWrites);
       const data: FieldWork[] = [];
       snapshot.forEach(doc => {
         data.push(doc.data() as FieldWork);
@@ -55,7 +68,8 @@ export const InventoryProvider: React.FC<{ children: ReactNode }> = ({ children 
     });
 
     const talRef = collection(db, `users/${uidToUse}/talhoes`);
-    const unsubscribeTal = onSnapshot(talRef, (snapshot) => {
+    const unsubscribeTal = onSnapshot(talRef, { includeMetadataChanges: true }, (snapshot) => {
+      setTalPending(snapshot.metadata.hasPendingWrites);
       const data: Talhao[] = [];
       snapshot.forEach(doc => {
         data.push(doc.data() as Talhao);
@@ -67,7 +81,8 @@ export const InventoryProvider: React.FC<{ children: ReactNode }> = ({ children 
     });
 
     const invRef = collection(db, `users/${uidToUse}/inventories`);
-    const unsubscribeInv = onSnapshot(invRef, (snapshot) => {
+    const unsubscribeInv = onSnapshot(invRef, { includeMetadataChanges: true }, (snapshot) => {
+      setInvPending(snapshot.metadata.hasPendingWrites);
       const data: Inventory[] = [];
       snapshot.forEach(doc => {
         data.push(doc.data() as Inventory);
@@ -79,7 +94,8 @@ export const InventoryProvider: React.FC<{ children: ReactNode }> = ({ children 
     });
 
     const strataRef = collection(db, `users/${uidToUse}/strata`);
-    const unsubscribeStrata = onSnapshot(strataRef, (snapshot) => {
+    const unsubscribeStrata = onSnapshot(strataRef, { includeMetadataChanges: true }, (snapshot) => {
+      setStrataPending(snapshot.metadata.hasPendingWrites);
       const data: Stratum[] = [];
       snapshot.forEach(doc => {
         data.push(doc.data() as Stratum);
@@ -215,6 +231,7 @@ export const InventoryProvider: React.FC<{ children: ReactNode }> = ({ children 
         deleteTalhao,
         createStratum,
         deleteStratum,
+        isSynced
       }}
     >
       {children}

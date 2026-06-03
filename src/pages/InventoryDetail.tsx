@@ -11,7 +11,7 @@ import { getCurrentPosition } from '../utils/gpsOperations';
 export const InventoryDetail = () => {
   const navigate = useNavigate();
   const { id } = useParams();
-  const { inventories, deleteInventory, setCurrentInventory, fieldWorks, saveInventory, talhoes } = useInventory();
+  const { inventories, deleteInventory, setCurrentInventory, fieldWorks, saveInventory, talhoes, isSynced } = useInventory();
   
   const inventory = inventories.find(i => i.id.toString() === id);
   const fieldwork = fieldWorks.find(f => f.id === inventory?.fieldWorkId);
@@ -271,6 +271,22 @@ export const InventoryDetail = () => {
     }
   };
 
+  const navigateToIndividual = (newIdx: number) => {
+    if (!inventory || newIdx < 0 || newIdx >= sortedDados.length) return;
+    
+    // Save current edits first
+    const freshInv = JSON.parse(JSON.stringify(inventory));
+    const targetIdx = freshInv.dados.findIndex((d: any) => d.id === editingInd.id);
+    if (targetIdx >= 0) {
+      freshInv.dados[targetIdx] = editingInd;
+      saveInventory(freshInv);
+    }
+    
+    // Switch to next/prev individual
+    const nextInd = sortedDados[newIdx];
+    setEditingInd(JSON.parse(JSON.stringify(nextInd)));
+  };
+
   const handleDownloadPhotos = async () => {
     setIsZipping(true);
     try {
@@ -321,6 +337,41 @@ export const InventoryDetail = () => {
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <h2 style={{ color: 'var(--primary-hover)', fontSize: '24px', fontWeight: '800', margin: 0 }}>{inventory.nome}</h2>
+            
+            {/* Cloud Sync Icon */}
+            <div 
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '28px',
+                height: '28px',
+                borderRadius: '50%',
+                background: isSynced ? 'rgba(76, 175, 80, 0.08)' : 'rgba(255, 152, 0, 0.08)',
+                border: isSynced ? '1px solid rgba(76, 175, 80, 0.25)' : '1px solid rgba(255, 152, 0, 0.25)',
+                color: isSynced ? '#81c784' : '#ffb74d',
+                transition: 'all 0.3s ease',
+                cursor: 'default'
+              }}
+              title={isSynced ? "Dados 100% Sincronizados" : "Sincronizando com a Nuvem..."}
+            >
+              <svg 
+                xmlns="http://www.w3.org/2000/svg" 
+                width="14" 
+                height="14" 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="2.5" 
+                strokeLinecap="round" 
+                strokeLinejoin="round"
+                className={isSynced ? "" : "spin-icon"}
+              >
+                <path d="M17.5 19A3.5 3.5 0 0 0 21 15.5c0-2.79-2.54-4.5-5-4.5-.47-.47-1.15-.78-2-.78-2 0-3.5 1.5-3.5 3.5v.78c-2.3 0-4 1.7-4 4A3.5 3.5 0 0 0 10 22h7.5" />
+                {isSynced && <path d="M9 16l2 2 4-4" />}
+              </svg>
+            </div>
+            
             <button 
               className="btn btn-secondary" 
               style={{ width: 'auto', padding: '4px 10px', fontSize: '11px', height: 'auto', border: '1px solid rgba(255,255,255,0.15)' }} 
@@ -544,16 +595,38 @@ export const InventoryDetail = () => {
             <table style={{ width: '100%', minWidth: '600px' }}>
               <thead>
                 <tr>
+                  <th style={{ width: '50px', textAlign: 'center' }}>Editar</th>
                   <th style={{ width: '60px' }}>Nº</th>
                   {inventory.colunas.map(col => (
                     <th key={col.id}>{col.nome}</th>
                   ))}
-                  <th style={{ width: '100px', textAlign: 'center' }}>Ação</th>
                 </tr>
               </thead>
               <tbody>
                 {sortedDados.map((ind: any) => (
                   <tr key={ind.id}>
+                    <td style={{ textAlign: 'center' }}>
+                      <button 
+                        className="btn btn-secondary" 
+                        style={{ 
+                          padding: '6px', 
+                          borderRadius: '8px', 
+                          width: '32px', 
+                          height: '32px', 
+                          display: 'inline-flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'center',
+                          border: '1px solid rgba(255,255,255,0.1)'
+                        }} 
+                        onClick={() => setEditingInd(JSON.parse(JSON.stringify(ind)))}
+                        title="Editar indivíduo"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M12 20h9"></path>
+                          <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+                        </svg>
+                      </button>
+                    </td>
                     <td style={{ fontWeight: 'bold' }}>{ind.numeroIndividuo}</td>
                     {inventory.colunas.map(col => (
                       <td key={col.id}>
@@ -561,11 +634,6 @@ export const InventoryDetail = () => {
                          {ind.multipleStems && ['cap', 'hc', 'ht'].includes(col.id) ? ` [Bifurcado: ${ind.stems?.length}]` : ''}
                       </td>
                     ))}
-                    <td style={{ textAlign: 'center' }}>
-                      <button className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '11px', width: 'auto' }} onClick={() => setEditingInd(JSON.parse(JSON.stringify(ind)))}>
-                        Editar
-                      </button>
-                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -618,9 +686,9 @@ export const InventoryDetail = () => {
                         value={editingInd[col.id] || ''}
                         onChange={e => setEditingInd({...editingInd, [col.id]: e.target.value})}
                       >
-                        <option value="" style={{ background: '#0a0f0d', color: 'var(--text-muted)' }}>-- Selecione --</option>
+                        <option value="" style={{ background: 'var(--bg-color)', color: 'var(--text-muted)' }}>-- Selecione --</option>
                         {(col.opcoes || []).map((o: string) => (
-                          <option key={o} value={o} style={{ background: '#0a0f0d', color: '#fff' }}>{o}</option>
+                          <option key={o} value={o} style={{ background: 'var(--bg-color)', color: 'var(--text-main)' }}>{o}</option>
                         ))}
                       </select>
                     ) : (
@@ -657,6 +725,48 @@ export const InventoryDetail = () => {
                   ))}
                 </div>
               )}
+
+              {/* Navegação entre indivíduos anteriores/próximos */}
+              {(() => {
+                const activeIdx = sortedDados.findIndex((d: any) => d.id === editingInd.id);
+                if (activeIdx === -1 || sortedDados.length <= 1) return null;
+                
+                return (
+                  <div style={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    alignItems: 'center', 
+                    marginTop: '20px',
+                    padding: '12px 16px',
+                    background: 'rgba(255, 255, 255, 0.02)',
+                    border: '1px solid rgba(255, 255, 255, 0.05)',
+                    borderRadius: '12px',
+                    marginBottom: '16px'
+                  }}>
+                    <button
+                      className="btn btn-secondary"
+                      style={{ width: 'auto', padding: '8px 12px', fontSize: '10.5px', height: '32px' }}
+                      disabled={activeIdx === 0}
+                      onClick={() => navigateToIndividual(activeIdx - 1)}
+                    >
+                      &larr; Anterior
+                    </button>
+                    
+                    <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 'bold' }}>
+                      {activeIdx + 1} de {sortedDados.length}
+                    </span>
+
+                    <button
+                      className="btn btn-secondary"
+                      style={{ width: 'auto', padding: '8px 12px', fontSize: '10.5px', height: '32px' }}
+                      disabled={activeIdx === sortedDados.length - 1}
+                      onClick={() => navigateToIndividual(activeIdx + 1)}
+                    >
+                      Próximo &rarr;
+                    </button>
+                  </div>
+                );
+              })()}
 
               <div style={{ display: 'flex', gap: '12px', marginTop: '28px' }}>
                 <button className="btn btn-secondary" onClick={() => setEditingInd(null)}>Cancelar</button>

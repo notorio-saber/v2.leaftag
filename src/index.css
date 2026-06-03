@@ -276,3 +276,129 @@ td {
   color: #ffffff !important;
   transform: scale(0.92) !important;
 }
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.spin-icon {
+  animation: spin 2s linear infinite;
+}
+
+/* Light Theme Variables and Rules */
+body.light-theme {
+  --bg-color: #f4f6f4;
+  --card-bg: rgba(255, 255, 255, 0.65);
+  --primary-color: #2e7d32;
+  --primary-hover: #388e3c;
+  --primary-glow: rgba(46, 125, 50, 0.15);
+  --text-main: #141914;
+  --text-muted: #5e665e;
+  --accent-color: #2e7d32;
+  --danger-color: #ef233c;
+  --danger-hover: #d90429;
+  --border-color: rgba(0, 0, 0, 0.09);
+}
+
+body.light-theme, 
+body.light-theme #root {
+  background-color: #f4f6f4 !important;
+  background: linear-gradient(135deg, #f4f6f4 0%, #eef3ef 50%, #e3ede3 100%) !important;
+  color: #141914 !important;
+}
+
+body.light-theme::before {
+  background: rgba(46, 125, 50, 0.04) !important;
+}
+
+body.light-theme::after {
+  background: rgba(0, 150, 136, 0.02) !important;
+}
+
+body.light-theme .glass-card {
+  background: rgba(255, 255, 255, 0.65) !important;
+  border-color: rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.06), 0 0 25px rgba(46, 125, 50, 0.03) !important;
+}
+
+body.light-theme .glass-card:hover {
+  border-color: rgba(46, 125, 50, 0.25) !important;
+  background: rgba(255, 255, 255, 0.8) !important;
+  box-shadow: 0 0 35px rgba(46, 125, 50, 0.08), 0 25px 45px rgba(0, 0, 0, 0.08) !important;
+}
+
+body.light-theme .card-divider, 
+body.light-theme .divider-dashed {
+  background: linear-gradient(90deg, transparent, rgba(0, 0, 0, 0.06) 20%, rgba(0, 0, 0, 0.1) 50%, rgba(0, 0, 0, 0.06) 80%, transparent) !important;
+}
+
+body.light-theme .btn-secondary {
+  background: rgba(0, 0, 0, 0.03) !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  color: #141914 !important;
+}
+
+body.light-theme .btn-secondary:hover {
+  background: rgba(0, 0, 0, 0.06) !important;
+  border-color: rgba(0, 0, 0, 0.15) !important;
+}
+
+body.light-theme .input-field {
+  background-color: rgba(255, 255, 255, 0.8) !important;
+  border: 1px solid rgba(0, 0, 0, 0.12) !important;
+  color: #141914 !important;
+}
+
+body.light-theme .input-field:focus {
+  background-color: #ffffff !important;
+  border-color: var(--primary-hover) !important;
+  box-shadow: 0 0 15px rgba(46, 125, 50, 0.08) !important;
+}
+
+body.light-theme th {
+  border-bottom-color: rgba(0, 0, 0, 0.1) !important;
+}
+
+body.light-theme td {
+  border-bottom-color: rgba(0, 0, 0, 0.06) !important;
+  color: #141914 !important;
+}
+
+body.light-theme .gradient-text {
+  background: linear-gradient(to right, #141914 0%, #3e4c3e 100%) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+}
+
+/* Floating theme switch button override in light theme */
+body.light-theme button[style*="position: fixed"] {
+  background: rgba(255, 255, 255, 0.85) !important;
+  border-color: rgba(0, 0, 0, 0.12) !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08) !important;
+}
+
+/* Global style overrides for inline styling in light theme */
+body.light-theme [style*="color: #fff"],
+body.light-theme [style*="color: #ffffff"],
+body.light-theme [style*="color:#fff"],
+body.light-theme [style*="color:#ffffff"],
+body.light-theme [style*="color: rgb(255, 255, 255)"] {
+  color: var(--text-main) !important;
+}
+
+body.light-theme [style*="background: #020503"],
+body.light-theme [style*="background:#020503"] {
+  background: var(--bg-color) !important;
+}
+
+body.light-theme select {
+  background-color: rgba(255, 255, 255, 0.8) !important;
+  color: var(--text-main) !important;
+  border: 1px solid rgba(0, 0, 0, 0.12) !important;
+}
+
+body.light-theme option {
+  background-color: var(--bg-color) !important;
+  color: var(--text-main) !important;
+}

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useInventory } from '../context/InventoryContext';
 import type { InventoryColumn, ColumnType } from '../types';
@@ -23,8 +23,16 @@ const getNewCustomCol = () => ({ id: '', nome: '', tipo: 'text', checked: true, 
 export const InventorySetup = () => {
   const navigate = useNavigate();
   const { fieldWorkId, talhaoId } = useParams();
-  const { setCurrentInventory, saveInventory, strata } = useInventory();
+  const { setCurrentInventory, saveInventory, strata, inventories } = useInventory();
   const activeStrata = strata.filter(s => s.fieldWorkId === fieldWorkId);
+  
+  // Find the last inventory in this fieldwork to inherit settings
+  const lastInventory = useMemo(() => {
+    const fwInvs = inventories.filter(i => i.fieldWorkId === fieldWorkId);
+    if (fwInvs.length === 0) return null;
+    return [...fwInvs].sort((a, b) => b.id - a.id)[0];
+  }, [inventories, fieldWorkId]);
+
   const [nome, setNome] = useState('');
   const [area, setArea] = useState('');
   const [stratumId, setStratumId] = useState('');
@@ -44,6 +52,42 @@ export const InventorySetup = () => {
 
   const [cols, setCols] = useState(columnsBase);
   const [customCols, setCustomCols] = useState([getNewCustomCol()]);
+
+  const [hasInitialized, setHasInitialized] = useState(false);
+
+  // Inherit configuration from last inventory of the same fieldwork once loaded
+  useEffect(() => {
+    if (lastInventory && !hasInitialized) {
+      setArea(lastInventory.areaParcela?.toString() || '');
+      setStratumId(lastInventory.stratumId || '');
+      setFormatoParcela((lastInventory.formatoParcela as 'retangular' | 'circular') || 'retangular');
+      setSelectedTemplate(lastInventory.template || 'custom');
+      
+      setCols(columnsBase.map(col => ({
+        ...col,
+        checked: lastInventory.colunas.some(lc => lc.id === col.id)
+      })));
+      
+      const custom = lastInventory.colunas
+        .filter(lc => !columnsBase.some(cb => cb.id === lc.id))
+        .map(lc => ({
+          id: lc.id,
+          nome: lc.nome,
+          tipo: lc.tipo,
+          checked: true,
+          opcoes: lc.opcoes ? lc.opcoes.join(', ') : ''
+        }));
+      setCustomCols(custom.length > 0 ? custom : [getNewCustomCol()]);
+      
+      // Compute radius if circular and area is present
+      if (lastInventory.formatoParcela === 'circular' && lastInventory.areaParcela) {
+        const r = Math.sqrt(lastInventory.areaParcela / Math.PI);
+        setRaio(r.toFixed(2));
+      }
+
+      setHasInitialized(true);
+    }
+  }, [lastInventory, hasInitialized]);
 
   const applyTemplate = (tpl: string) => {
     setSelectedTemplate(tpl);
@@ -154,9 +198,9 @@ export const InventorySetup = () => {
                 backgroundSize: '16px'
               }}
             >
-              <option value="" style={{ background: '#0a0f0d', color: '#fff' }}>-- Sem Estrato --</option>
+              <option value="" style={{ background: 'var(--bg-color)', color: 'var(--text-main)' }}>-- Sem Estrato --</option>
               {activeStrata.map(s => (
-                <option key={s.id} value={s.id} style={{ background: '#0a0f0d', color: '#fff' }}>{s.nome} ({s.area} ha)</option>
+                <option key={s.id} value={s.id} style={{ background: 'var(--bg-color)', color: 'var(--text-main)' }}>{s.nome} ({s.area} ha)</option>
               ))}
             </select>
           </>
@@ -237,22 +281,55 @@ export const InventorySetup = () => {
                 </div>
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
-                <label style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Raio (m)</label>
-                <input type="number" className="input-field" style={{ marginBottom: 0, marginTop: '4px' }} value={raio} onChange={e => {
-                  setRaio(e.target.value);
-                  const r = parseFloat(e.target.value);
-                  if (r > 0) {
-                    const a = Math.PI * Math.pow(r, 2);
-                    setArea(a.toFixed(2));
-                  }
-                }} placeholder="0.0" />
+              <div style={{ display: 'flex', flexDirection: 'column', width: '100%', gap: '12px' }}>
+                <div>
+                  <label style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Raio (m)</label>
+                  <input 
+                    type="number" 
+                    className="input-field" 
+                    style={{ marginBottom: 0, marginTop: '4px' }} 
+                    value={raio} 
+                    onChange={e => {
+                      const rVal = e.target.value;
+                      setRaio(rVal);
+                      const r = parseFloat(rVal);
+                      if (r > 0) {
+                        const a = Math.PI * Math.pow(r, 2);
+                        setArea(a.toFixed(2));
+                      } else {
+                        setArea('');
+                      }
+                    }} 
+                    placeholder="0.0" 
+                  />
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: '12px', fontWeight: 'bold' }}>
+                  <span>OU insira a Área abaixo para calcular o Raio</span>
+                </div>
               </div>
             )}
           </div>
         )}
 
-        <input type="number" className="input-field" value={area} onChange={e => setArea(e.target.value)} placeholder="Área em m² (Ex: 400)" />
+        <input 
+          type="number" 
+          className="input-field" 
+          value={area} 
+          onChange={e => {
+            const aVal = e.target.value;
+            setArea(aVal);
+            if (formatoParcela === 'circular') {
+              const a = parseFloat(aVal);
+              if (a > 0) {
+                const r = Math.sqrt(a / Math.PI);
+                setRaio(r.toFixed(2));
+              } else {
+                setRaio('');
+              }
+            }
+          }} 
+          placeholder="Área em m² (Ex: 400)" 
+        />
 
         <label className="input-label" style={{ marginTop: '12px' }}>Coordenadas GPS da Parcela (Opcional)</label>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '12px' }}>
@@ -294,10 +371,10 @@ export const InventorySetup = () => {
             backgroundSize: '16px'
           }}
         >
-          <option value="custom" style={{ background: '#0a0f0d', color: '#fff' }}>Personalizado...</option>
-          <option value="basico" style={{ background: '#0a0f0d', color: '#fff' }}>Básico (Nome Popular + CAP + DAP)</option>
-          <option value="completo" style={{ background: '#0a0f0d', color: '#fff' }}>Completo (Todos os campos padrões)</option>
-          <option value="rapido" style={{ background: '#0a0f0d', color: '#fff' }}>Rápido (Campos essenciais de medição)</option>
+          <option value="custom" style={{ background: 'var(--bg-color)', color: 'var(--text-main)' }}>Personalizado...</option>
+          <option value="basico" style={{ background: 'var(--bg-color)', color: 'var(--text-main)' }}>Básico (Nome Popular + CAP + DAP)</option>
+          <option value="completo" style={{ background: 'var(--bg-color)', color: 'var(--text-main)' }}>Completo (Todos os campos padrões)</option>
+          <option value="rapido" style={{ background: 'var(--bg-color)', color: 'var(--text-main)' }}>Rápido (Campos essenciais de medição)</option>
         </select>
 
         <h3 style={{ margin: '24px 0 12px', color: 'var(--primary-hover)', fontSize: '16px', fontWeight: '800' }}>Colunas de Coleta Padrão</h3>
@@ -386,11 +463,11 @@ export const InventorySetup = () => {
                   setCustomCols(newCols);
                 }}
               >
-                <option value="text" style={{ background: '#0a0f0d', color: '#fff' }}>Texto</option>
-                <option value="number" style={{ background: '#0a0f0d', color: '#fff' }}>Número</option>
-                <option value="textarea" style={{ background: '#0a0f0d', color: '#fff' }}>Longo</option>
-                <option value="photo" style={{ background: '#0a0f0d', color: '#fff' }}>Foto (Câmera)</option>
-                <option value="select" style={{ background: '#0a0f0d', color: '#fff' }}>Múltipla Escolha</option>
+                <option value="text" style={{ background: 'var(--bg-color)', color: 'var(--text-main)' }}>Texto</option>
+                <option value="number" style={{ background: 'var(--bg-color)', color: 'var(--text-main)' }}>Número</option>
+                <option value="textarea" style={{ background: 'var(--bg-color)', color: 'var(--text-main)' }}>Longo</option>
+                <option value="photo" style={{ background: 'var(--bg-color)', color: 'var(--text-main)' }}>Foto (Câmera)</option>
+                <option value="select" style={{ background: 'var(--bg-color)', color: 'var(--text-main)' }}>Múltipla Escolha</option>
               </select>
             </div>
 

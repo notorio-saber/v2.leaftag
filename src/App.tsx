@@ -24,7 +24,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 const Home = () => {
-  const { fieldWorks, createFieldWork, talhoes, inventories } = useInventory();
+  const { fieldWorks, createFieldWork, talhoes, inventories, isSynced } = useInventory();
   const { currentUser, signOut, status, uidToUse } = useAuth();
   const isOwner = currentUser && currentUser.uid === uidToUse && (status === 'active' || status === 'admin');
   const userName = currentUser?.displayName ? currentUser.displayName.split(' ')[0] : 'Usuário';
@@ -167,7 +167,43 @@ const Home = () => {
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
           <img src="/logo.png" alt="Logo" style={{ width: '48px', height: '48px', borderRadius: '0px' }} />
           <div>
-            <h1 style={{ color: 'var(--primary-color)', fontSize: '20px', whiteSpace: 'nowrap', margin: 0 }}>Trabalhos de Campo</h1>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <h1 style={{ color: 'var(--primary-color)', fontSize: '20px', whiteSpace: 'nowrap', margin: 0 }}>Trabalhos de Campo</h1>
+              
+              {/* Cloud Sync Icon */}
+              <div 
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '28px',
+                  height: '28px',
+                  borderRadius: '50%',
+                  background: isSynced ? 'rgba(76, 175, 80, 0.08)' : 'rgba(255, 152, 0, 0.08)',
+                  border: isSynced ? '1px solid rgba(76, 175, 80, 0.25)' : '1px solid rgba(255, 152, 0, 0.25)',
+                  color: isSynced ? '#81c784' : '#ffb74d',
+                  transition: 'all 0.3s ease',
+                  cursor: 'default'
+                }}
+                title={isSynced ? "Dados 100% Sincronizados" : "Sincronizando com a Nuvem..."}
+              >
+                <svg 
+                  xmlns="http://www.w3.org/2000/svg" 
+                  width="14" 
+                  height="14" 
+                  viewBox="0 0 24 24" 
+                  fill="none" 
+                  stroke="currentColor" 
+                  strokeWidth="2.5" 
+                  strokeLinecap="round" 
+                  strokeLinejoin="round"
+                  className={isSynced ? "" : "spin-icon"}
+                >
+                  <path d="M17.5 19A3.5 3.5 0 0 0 21 15.5c0-2.79-2.54-4.5-5-4.5-.47-.47-1.15-.78-2-.78-2 0-3.5 1.5-3.5 3.5v.78c-2.3 0-4 1.7-4 4A3.5 3.5 0 0 0 10 22h7.5" />
+                  {isSynced && <path d="M9 16l2 2 4-4" />}
+                </svg>
+              </div>
+            </div>
             <p style={{ color: 'var(--text-muted)', fontSize: '14px', margin: 0 }}>Olá, {userName}!</p>
           </div>
         </div>
@@ -537,6 +573,23 @@ const Home = () => {
 };
 
 function App() {
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    return (localStorage.getItem('theme') as 'dark' | 'light') || 'dark';
+  });
+
+  useEffect(() => {
+    if (theme === 'light') {
+      document.body.classList.add('light-theme');
+    } else {
+      document.body.classList.remove('light-theme');
+    }
+    localStorage.setItem('theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme(prev => prev === 'dark' ? 'light' : 'dark');
+  };
+
   return (
     <BrowserRouter>
       <Routes>
@@ -552,6 +605,50 @@ function App() {
         <Route path="/admin" element={<ProtectedRoute><AdminAccounts /></ProtectedRoute>} />
         <Route path="/office" element={<ProtectedRoute><OfficeDashboard /></ProtectedRoute>} />
       </Routes>
+
+      {/* Floating Theme Switcher Button */}
+      <button
+        onClick={toggleTheme}
+        style={{
+          position: 'fixed',
+          bottom: '24px',
+          right: '24px',
+          width: '48px',
+          height: '48px',
+          borderRadius: '50%',
+          border: '1px solid rgba(255,255,255,0.08)',
+          background: 'rgba(255,255,255,0.03)',
+          backdropFilter: 'blur(16px)',
+          WebkitBackdropFilter: 'blur(16px)',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer',
+          zIndex: 999999,
+          color: theme === 'dark' ? '#ffb74d' : '#f57c00',
+          transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
+        }}
+        title={theme === 'dark' ? "Ativar Modo Claro" : "Ativar Modo Escuro"}
+      >
+        {theme === 'dark' ? (
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="5"></circle>
+            <line x1="12" y1="1" x2="12" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="23"></line>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+            <line x1="1" y1="12" x2="3" y2="12"></line>
+            <line x1="21" y1="12" x2="23" y2="12"></line>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+          </svg>
+        ) : (
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+          </svg>
+        )}
+      </button>
     </BrowserRouter>
   );
 }

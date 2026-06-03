@@ -28,6 +28,7 @@ export interface FieldWork {
   local: string;
   dataInicio: string;
   status: string;
+  googleSheetsUrl?: string;
 }
 
 export interface Talhao {
@@ -35,6 +36,7 @@ export interface Talhao {
   fieldWorkId: string;
   nome: string;
   observacoes?: string;
+  area?: number;
 }
 
 export interface Stratum {

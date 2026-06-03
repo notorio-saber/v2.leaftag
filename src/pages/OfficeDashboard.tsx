@@ -14,7 +14,7 @@ import {
 
 export const OfficeDashboard = () => {
   const navigate = useNavigate();
-  const { fieldWorks, talhoes, inventories, strata, createStratum, deleteStratum, saveInventory } = useInventory();
+  const { fieldWorks, talhoes, inventories, strata, createStratum, deleteStratum, saveInventory, isSynced, createTalhao, deleteTalhao, createFieldWork } = useInventory();
   const { currentUser, signOut } = useAuth();
 
   const [activeFwId, setActiveFwId] = useState<string>('');
@@ -28,12 +28,30 @@ export const OfficeDashboard = () => {
   const [showParcelDashboardId, setShowParcelDashboardId] = useState<number | null>(null);
   const [selectedTalhaoId, setSelectedTalhaoId] = useState<string | null>(null);
   const [showProjectDashboard, setShowProjectDashboard] = useState(false);
+  const [dateFilter, setDateFilter] = useState('');
 
   // States for Strata Creation Modal
   const [showStratumModal, setShowStratumModal] = useState(false);
   const [newStratumName, setNewStratumName] = useState('');
   const [newStratumArea, setNewStratumArea] = useState('');
   const [newStratumDesc, setNewStratumDesc] = useState('');
+
+  // States for Talhao Editing
+  const [editingTalhao, setEditingTalhao] = useState<any>(null);
+  const [editTalhaoName, setEditTalhaoName] = useState('');
+  const [editTalhaoArea, setEditTalhaoArea] = useState('');
+  const [editTalhaoObs, setEditTalhaoObs] = useState('');
+
+  // States for Google Sheets
+  const [showSheetsModal, setShowSheetsModal] = useState(false);
+  const [googleSheetsUrlInput, setGoogleSheetsUrlInput] = useState('');
+  const [isSyncingSheets, setIsSyncingSheets] = useState(false);
+
+  useEffect(() => {
+    if (activeFw) {
+      setGoogleSheetsUrlInput(activeFw.googleSheetsUrl || '');
+    }
+  }, [activeFw]);
 
   // Filter projects by search
   const filteredFieldWorks = useMemo(() => {
@@ -147,6 +165,18 @@ export const OfficeDashboard = () => {
   const talhaoKpis = useMemo(() => {
     return getKpisForParcels(talhaoParcels);
   }, [talhaoParcels]);
+
+  const filteredParcelsList = useMemo(() => {
+    let list = activeParcels;
+    if (selectedTalhaoId) {
+      list = list.filter(p => p.talhaoId === selectedTalhaoId);
+    }
+    if (dateFilter) {
+      const formattedFilter = new Date(dateFilter + 'T12:00:00').toLocaleDateString('pt-BR');
+      list = list.filter(p => p.dataInicio === formattedFilter || p.ultimaColeta === formattedFilter);
+    }
+    return list;
+  }, [activeParcels, selectedTalhaoId, dateFilter]);
 
   // Stratified inventory calculations
   const stratifiedStats = useMemo(() => {
@@ -296,6 +326,73 @@ export const OfficeDashboard = () => {
     XLSX.writeFile(workbook, `Projeto_${activeFw.nome.replace(/\s+/g, '_')}_Completo.xlsx`);
   };
 
+  const handleSyncGoogleSheets = async () => {
+    if (!activeFw || !activeFw.googleSheetsUrl) return alert("Por favor, vincule uma planilha do Google nas configurações primeiro.");
+
+    const allData: any[] = [];
+    activeParcels.forEach(inv => {
+      const currentTal = talhoes.find(t => t.id === inv.talhaoId);
+      inv.dados.forEach(ind => {
+        const baseData: any = {
+           'Talhão': currentTal ? currentTal.nome : 'Sem Talhão',
+           'Talhão Observações': currentTal?.observacoes || '',
+           'Parcela': inv.nome,
+           'Parcela Coordenadas': inv.coordenadas || '',
+           'Parcela Observações': inv.observacoes || '',
+           'Número': ind.numeroIndividuo,
+           'Data / Hora': ind.timestamp,
+        };
+        inv.colunas.forEach(col => {
+           baseData[col.nome] = ind[col.id] || '';
+        });
+        if (ind.multipleStems && ind.stems) {
+           ind.stems.forEach((stem: any, i: number) => {
+             baseData[`Fuste_${i+1}_CAP`] = stem.cap;
+             baseData[`Fuste_${i+1}_Altura`] = stem.altura;
+           });
+        }
+        allData.push(baseData);
+      });
+    });
+
+    if (allData.length === 0) return alert("Nenhum dado encontrado nas parcelas deste trabalho.");
+
+    const headers = Array.from(new Set(allData.flatMap(Object.keys)));
+    const payload = { headers, rows: allData };
+
+    setIsSyncingSheets(true);
+    try {
+      const response = await fetch(activeFw.googleSheetsUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'text/plain'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const resText = await response.text();
+      let result;
+      try {
+        result = JSON.parse(resText);
+      } catch (e) {
+        console.warn("Could not parse response JSON:", resText);
+      }
+
+      if (result && result.status === 'success') {
+        alert(result.message);
+      } else if (result && result.status === 'error') {
+        alert("Erro no script do Google: " + result.message);
+      } else {
+        alert("Sincronização concluída com sucesso!");
+      }
+    } catch (err: any) {
+      console.error(err);
+      alert("Erro ao sincronizar com Google Planilhas. Detalhes: " + err.message);
+    } finally {
+      setIsSyncingSheets(false);
+    }
+  };
+
   // Talhão level Excel Export
   const handleExportTalhao = (talhaoId: string, talhaoNome: string) => {
     const talhaoParcels = activeParcels.filter(p => p.talhaoId === talhaoId);
@@ -372,7 +469,7 @@ export const OfficeDashboard = () => {
   }, [auditParcel]);
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: '#020503', color: '#fff', fontFamily: "'Plus Jakarta Sans', sans-serif", overflowX: 'hidden' }}>
+    <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg-color)', color: 'var(--text-main)', fontFamily: "'Plus Jakarta Sans', sans-serif", overflowX: 'hidden' }}>
       
       {/* Sidebar (List of projects) */}
       <div style={{ width: '320px', background: 'rgba(5, 13, 8, 0.4)', backdropFilter: 'blur(30px)', borderRight: '1px solid rgba(255, 255, 255, 0.05)', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
@@ -381,8 +478,44 @@ export const OfficeDashboard = () => {
         <div style={{ padding: '24px 24px 16px', display: 'flex', flexDirection: 'column', gap: '12px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <img src="/logo.png" alt="Logo" style={{ width: '40px', height: '40px' }} />
-            <div>
-              <h1 style={{ color: 'var(--primary-color)', fontSize: '18px', fontWeight: '800', margin: 0, letterSpacing: '0.5px' }}>LeafTag</h1>
+            <div style={{ flex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <h1 style={{ color: 'var(--primary-color)', fontSize: '18px', fontWeight: '800', margin: 0, letterSpacing: '0.5px' }}>LeafTag</h1>
+                
+                {/* Cloud Sync Icon */}
+                <div 
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '20px',
+                    height: '20px',
+                    borderRadius: '50%',
+                    background: isSynced ? 'rgba(76, 175, 80, 0.08)' : 'rgba(255, 152, 0, 0.08)',
+                    border: isSynced ? '1px solid rgba(76, 175, 80, 0.25)' : '1px solid rgba(255, 152, 0, 0.25)',
+                    color: isSynced ? '#81c784' : '#ffb74d',
+                    transition: 'all 0.3s ease',
+                    cursor: 'default'
+                  }}
+                  title={isSynced ? "Dados 100% Sincronizados" : "Sincronizando com a Nuvem..."}
+                >
+                  <svg 
+                    xmlns="http://www.w3.org/2000/svg" 
+                    width="10" 
+                    height="10" 
+                    viewBox="0 0 24 24" 
+                    fill="none" 
+                    stroke="currentColor" 
+                    strokeWidth="2.5" 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round"
+                    className={isSynced ? "" : "spin-icon"}
+                  >
+                    <path d="M17.5 19A3.5 3.5 0 0 0 21 15.5c0-2.79-2.54-4.5-5-4.5-.47-.47-1.15-.78-2-.78-2 0-3.5 1.5-3.5 3.5v.78c-2.3 0-4 1.7-4 4A3.5 3.5 0 0 0 10 22h7.5" />
+                    {isSynced && <path d="M9 16l2 2 4-4" />}
+                  </svg>
+                </div>
+              </div>
               <span style={{ fontSize: '11px', color: '#00e676', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '1px' }}>Painel Escritório</span>
             </div>
           </div>
@@ -506,7 +639,7 @@ export const OfficeDashboard = () => {
               </div>
               
               {activeParcels.length > 0 && (
-                <div style={{ display: 'flex', gap: '12px' }}>
+                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
                   <button 
                     className="btn btn-secondary" 
                     style={{ width: 'auto', padding: '10px 20px', borderColor: '#2e7d32', color: '#a5d6a7', background: 'rgba(46, 125, 50, 0.08)' }} 
@@ -515,12 +648,64 @@ export const OfficeDashboard = () => {
                     Dashboard Geral
                   </button>
                   <button 
-                    className="btn btn-primary" 
+                    className="btn btn-secondary" 
                     style={{ width: 'auto', padding: '10px 20px' }} 
                     onClick={handleExportAll}
                   >
                     Exportar Excel Completo
                   </button>
+                  <button 
+                    type="button" 
+                    className="btn btn-secondary" 
+                    style={{ 
+                      width: 'auto', 
+                      padding: '10px 20px', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '8px', 
+                      borderColor: activeFw.googleSheetsUrl ? 'var(--primary-hover)' : 'rgba(255,255,255,0.1)' 
+                    }} 
+                    onClick={() => setShowSheetsModal(true)}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                      <line x1="3" y1="9" x2="21" y2="9"></line>
+                      <line x1="9" y1="21" x2="9" y2="9"></line>
+                    </svg>
+                    {activeFw.googleSheetsUrl ? "Planilha Vinculada" : "Vincular Planilha"}
+                  </button>
+                  {activeFw.googleSheetsUrl && (
+                    <button 
+                      type="button" 
+                      className="btn btn-primary" 
+                      style={{ 
+                        width: 'auto', 
+                        padding: '10px 20px', 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: '8px', 
+                        background: 'linear-gradient(135deg, #00e676 0%, #00b0ff 100%)',
+                        border: 'none'
+                      }} 
+                      onClick={handleSyncGoogleSheets}
+                      disabled={isSyncingSheets}
+                    >
+                      <svg 
+                        xmlns="http://www.w3.org/2000/svg" 
+                        width="16" height="16" 
+                        viewBox="0 0 24 24" 
+                        fill="none" 
+                        stroke="currentColor" 
+                        strokeWidth="2.5" 
+                        strokeLinecap="round" 
+                        strokeLinejoin="round"
+                        className={isSyncingSheets ? "spin-icon" : ""}
+                      >
+                        <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+                      </svg>
+                      {isSyncingSheets ? "Enviando..." : "Sincronizar Planilha"}
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -616,10 +801,11 @@ export const OfficeDashboard = () => {
                       <thead>
                         <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                           <th style={{ padding: '16px 24px', textAlign: 'left', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Nome do Talhão</th>
+                          <th style={{ padding: '16px 24px', textAlign: 'left', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', width: '120px' }}>Área (ha)</th>
                           <th style={{ padding: '16px 24px', textAlign: 'left', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Observações</th>
-                          <th style={{ padding: '16px 24px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', width: '120px' }}>Nº Parcelas</th>
-                          <th style={{ padding: '16px 24px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', width: '120px' }}>Nº Árvores</th>
-                          <th style={{ padding: '16px 24px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', width: '280px' }}>Ações</th>
+                          <th style={{ padding: '16px 24px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', width: '100px' }}>Nº Parcelas</th>
+                          <th style={{ padding: '16px 24px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', width: '100px' }}>Nº Árvores</th>
+                          <th style={{ padding: '16px 24px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', width: '380px' }}>Ações</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -631,11 +817,14 @@ export const OfficeDashboard = () => {
                           return (
                             <tr key={t.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
                               <td style={{ padding: '18px 24px', fontWeight: 'bold' }}>{t.nome}</td>
+                              <td style={{ padding: '18px 24px', fontWeight: 'bold', color: '#00e676' }}>
+                                {t.area !== undefined ? `${t.area.toFixed(2)} ha` : '-'}
+                              </td>
                               <td style={{ padding: '18px 24px', color: 'var(--text-muted)', fontSize: '13px' }}>{t.observacoes || 'Sem observações'}</td>
                               <td style={{ padding: '18px 24px', textAlign: 'center', fontWeight: 'bold' }}>{talParcels.length}</td>
                               <td style={{ padding: '18px 24px', textAlign: 'center', color: '#4fc3f7', fontWeight: 'bold' }}>{treesCount}</td>
                               <td style={{ padding: '18px 24px', textAlign: 'center' }}>
-                                <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                                <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', flexWrap: 'wrap' }}>
                                   <button 
                                     className="btn btn-secondary" 
                                     style={{ width: 'auto', padding: '6px 12px', fontSize: '11px', borderColor: '#00e676', color: '#00e676', background: 'rgba(0, 230, 118, 0.08)' }} 
@@ -650,7 +839,7 @@ export const OfficeDashboard = () => {
                                     <>
                                       <button 
                                         className="btn btn-secondary" 
-                                        style={{ width: 'auto', padding: '6px 12px', fontSize: '11px', borderColor: '#2e7d32', color: '#a5d6a7', background: 'rgba(46, 125, 50, 0.08)' }} 
+                                        style={{ width: 'auto', padding: '6px 12px', fontSize: '11px', borderColor: '#ffb74d', color: '#ffb74d', background: 'rgba(255, 183, 77, 0.08)' }} 
                                         onClick={() => setTalhaoDashboardId(t.id)}
                                       >
                                         Dashboard
@@ -660,10 +849,33 @@ export const OfficeDashboard = () => {
                                         style={{ width: 'auto', padding: '6px 12px', fontSize: '11px', borderColor: '#00838f', color: '#80deea', background: 'rgba(0, 131, 143, 0.08)' }} 
                                         onClick={() => handleExportTalhao(t.id, t.nome)}
                                       >
-                                        Planilha Excel
+                                        Excel
                                       </button>
                                     </>
                                   )}
+                                  <button 
+                                    className="btn btn-secondary" 
+                                    style={{ width: 'auto', padding: '6px 12px', fontSize: '11px', borderColor: '#4fc3f7', color: '#4fc3f7', background: 'rgba(79, 195, 247, 0.08)' }} 
+                                    onClick={() => {
+                                      setEditingTalhao(t);
+                                      setEditTalhaoName(t.nome);
+                                      setEditTalhaoArea(t.area?.toString() || '');
+                                      setEditTalhaoObs(t.observacoes || '');
+                                    }}
+                                  >
+                                    Editar
+                                  </button>
+                                  <button 
+                                    className="btn btn-danger" 
+                                    style={{ width: 'auto', padding: '4px 10px', fontSize: '10px', height: 'auto', lineHeight: 'normal' }} 
+                                    onClick={() => {
+                                      if (confirm(`Excluir o talhão "${t.nome}" apagará permanentemente todas as parcelas (${talParcels.length}) vinculadas a ele. Deseja prosseguir?`)) {
+                                        deleteTalhao(t.id);
+                                      }
+                                    }}
+                                  >
+                                    Excluir
+                                  </button>
                                 </div>
                               </td>
                             </tr>
@@ -676,6 +888,30 @@ export const OfficeDashboard = () => {
               </div>
             ) : activeTab === 'parcelas' ? (
               <div className="glass-card" style={{ padding: 24, border: '1px solid rgba(255,255,255,0.05)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
+                  <h3 style={{ fontSize: '16px', fontWeight: '800', margin: 0 }}>Parcelas Cadastradas ({filteredParcelsList.length})</h3>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.03)', padding: '4px 10px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: '800', textTransform: 'uppercase' }}>Filtrar Dia:</span>
+                    <input 
+                      type="date" 
+                      className="input-field" 
+                      style={{ marginBottom: 0, padding: '4px 8px', borderRadius: '6px', fontSize: '12px', width: 'auto', height: '30px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', color: '#fff' }} 
+                      value={dateFilter} 
+                      onChange={e => setDateFilter(e.target.value)} 
+                    />
+                    {dateFilter && (
+                      <button 
+                        type="button" 
+                        className="btn btn-secondary" 
+                        style={{ width: 'auto', padding: '2px 8px', fontSize: '10px', height: '24px', lineHeight: 1 }} 
+                        onClick={() => setDateFilter('')}
+                      >
+                        Limpar
+                      </button>
+                    )}
+                  </div>
+                </div>
+
                 {selectedTalhaoId && (
                   <div style={{ marginBottom: '20px' }}>
                     {/* Filter Banner */}
@@ -748,9 +984,9 @@ export const OfficeDashboard = () => {
                   </div>
                 )}
 
-                {activeParcels.length === 0 ? (
+                {filteredParcelsList.length === 0 ? (
                   <div style={{ padding: '48px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                    Nenhuma parcela cadastrada neste projeto.
+                    Nenhuma parcela corresponde aos filtros ativos.
                   </div>
                 ) : (
                   <div style={{ overflowX: 'auto' }}>
@@ -769,7 +1005,7 @@ export const OfficeDashboard = () => {
                         </tr>
                       </thead>
                       <tbody>
-                        {(selectedTalhaoId ? activeParcels.filter(p => p.talhaoId === selectedTalhaoId) : activeParcels).map(p => {
+                        {filteredParcelsList.map(p => {
                           const talName = activeTalhoes.find(t => t.id === p.talhaoId)?.nome || 'Sem Talhão';
                           return (
                             <tr key={p.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
@@ -1156,6 +1392,204 @@ export const OfficeDashboard = () => {
                 setNewStratumArea('');
                 setNewStratumDesc('');
               }}>Criar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Talhão Edit Modal */}
+      {editingTalhao && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100000, padding: '20px', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
+          <div className="glass-card" style={{ width: '100%', maxWidth: '400px', margin: 0 }}>
+            <h3 style={{ margin: 0, fontSize: '18px', color: 'var(--primary-hover)', fontWeight: '800' }}>Editar Talhão</h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: '12px', marginTop: '4px', marginBottom: '16px' }}>Edite as informações do talhão.</p>
+            
+            <input 
+              className="input-field" 
+              placeholder="Nome do Talhão" 
+              value={editTalhaoName} 
+              onChange={e => setEditTalhaoName(e.target.value)} 
+              style={{ marginTop: '8px' }} 
+            />
+            <input 
+              type="number" 
+              step="0.01" 
+              className="input-field" 
+              placeholder="Área em Hectares (Ex: 10.5)" 
+              value={editTalhaoArea} 
+              onChange={e => setEditTalhaoArea(e.target.value)} 
+            />
+            <textarea 
+              className="input-field" 
+              placeholder="Observações do talhão (Opcional)" 
+              value={editTalhaoObs} 
+              onChange={e => setEditTalhaoObs(e.target.value)} 
+              style={{ minHeight: '80px', fontFamily: 'inherit' }} 
+            />
+            
+            <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
+              <button className="btn btn-secondary" onClick={() => {
+                setEditingTalhao(null);
+                setEditTalhaoName('');
+                setEditTalhaoArea('');
+                setEditTalhaoObs('');
+              }}>Cancelar</button>
+              <button className="btn btn-primary" onClick={async () => {
+                if (!editTalhaoName.trim()) return alert('Por favor, dê um nome ao talhão.');
+                
+                await createTalhao({
+                  ...editingTalhao,
+                  nome: editTalhaoName.trim(),
+                  area: editTalhaoArea ? parseFloat(editTalhaoArea) : undefined,
+                  observacoes: editTalhaoObs.trim()
+                });
+
+                setEditingTalhao(null);
+                setEditTalhaoName('');
+                setEditTalhaoArea('');
+                setEditTalhaoObs('');
+              }}>Salvar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Google Sheets Integration Modal */}
+      {showSheetsModal && activeFw && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100000, padding: '20px', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
+          <div className="glass-card" style={{ width: '100%', maxWidth: '550px', margin: 0, maxHeight: '90vh', overflowY: 'auto', padding: '24px' }}>
+            <h3 style={{ margin: 0, fontSize: '18px', color: 'var(--primary-hover)', fontWeight: '800' }}>Vincular Google Planilhas</h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: '12.5px', marginTop: '6px', marginBottom: '16px', lineHeight: '1.4' }}>
+              Vincule este Trabalho de Campo a uma planilha do Google Sheets para enviar seus dados estruturados com um clique.
+            </p>
+            
+            <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)', fontSize: '12.5px', color: '#e0e0e0', marginBottom: '16px' }}>
+              <strong style={{ color: '#fff', display: 'block', marginBottom: '8px' }}>Instruções de Configuração:</strong>
+              <ol style={{ paddingLeft: '20px', margin: 0, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <li>Crie uma nova planilha vazia no Google Planilhas (<a href="https://sheets.new" target="_blank" rel="noreferrer" style={{ color: 'var(--primary-hover)', textDecoration: 'underline' }}>sheets.new</a>).</li>
+                <li>No menu superior, acesse <strong>Extensões</strong> &gt; <strong>Apps Script</strong>.</li>
+                <li>Apague todo o código existente na janela e cole o script abaixo.</li>
+                <li>Clique no ícone de salvar (disquete) e depois clique em <strong>Implantar</strong> &gt; <strong>Nova implantação</strong>.</li>
+                <li>Clique na engrenagem de "Tipo", escolha <strong>App da Web</strong>. Em "Quem pode acessar", mude para <strong>Qualquer pessoa</strong>.</li>
+                <li>Clique em Implantar, conceda as permissões se solicitado, copie a <strong>URL do App da Web</strong> gerada e cole no campo de texto abaixo.</li>
+              </ol>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
+              <label style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Código do Google Apps Script:</label>
+              <textarea 
+                readOnly 
+                className="input-field" 
+                style={{ height: '140px', fontFamily: 'monospace', fontSize: '11px', background: 'rgba(0,0,0,0.5)', color: '#81c784', padding: '10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)', cursor: 'text' }} 
+                value={`function doPost(e) {
+  try {
+    var data = JSON.parse(e.postData.contents);
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+    sheet.clear();
+    
+    if (data.headers && data.headers.length > 0) {
+      sheet.appendRow(data.headers);
+    }
+    
+    if (data.rows && data.rows.length > 0) {
+      var range = sheet.getRange(2, 1, data.rows.length, data.headers.length);
+      var values = data.rows.map(function(row) {
+        return data.headers.map(function(header) {
+          return row[header] !== undefined ? row[header] : "";
+        });
+      });
+      range.setValues(values);
+    }
+    
+    return ContentService.createTextOutput(JSON.stringify({ status: "success", message: "Dados sincronizados com sucesso! Total: " + (data.rows ? data.rows.length : 0) + " linhas." }))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch (error) {
+    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: error.toString() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}`}
+              />
+              <button 
+                type="button" 
+                className="btn btn-secondary" 
+                style={{ width: 'auto', padding: '6px 12px', fontSize: '11px', alignSelf: 'flex-start' }}
+                onClick={() => {
+                  navigator.clipboard.writeText(`function doPost(e) {
+  try {
+    var data = JSON.parse(e.postData.contents);
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+    sheet.clear();
+    
+    if (data.headers && data.headers.length > 0) {
+      sheet.appendRow(data.headers);
+    }
+    
+    if (data.rows && data.rows.length > 0) {
+      var range = sheet.getRange(2, 1, data.rows.length, data.headers.length);
+      var values = data.rows.map(function(row) {
+        return data.headers.map(function(header) {
+          return row[header] !== undefined ? row[header] : "";
+        });
+      });
+      range.setValues(values);
+    }
+    
+    return ContentService.createTextOutput(JSON.stringify({ status: "success", message: "Dados sincronizados com sucesso! Total: " + (data.rows ? data.rows.length : 0) + " linhas." }))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch (error) {
+    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: error.toString() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}`);
+                  alert("Código copiado para a área de transferência!");
+                }}
+              >
+                Copiar Script
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '20px' }}>
+              <label style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>URL do App da Web:</label>
+              <input 
+                type="url" 
+                className="input-field" 
+                placeholder="https://script.google.com/macros/s/.../exec" 
+                value={googleSheetsUrlInput} 
+                onChange={e => setGoogleSheetsUrlInput(e.target.value)} 
+                style={{ marginBottom: 0 }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <button 
+                className="btn btn-secondary" 
+                style={{ width: 'auto' }}
+                onClick={() => {
+                  setShowSheetsModal(false);
+                }}
+              >
+                Cancelar
+              </button>
+              <button 
+                className="btn btn-primary" 
+                style={{ width: 'auto' }}
+                onClick={async () => {
+                  if (googleSheetsUrlInput.trim() && !googleSheetsUrlInput.startsWith('https://script.google.com')) {
+                    return alert('Por favor, insira uma URL válida do Google Apps Script.');
+                  }
+                  
+                  // Save to Firebase
+                  await createFieldWork({
+                    ...activeFw,
+                    googleSheetsUrl: googleSheetsUrlInput.trim() || undefined
+                  });
+
+                  alert('Configurações de sincronização salvas com sucesso!');
+                  setShowSheetsModal(false);
+                }}
+              >
+                Salvar Configurações
+              </button>
             </div>
           </div>
         </div>

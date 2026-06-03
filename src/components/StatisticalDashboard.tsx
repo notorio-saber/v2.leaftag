@@ -2,6 +2,7 @@ import React, { useState, useMemo, useRef } from 'react';
 import { BarChart, Bar, AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import html2canvas from 'html2canvas';
 import type { Inventory, IndividualData } from '../types';
+import { useInventory } from '../context/InventoryContext';
 import { calculateShannonIndex, calculateSimpsonIndex, calculatePielouIndex, calculateBasalArea, calculateVolume } from '../utils/forestryCalculations';
 
 interface DashboardProps {
@@ -33,6 +34,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 export const StatisticalDashboard: React.FC<DashboardProps> = ({ inventories, onClose }) => {
+  const { talhoes, strata } = useInventory();
   const [classInterval, setClassInterval] = useState<number>(10);
   const [alturaInterval, setAlturaInterval] = useState<number>(5);
   const [fatorForma, setFatorForma] = useState<number>(0.7);
@@ -170,11 +172,76 @@ export const StatisticalDashboard: React.FC<DashboardProps> = ({ inventories, on
     };
   }, [inventories, classInterval, alturaInterval, fatorForma]);
 
+  const areaHa = useMemo(() => {
+    if (inventories.length === 0) return undefined;
+    
+    // Check if we are viewing a single Talhão
+    const firstTalhaoId = inventories[0].talhaoId;
+    if (firstTalhaoId && inventories.every(inv => inv.talhaoId === firstTalhaoId)) {
+      const talhao = talhoes.find(t => t.id === firstTalhaoId);
+      if (talhao && talhao.area !== undefined) return talhao.area;
+    }
+    
+    // Check if we are viewing a single Stratum
+    const firstStratumId = inventories[0].stratumId;
+    if (firstStratumId && inventories.every(inv => inv.stratumId === firstStratumId)) {
+      const stratum = strata.find(s => s.id === firstStratumId);
+      if (stratum && stratum.area !== undefined) return stratum.area;
+    }
+
+    // Otherwise, compute project-wide area
+    const activeFwId = inventories[0].fieldWorkId;
+    const fwTalhoes = talhoes.filter(t => t.fieldWorkId === activeFwId);
+    const fwStrata = strata.filter(s => s.fieldWorkId === activeFwId);
+    
+    const totalStrataArea = fwStrata.reduce((acc, s) => acc + (s.area || 0), 0);
+    const totalTalhaoArea = fwTalhoes.reduce((acc, t) => acc + (t.area || 0), 0);
+    const totalArea = totalStrataArea > 0 ? totalStrataArea : totalTalhaoArea;
+
+    return totalArea > 0 ? totalArea : undefined;
+  }, [inventories, talhoes, strata]);
+
+  const totalSampleAreaHa = useMemo(() => {
+    const sumSqm = inventories.reduce((acc, inv) => acc + (inv.areaParcela || 0), 0);
+    return sumSqm / 10000;
+  }, [inventories]);
+
+  const scaledStats = useMemo(() => {
+    const { totalV, totalG, totalFustes } = stats;
+    
+    if (totalSampleAreaHa <= 0) {
+      return {
+        vHa: 0,
+        vTotalEst: 0,
+        gHa: 0,
+        gTotalEst: 0,
+        nHa: 0,
+        nTotalEst: 0
+      };
+    }
+
+    const vHa = totalV / totalSampleAreaHa;
+    const gHa = totalG / totalSampleAreaHa;
+    const nHa = totalFustes / totalSampleAreaHa;
+
+    return {
+      vHa,
+      vTotalEst: areaHa !== undefined ? vHa * areaHa : undefined,
+      gHa,
+      gTotalEst: areaHa !== undefined ? gHa * areaHa : undefined,
+      nHa,
+      nTotalEst: areaHa !== undefined ? nHa * areaHa : undefined
+    };
+  }, [stats, totalSampleAreaHa, areaHa]);
+
   const handleExportSnapshot = async () => {
     if (!containerRef.current) return;
     setIsExporting(true);
     try {
-      const canvas = await html2canvas(containerRef.current, { backgroundColor: '#020503', scale: 2 });
+      const canvas = await html2canvas(containerRef.current, { 
+        backgroundColor: document.body.classList.contains('light-theme') ? '#f4f6f4' : '#020503', 
+        scale: 2 
+      });
       const url = canvas.toDataURL('image/png');
       const link = document.createElement('a');
       link.href = url;
@@ -242,7 +309,7 @@ export const StatisticalDashboard: React.FC<DashboardProps> = ({ inventories, on
   return (
     <div style={{
       position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-      background: '#020503', zIndex: 9999, display: 'flex', flexDirection: 'column',
+      background: 'var(--bg-color)', zIndex: 9999, display: 'flex', flexDirection: 'column',
       overflowX: 'hidden', maxWidth: '100vw'
     }}>
       {/* Premium Header */}
@@ -272,6 +339,8 @@ export const StatisticalDashboard: React.FC<DashboardProps> = ({ inventories, on
           </h2>
           <span style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginTop: '3px', fontWeight: '500' }}>
             Análise Fitossociológica de Parcelas Florestais
+            {areaHa !== undefined && ` • Área Total: ${areaHa.toFixed(2)} ha`}
+            {totalSampleAreaHa > 0 && ` • Área Amostrada: ${totalSampleAreaHa.toFixed(4)} ha`}
           </span>
         </div>
         <button 
@@ -375,9 +444,15 @@ export const StatisticalDashboard: React.FC<DashboardProps> = ({ inventories, on
           marginBottom: '32px' 
         }}>
            <TopStatCard 
-             title="Amostragem Base" 
-             value={stats.totalFustes.toString()} 
-             sub={`${stats.totalInd} Indivíduos`} 
+             title={areaHa !== undefined ? "Fustes (Estimado)" : "Amostragem Base"} 
+             value={areaHa !== undefined && scaledStats.nTotalEst !== undefined
+               ? Math.round(scaledStats.nTotalEst).toLocaleString()
+               : stats.totalFustes.toString()
+             } 
+             sub={areaHa !== undefined
+               ? `${scaledStats.nHa.toFixed(1)}/ha (Amostra: ${stats.totalFustes})`
+               : `${stats.totalInd} Indivíduos`
+             } 
              color="#4fc3f7"
              icon={
                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -397,9 +472,15 @@ export const StatisticalDashboard: React.FC<DashboardProps> = ({ inventories, on
              }
            />
            <TopStatCard 
-             title="Volume Total" 
-             value={`${stats.totalV.toFixed(2)} m³`} 
-             sub="Biomassa Estimada" 
+             title={areaHa !== undefined ? "Volume (Estimado)" : "Volume Amostrado"} 
+             value={areaHa !== undefined && scaledStats.vTotalEst !== undefined
+               ? `${scaledStats.vTotalEst.toFixed(2)} m³`
+               : `${stats.totalV.toFixed(2)} m³`
+             } 
+             sub={areaHa !== undefined
+               ? `${scaledStats.vHa.toFixed(2)} m³/ha (Amostra: ${stats.totalV.toFixed(1)} m³)`
+               : "Biomassa Estimada"
+             } 
              color="#ba68c8"
              icon={
                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -410,9 +491,15 @@ export const StatisticalDashboard: React.FC<DashboardProps> = ({ inventories, on
              }
            />
            <TopStatCard 
-             title="Área Basal" 
-             value={`${stats.totalG.toFixed(4)} m²`} 
-             sub="Basimetria" 
+             title={areaHa !== undefined ? "Área Basal (Estimada)" : "Área Basal Amostrada"} 
+             value={areaHa !== undefined && scaledStats.gTotalEst !== undefined
+               ? `${scaledStats.gTotalEst.toFixed(4)} m²`
+               : `${stats.totalG.toFixed(4)} m²`
+             } 
+             sub={areaHa !== undefined
+               ? `${scaledStats.gHa.toFixed(4)} m²/ha (Amostra: ${stats.totalG.toFixed(3)} m²)`
+               : "Basimetria"
+             } 
              color="#e57373"
              icon={
                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">

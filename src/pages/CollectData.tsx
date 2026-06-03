@@ -43,7 +43,7 @@ const PhotoThumbnails = ({ individualId, inventoryId }: { individualId: string; 
 
 export const CollectData = () => {
   const navigate = useNavigate();
-  const { currentInventory, saveInventory, setCurrentInventory } = useInventory();
+  const { currentInventory, saveInventory, setCurrentInventory, isSynced } = useInventory();
   
   const [stepIndex, setStepIndex] = useState(0);
   const [formData, setFormData] = useState<any>({});
@@ -353,9 +353,43 @@ export const CollectData = () => {
         {/* Wizard Header & Progress */}
         <div>
           <div className="app-header" style={{ marginBottom: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'nowrap' }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
               <h2 style={{ color: '#ffffff', fontSize: '17px', fontWeight: '800', margin: 0, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{currentInventory.nome}</h2>
-              <span style={{ fontSize: '12.5px', color: 'var(--text-muted)' }}>Coleta em Andamento</span>
+              
+              {/* Cloud Sync Icon */}
+              <div 
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '24px',
+                  height: '24px',
+                  borderRadius: '50%',
+                  background: isSynced ? 'rgba(76, 175, 80, 0.08)' : 'rgba(255, 152, 0, 0.08)',
+                  border: isSynced ? '1px solid rgba(76, 175, 80, 0.25)' : '1px solid rgba(255, 152, 0, 0.25)',
+                  color: isSynced ? '#81c784' : '#ffb74d',
+                  transition: 'all 0.3s ease',
+                  cursor: 'default',
+                  flexShrink: 0
+                }}
+                title={isSynced ? "Dados 100% Sincronizados" : "Sincronizando com a Nuvem..."}
+              >
+                <svg 
+                  xmlns="http://www.w3.org/2000/svg" 
+                  width="12" 
+                  height="12" 
+                  viewBox="0 0 24 24" 
+                  fill="none" 
+                  stroke="currentColor" 
+                  strokeWidth="2.5" 
+                  strokeLinecap="round" 
+                  strokeLinejoin="round"
+                  className={isSynced ? "" : "spin-icon"}
+                >
+                  <path d="M17.5 19A3.5 3.5 0 0 0 21 15.5c0-2.79-2.54-4.5-5-4.5-.47-.47-1.15-.78-2-.78-2 0-3.5 1.5-3.5 3.5v.78c-2.3 0-4 1.7-4 4A3.5 3.5 0 0 0 10 22h7.5" />
+                  {isSynced && <path d="M9 16l2 2 4-4" />}
+                </svg>
+              </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
               <div style={{
@@ -943,9 +977,9 @@ export const CollectData = () => {
                           value={value || ''}
                           onChange={e => setTempPrevIndData({ ...tempPrevIndData, [col.id]: e.target.value })}
                         >
-                          <option value="" style={{ background: '#0a0f0d', color: 'var(--text-muted)' }}>-- Selecione --</option>
+                          <option value="" style={{ background: 'var(--bg-color)', color: 'var(--text-muted)' }}>-- Selecione --</option>
                           {(col.opcoes || []).map((o: string) => (
-                            <option key={o} value={o} style={{ background: '#0a0f0d', color: '#fff' }}>{o}</option>
+                            <option key={o} value={o} style={{ background: 'var(--bg-color)', color: 'var(--text-main)' }}>{o}</option>
                           ))}
                         </select>
                       ) : (

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useInventory } from '../context/InventoryContext';
 import * as XLSX from 'xlsx';
@@ -10,19 +10,32 @@ const generateId = () => Date.now().toString();
 export const FieldWorkDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { fieldWorks, talhoes, inventories, setCurrentInventory, deleteFieldWork, createTalhao, deleteTalhao } = useInventory();
+  const { fieldWorks, talhoes, inventories, setCurrentInventory, deleteFieldWork, createTalhao, deleteTalhao, isSynced, strata, createFieldWork } = useInventory();
   const [showMap, setShowMap] = useState(false);
   const [showDashboard, setShowDashboard] = useState(false);
   const [talhaoDashboardId, setTalhaoDashboardId] = useState<string | null>(null);
   const [showTalhaoModal, setShowTalhaoModal] = useState(false);
   const [newTalhaoName, setNewTalhaoName] = useState('');
+  const [newTalhaoArea, setNewTalhaoArea] = useState('');
   const [newTalhaoObs, setNewTalhaoObs] = useState('');
+  const [dateFilter, setDateFilter] = useState('');
 
   const [editingTalhao, setEditingTalhao] = useState<any>(null);
   const [editTalhaoName, setEditTalhaoName] = useState('');
+  const [editTalhaoArea, setEditTalhaoArea] = useState('');
   const [editTalhaoObs, setEditTalhaoObs] = useState('');
 
+  const [showSheetsModal, setShowSheetsModal] = useState(false);
+  const [googleSheetsUrlInput, setGoogleSheetsUrlInput] = useState('');
+  const [isSyncingSheets, setIsSyncingSheets] = useState(false);
+
   const fw = fieldWorks.find(f => f.id === id);
+
+  useEffect(() => {
+    if (fw) {
+      setGoogleSheetsUrlInput(fw.googleSheetsUrl || '');
+    }
+  }, [fw]);
   if (!fw) {
     return (
       <div className="container" style={{ marginTop: '20px', textAlign: 'center' }}>
@@ -38,9 +51,23 @@ export const FieldWorkDetail = () => {
   const fwTalhoes = talhoes.filter(t => t.fieldWorkId === id);
   const parcels = inventories.filter(i => i.fieldWorkId === id);
 
+  const filteredParcels = dateFilter
+    ? parcels.filter(p => {
+        const formattedFilter = new Date(dateFilter + 'T12:00:00').toLocaleDateString('pt-BR');
+        return p.dataInicio === formattedFilter || p.ultimaColeta === formattedFilter;
+      })
+    : parcels;
+
   // Group parcels by talhaoId
-  const parcelsByTalhao = parcels.filter(p => p.talhaoId);
-  const legacyParcels = parcels.filter(p => !p.talhaoId);
+  // Group parcels by talhaoId
+  const parcelsByTalhao = filteredParcels.filter(p => p.talhaoId);
+  const legacyParcels = filteredParcels.filter(p => !p.talhaoId);
+
+  // Calculate total area (ha)
+  const fwStrata = strata.filter(s => s.fieldWorkId === id);
+  const totalStrataArea = fwStrata.reduce((acc, s) => acc + (s.area || 0), 0);
+  const totalTalhaoArea = fwTalhoes.reduce((acc, t) => acc + (t.area || 0), 0);
+  const totalArea = totalStrataArea > 0 ? totalStrataArea : totalTalhaoArea;
 
   const handleDeleteFieldWork = () => {
     if (confirm('Tem certeza que deseja apagar este Trabalho de Campo, todos os seus talhões e todas as suas parcelas?')) {
@@ -62,17 +89,20 @@ export const FieldWorkDetail = () => {
       id: generateId(),
       fieldWorkId: fw.id,
       nome: newTalhaoName.trim(),
+      area: parseFloat(newTalhaoArea) || undefined,
       observacoes: newTalhaoObs.trim()
     });
 
     setShowTalhaoModal(false);
     setNewTalhaoName('');
+    setNewTalhaoArea('');
     setNewTalhaoObs('');
   };
 
   const handleEditTalhao = (talhao: any) => {
     setEditingTalhao(talhao);
     setEditTalhaoName(talhao.nome);
+    setEditTalhaoArea(talhao.area?.toString() || '');
     setEditTalhaoObs(talhao.observacoes || '');
   };
 
@@ -83,11 +113,13 @@ export const FieldWorkDetail = () => {
     createTalhao({
       ...editingTalhao,
       nome: editTalhaoName.trim(),
+      area: parseFloat(editTalhaoArea) || undefined,
       observacoes: editTalhaoObs.trim()
     });
 
     setEditingTalhao(null);
     setEditTalhaoName('');
+    setEditTalhaoArea('');
     setEditTalhaoObs('');
   };
 
@@ -124,6 +156,73 @@ export const FieldWorkDetail = () => {
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Dados Consolidados");
     XLSX.writeFile(workbook, `Projeto_${fw.nome.replace(/\s+/g, '_')}_Completo.xlsx`);
+  };
+
+  const handleSyncGoogleSheets = async () => {
+    if (!fw || !fw.googleSheetsUrl) return alert("Por favor, vincule uma planilha do Google nas configurações primeiro.");
+
+    const allData: any[] = [];
+    parcels.forEach(inv => {
+      const currentTal = talhoes.find(t => t.id === inv.talhaoId);
+      inv.dados.forEach(ind => {
+        const baseData: any = {
+           'Talhão': currentTal ? currentTal.nome : 'Sem Talhão',
+           'Talhão Observações': currentTal?.observacoes || '',
+           'Parcela': inv.nome,
+           'Parcela Coordenadas': inv.coordenadas || '',
+           'Parcela Observações': inv.observacoes || '',
+           'Número': ind.numeroIndividuo,
+           'Data / Hora': ind.timestamp,
+        };
+        inv.colunas.forEach(col => {
+           baseData[col.nome] = ind[col.id] || '';
+        });
+        if (ind.multipleStems && ind.stems) {
+           ind.stems.forEach((stem: any, i: number) => {
+             baseData[`Fuste_${i+1}_CAP`] = stem.cap;
+             baseData[`Fuste_${i+1}_Altura`] = stem.altura;
+           });
+        }
+        allData.push(baseData);
+      });
+    });
+
+    if (allData.length === 0) return alert("Nenhum dado encontrado nas parcelas deste trabalho.");
+
+    const headers = Array.from(new Set(allData.flatMap(Object.keys)));
+    const payload = { headers, rows: allData };
+
+    setIsSyncingSheets(true);
+    try {
+      const response = await fetch(fw.googleSheetsUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'text/plain'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const resText = await response.text();
+      let result;
+      try {
+        result = JSON.parse(resText);
+      } catch (e) {
+        console.warn("Could not parse response JSON:", resText);
+      }
+
+      if (result && result.status === 'success') {
+        alert(result.message);
+      } else if (result && result.status === 'error') {
+        alert("Erro no script do Google: " + result.message);
+      } else {
+        alert("Sincronização concluída com sucesso!");
+      }
+    } catch (err: any) {
+      console.error(err);
+      alert("Erro ao sincronizar com Google Planilhas. Detalhes: " + err.message);
+    } finally {
+      setIsSyncingSheets(false);
+    }
   };
 
   const handleExportTalhao = (talhaoId: string, talhaoNome: string) => {
@@ -194,8 +293,47 @@ export const FieldWorkDetail = () => {
       {/* Header */}
       <div className="app-header">
         <div>
-          <h1 style={{ color: 'var(--primary-hover)', fontSize: '24px', fontWeight: '800' }}>{fw.nome}</h1>
-          <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginTop: '4px' }}>Local: {fw.local} | Data: {fw.dataInicio}</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <h1 style={{ color: 'var(--primary-hover)', fontSize: '24px', fontWeight: '800', margin: 0 }}>{fw.nome}</h1>
+            
+            {/* Cloud Sync Icon */}
+            <div 
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '28px',
+                height: '28px',
+                borderRadius: '50%',
+                background: isSynced ? 'rgba(76, 175, 80, 0.08)' : 'rgba(255, 152, 0, 0.08)',
+                border: isSynced ? '1px solid rgba(76, 175, 80, 0.25)' : '1px solid rgba(255, 152, 0, 0.25)',
+                color: isSynced ? '#81c784' : '#ffb74d',
+                transition: 'all 0.3s ease',
+                cursor: 'default'
+              }}
+              title={isSynced ? "Dados 100% sincronizados na nuvem" : "Sincronizando alterações locais..."}
+            >
+              <svg 
+                xmlns="http://www.w3.org/2000/svg" 
+                width="14" 
+                height="14" 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="2.5" 
+                strokeLinecap="round" 
+                strokeLinejoin="round"
+                className={isSynced ? "" : "spin-icon"}
+              >
+                <path d="M17.5 19A3.5 3.5 0 0 0 21 15.5c0-2.79-2.54-4.5-5-4.5-.47-.47-1.15-.78-2-.78-2 0-3.5 1.5-3.5 3.5v.78c-2.3 0-4 1.7-4 4A3.5 3.5 0 0 0 10 22h7.5" />
+                {isSynced && <path d="M9 16l2 2 4-4" />}
+              </svg>
+            </div>
+          </div>
+          <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginTop: '4px' }}>
+            Local: {fw.local} | Data: {fw.dataInicio}
+            {totalArea > 0 && ` | Área Total: ${totalArea.toFixed(2)} ha`}
+          </p>
         </div>
         <button className="btn btn-secondary" style={{ width: 'auto', padding: '10px 20px' }} onClick={() => navigate('/')}>
           Voltar
@@ -204,12 +342,94 @@ export const FieldWorkDetail = () => {
 
       {/* Action bar and summary */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '28px 0 16px', flexWrap: 'wrap', gap: '16px' }}>
-        <h2 style={{ fontSize: '16px', fontWeight: '700', letterSpacing: '-0.02em' }}>Talhões ({fwTalhoes.length}) • Parcelas ({parcels.length})</h2>
-        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+        <div>
+          <h2 style={{ fontSize: '16px', fontWeight: '700', letterSpacing: '-0.02em', margin: 0 }}>Talhões ({fwTalhoes.length}) • Parcelas ({parcels.length})</h2>
+          {dateFilter && (
+            <span style={{ fontSize: '12px', color: 'var(--primary-hover)', fontWeight: 'bold', display: 'block', marginTop: '4px' }}>
+              Filtrado: {new Date(dateFilter + 'T12:00:00').toLocaleDateString('pt-BR')} ({filteredParcels.length} parcelas)
+            </span>
+          )}
+        </div>
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
+          {/* Date Filter Input */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.03)', padding: '4px 10px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.06)' }}>
+            <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: '800', textTransform: 'uppercase' }}>Filtrar Dia:</span>
+            <input 
+              type="date" 
+              className="input-field" 
+              style={{ marginBottom: 0, padding: '4px 8px', borderRadius: '6px', fontSize: '12px', width: 'auto', height: '30px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', color: '#fff' }} 
+              value={dateFilter} 
+              onChange={e => setDateFilter(e.target.value)} 
+            />
+            {dateFilter && (
+              <button 
+                type="button" 
+                className="btn btn-secondary" 
+                style={{ width: 'auto', padding: '2px 8px', fontSize: '10px', height: '24px', lineHeight: 1 }} 
+                onClick={() => setDateFilter('')}
+              >
+                Limpar
+              </button>
+            )}
+          </div>
           {parcels.length > 0 && (
-            <button className="btn btn-secondary" style={{ width: 'auto', padding: '10px 18px' }} onClick={handleExportAll}>
-               Exportar Projeto Completo
-            </button>
+            <>
+              <button className="btn btn-secondary" style={{ width: 'auto', padding: '10px 18px' }} onClick={handleExportAll}>
+                 Exportar Projeto Completo
+              </button>
+              <button 
+                type="button" 
+                className="btn btn-secondary" 
+                style={{ 
+                  width: 'auto', 
+                  padding: '10px 18px', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '8px', 
+                  borderColor: fw.googleSheetsUrl ? 'var(--primary-hover)' : 'rgba(255,255,255,0.1)' 
+                }} 
+                onClick={() => setShowSheetsModal(true)}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                  <line x1="3" y1="9" x2="21" y2="9"></line>
+                  <line x1="9" y1="21" x2="9" y2="9"></line>
+                </svg>
+                {fw.googleSheetsUrl ? "Planilha Vinculada" : "Vincular Planilha"}
+              </button>
+              {fw.googleSheetsUrl && (
+                <button 
+                  type="button" 
+                  className="btn btn-primary" 
+                  style={{ 
+                    width: 'auto', 
+                    padding: '10px 18px', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '8px', 
+                    background: 'linear-gradient(135deg, #00e676 0%, #00b0ff 100%)',
+                    border: 'none'
+                  }} 
+                  onClick={handleSyncGoogleSheets}
+                  disabled={isSyncingSheets}
+                >
+                  <svg 
+                    xmlns="http://www.w3.org/2000/svg" 
+                    width="16" height="16" 
+                    viewBox="0 0 24 24" 
+                    fill="none" 
+                    stroke="currentColor" 
+                    strokeWidth="2.5" 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round"
+                    className={isSyncingSheets ? "spin-icon" : ""}
+                  >
+                    <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+                  </svg>
+                  {isSyncingSheets ? "Enviando..." : "Sincronizar Planilha"}
+                </button>
+              )}
+            </>
           )}
           <button className="btn btn-primary" style={{ width: 'auto', padding: '10px 18px' }} onClick={() => setShowTalhaoModal(true)}>
             + Novo Talhão
@@ -259,8 +479,24 @@ export const FieldWorkDetail = () => {
                 {/* Talhao Header Block */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
                   <div>
-                    <h3 style={{ color: '#ffffff', fontSize: '18px', fontWeight: '800' }}>{talhao.nome}</h3>
-                    <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{talhaoParcels.length} parcelas cadastradas</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <h3 style={{ color: '#ffffff', fontSize: '18px', fontWeight: '800', margin: 0 }}>{talhao.nome}</h3>
+                      {talhao.area !== undefined && (
+                        <span style={{ 
+                          background: 'rgba(0, 230, 118, 0.12)', 
+                          border: '1px solid rgba(0, 230, 118, 0.35)', 
+                          borderRadius: '8px', 
+                          padding: '3px 8px', 
+                          fontSize: '11px', 
+                          fontWeight: '800',
+                          color: '#00e676',
+                          display: 'inline-block'
+                        }}>
+                          {talhao.area.toFixed(2)} ha
+                        </span>
+                      )}
+                    </div>
+                    <span style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginTop: '4px' }}>{talhaoParcels.length} parcelas cadastradas</span>
                     {talhao.observacoes && (
                       <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: '6px 0 0 0', fontStyle: 'italic', wordBreak: 'break-all' }}>
                         Obs: {talhao.observacoes}
@@ -365,7 +601,7 @@ export const FieldWorkDetail = () => {
            <div className="glass-card" style={{ width: '100%', maxWidth: '400px', marginBottom: 0 }}>
               <h3 style={{ color: 'var(--primary-hover)', fontSize: '20px', fontWeight: '800' }}>Novo Talhão</h3>
               <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginTop: '6px' }}>
-                Defina o nome do talhão para organizar as parcelas de amostragem florestal.
+                Defina o nome, área e observações do talhão para organizar as parcelas.
               </p>
               <input 
                 className="input-field" 
@@ -373,6 +609,15 @@ export const FieldWorkDetail = () => {
                 value={newTalhaoName} 
                 onChange={e => setNewTalhaoName(e.target.value)} 
                 style={{ marginTop: '20px' }} 
+              />
+              <input 
+                type="number"
+                step="0.01"
+                className="input-field" 
+                placeholder="Área em Hectares (Ex: 10.5)" 
+                value={newTalhaoArea} 
+                onChange={e => setNewTalhaoArea(e.target.value)} 
+                style={{ marginTop: '8px' }} 
               />
               <textarea 
                 className="input-field" 
@@ -382,7 +627,7 @@ export const FieldWorkDetail = () => {
                 style={{ marginTop: '8px', minHeight: '80px', fontFamily: 'inherit' }} 
               />
               <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
-                <button className="btn btn-secondary" onClick={() => { setShowTalhaoModal(false); setNewTalhaoName(''); setNewTalhaoObs(''); }}>Cancelar</button>
+                <button className="btn btn-secondary" onClick={() => { setShowTalhaoModal(false); setNewTalhaoName(''); setNewTalhaoArea(''); setNewTalhaoObs(''); }}>Cancelar</button>
                 <button className="btn btn-primary" onClick={handleCreateTalhao}>Criar</button>
               </div>
            </div>
@@ -395,7 +640,7 @@ export const FieldWorkDetail = () => {
            <div className="glass-card" style={{ width: '100%', maxWidth: '400px', marginBottom: 0 }}>
               <h3 style={{ color: 'var(--primary-hover)', fontSize: '20px', fontWeight: '800' }}>Editar Talhão</h3>
               <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginTop: '6px' }}>
-                Edite o nome ou observações do talhão.
+                Edite o nome, área ou observações do talhão.
               </p>
               <input 
                 className="input-field" 
@@ -403,6 +648,15 @@ export const FieldWorkDetail = () => {
                 value={editTalhaoName} 
                 onChange={e => setEditTalhaoName(e.target.value)} 
                 style={{ marginTop: '20px' }} 
+              />
+              <input 
+                type="number"
+                step="0.01"
+                className="input-field" 
+                placeholder="Área em Hectares (Ex: 10.5)" 
+                value={editTalhaoArea} 
+                onChange={e => setEditTalhaoArea(e.target.value)} 
+                style={{ marginTop: '8px' }} 
               />
               <textarea 
                 className="input-field" 
@@ -412,7 +666,7 @@ export const FieldWorkDetail = () => {
                 style={{ marginTop: '8px', minHeight: '80px', fontFamily: 'inherit' }} 
               />
               <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
-                <button className="btn btn-secondary" onClick={() => { setEditingTalhao(null); setEditTalhaoName(''); setEditTalhaoObs(''); }}>Cancelar</button>
+                <button className="btn btn-secondary" onClick={() => { setEditingTalhao(null); setEditTalhaoName(''); setEditTalhaoArea(''); setEditTalhaoObs(''); }}>Cancelar</button>
                 <button className="btn btn-primary" onClick={handleSaveTalhaoEdit}>Salvar</button>
               </div>
            </div>
@@ -426,6 +680,147 @@ export const FieldWorkDetail = () => {
           inventories={parcels.filter(p => p.talhaoId === talhaoDashboardId)} 
           onClose={() => setTalhaoDashboardId(null)} 
         />
+      )}
+
+      {/* Google Sheets Integration Modal */}
+      {showSheetsModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100000, padding: '20px', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
+          <div className="glass-card" style={{ width: '100%', maxWidth: '550px', margin: 0, maxHeight: '90vh', overflowY: 'auto', padding: '24px' }}>
+            <h3 style={{ margin: 0, fontSize: '18px', color: 'var(--primary-hover)', fontWeight: '800' }}>Vincular Google Planilhas</h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: '12.5px', marginTop: '6px', marginBottom: '16px', lineHeight: '1.4' }}>
+              Vincule este Trabalho de Campo a uma planilha do Google Sheets para enviar seus dados estruturados com um clique.
+            </p>
+            
+            <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)', fontSize: '12.5px', color: '#e0e0e0', marginBottom: '16px' }}>
+              <strong style={{ color: '#fff', display: 'block', marginBottom: '8px' }}>Instruções de Configuração:</strong>
+              <ol style={{ paddingLeft: '20px', margin: 0, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <li>Crie uma nova planilha vazia no Google Planilhas (<a href="https://sheets.new" target="_blank" rel="noreferrer" style={{ color: 'var(--primary-hover)', textDecoration: 'underline' }}>sheets.new</a>).</li>
+                <li>No menu superior, acesse <strong>Extensões</strong> &gt; <strong>Apps Script</strong>.</li>
+                <li>Apague todo o código existente na janela e cole o script abaixo.</li>
+                <li>Clique no ícone de salvar (disquete) e depois clique em <strong>Implantar</strong> &gt; <strong>Nova implantação</strong>.</li>
+                <li>Clique na engrenagem de "Tipo", escolha <strong>App da Web</strong>. Em "Quem pode acessar", mude para <strong>Qualquer pessoa</strong>.</li>
+                <li>Clique em Implantar, conceda as permissões se solicitado, copie a <strong>URL do App da Web</strong> gerada e cole no campo de texto abaixo.</li>
+              </ol>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
+              <label style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Código do Google Apps Script:</label>
+              <textarea 
+                readOnly 
+                className="input-field" 
+                style={{ height: '140px', fontFamily: 'monospace', fontSize: '11px', background: 'rgba(0,0,0,0.5)', color: '#81c784', padding: '10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)', cursor: 'text' }} 
+                value={`function doPost(e) {
+  try {
+    var data = JSON.parse(e.postData.contents);
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+    sheet.clear();
+    
+    if (data.headers && data.headers.length > 0) {
+      sheet.appendRow(data.headers);
+    }
+    
+    if (data.rows && data.rows.length > 0) {
+      var range = sheet.getRange(2, 1, data.rows.length, data.headers.length);
+      var values = data.rows.map(function(row) {
+        return data.headers.map(function(header) {
+          return row[header] !== undefined ? row[header] : "";
+        });
+      });
+      range.setValues(values);
+    }
+    
+    return ContentService.createTextOutput(JSON.stringify({ status: "success", message: "Dados sincronizados com sucesso! Total: " + (data.rows ? data.rows.length : 0) + " linhas." }))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch (error) {
+    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: error.toString() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}`}
+              />
+              <button 
+                type="button" 
+                className="btn btn-secondary" 
+                style={{ width: 'auto', padding: '6px 12px', fontSize: '11px', alignSelf: 'flex-start' }}
+                onClick={() => {
+                  navigator.clipboard.writeText(`function doPost(e) {
+  try {
+    var data = JSON.parse(e.postData.contents);
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+    sheet.clear();
+    
+    if (data.headers && data.headers.length > 0) {
+      sheet.appendRow(data.headers);
+    }
+    
+    if (data.rows && data.rows.length > 0) {
+      var range = sheet.getRange(2, 1, data.rows.length, data.headers.length);
+      var values = data.rows.map(function(row) {
+        return data.headers.map(function(header) {
+          return row[header] !== undefined ? row[header] : "";
+        });
+      });
+      range.setValues(values);
+    }
+    
+    return ContentService.createTextOutput(JSON.stringify({ status: "success", message: "Dados sincronizados com sucesso! Total: " + (data.rows ? data.rows.length : 0) + " linhas." }))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch (error) {
+    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: error.toString() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}`);
+                  alert("Código copiado para a área de transferência!");
+                }}
+              >
+                Copiar Script
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '20px' }}>
+              <label style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>URL do App da Web:</label>
+              <input 
+                type="url" 
+                className="input-field" 
+                placeholder="https://script.google.com/macros/s/.../exec" 
+                value={googleSheetsUrlInput} 
+                onChange={e => setGoogleSheetsUrlInput(e.target.value)} 
+                style={{ marginBottom: 0 }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <button 
+                className="btn btn-secondary" 
+                style={{ width: 'auto' }}
+                onClick={() => {
+                  setShowSheetsModal(false);
+                }}
+              >
+                Cancelar
+              </button>
+              <button 
+                className="btn btn-primary" 
+                style={{ width: 'auto' }}
+                onClick={async () => {
+                  if (googleSheetsUrlInput.trim() && !googleSheetsUrlInput.startsWith('https://script.google.com')) {
+                    return alert('Por favor, insira uma URL válida do Google Apps Script.');
+                  }
+                  
+                  // Save to Firebase
+                  await createFieldWork({
+                    ...fw,
+                    googleSheetsUrl: googleSheetsUrlInput.trim() || undefined
+                  });
+
+                  alert('Configurações de sincronização salvas com sucesso!');
+                  setShowSheetsModal(false);
+                }}
+              >
+                Salvar Configurações
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
