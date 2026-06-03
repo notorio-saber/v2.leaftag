@@ -55,6 +55,12 @@ export const FieldWorkDetail = () => {
   const fwTalhoes = talhoes.filter(t => t.fieldWorkId === id);
   const parcels = inventories.filter(i => i.fieldWorkId === id);
 
+  // Helper variables for button layout responsiveness
+  const showExportAndSheets = parcels.length > 0;
+  const hasSheetsUrl = !!fw.googleSheetsUrl;
+  const totalProjectButtons = 2 + (showExportAndSheets ? (hasSheetsUrl ? 3 : 2) : 0);
+  const isProjectOdd = totalProjectButtons % 2 !== 0;
+
   // Group strata for this fieldwork
   const fwStrata = strata.filter(s => s.fieldWorkId === id);
 
@@ -362,100 +368,90 @@ export const FieldWorkDetail = () => {
         </button>
       </div>
 
-      {/* Action bar and summary */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '28px 0 16px', flexWrap: 'wrap', gap: '16px' }}>
-        <div>
-          <h2 style={{ fontSize: '16px', fontWeight: '700', letterSpacing: '-0.02em', margin: 0 }}>Talhões ({fwTalhoes.length}) • Parcelas ({parcels.length})</h2>
-          {isFilterActive && (
-            <span style={{ fontSize: '12px', color: 'var(--primary-hover)', fontWeight: 'bold', display: 'block', marginTop: '4px' }}>
-              Filtro Ativo ({filteredParcels.length} parcelas encontradas)
-            </span>
-          )}
-        </div>
-        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
-          {/* Filter Button */}
-          <button 
-            type="button" 
-            className="btn btn-secondary" 
-            style={{ 
-              width: 'auto', 
-              padding: '10px 18px', 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '8px', 
-              borderColor: isFilterActive ? 'var(--primary-hover)' : 'rgba(255,255,255,0.1)',
-              background: isFilterActive ? 'rgba(76, 175, 80, 0.05)' : 'transparent'
-            }} 
-            onClick={() => setShowFilterPanel(!showFilterPanel)}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
-            </svg>
-            Filtrar {isFilterActive && "•"}
-          </button>
-          {parcels.length > 0 && (
-            <>
-              <button className="btn btn-secondary" style={{ width: 'auto', padding: '10px 18px' }} onClick={handleExportAll}>
-                 Exportar Projeto Completo
-              </button>
+      {/* Title / Summary */}
+      <div style={{ margin: '28px 0 16px' }}>
+        <h2 style={{ fontSize: '16px', fontWeight: '700', letterSpacing: '-0.02em', margin: 0 }}>
+          Talhões ({fwTalhoes.length}) • Parcelas ({parcels.length})
+        </h2>
+        {isFilterActive && (
+          <span style={{ fontSize: '12px', color: 'var(--primary-hover)', fontWeight: 'bold', display: 'block', marginTop: '4px' }}>
+            Filtro Ativo ({filteredParcels.length} parcelas encontradas)
+          </span>
+        )}
+      </div>
+
+      {/* Grid containing action buttons */}
+      <div className="dashboard-actions-grid">
+        {/* Filter Button */}
+        <button 
+          type="button" 
+          className="btn btn-secondary" 
+          style={{ 
+            borderColor: isFilterActive ? 'var(--primary-hover)' : 'rgba(255,255,255,0.1)',
+            background: isFilterActive ? 'rgba(76, 175, 80, 0.05)' : 'transparent',
+          }} 
+          onClick={() => setShowFilterPanel(!showFilterPanel)}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+          </svg>
+          Filtrar {isFilterActive && "•"}
+        </button>
+        {showExportAndSheets && (
+          <>
+            <button className="btn btn-secondary" onClick={handleExportAll}>
+               Exportar
+            </button>
+            <button 
+              type="button" 
+              className="btn btn-secondary" 
+              style={{ 
+                borderColor: hasSheetsUrl ? 'var(--primary-hover)' : 'rgba(255,255,255,0.1)',
+              }} 
+              onClick={() => setShowSheetsModal(true)}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                <line x1="3" y1="9" x2="21" y2="9"></line>
+                <line x1="9" y1="21" x2="9" y2="9"></line>
+              </svg>
+              {hasSheetsUrl ? "Planilha" : "Vincular"}
+            </button>
+            {hasSheetsUrl && (
               <button 
                 type="button" 
-                className="btn btn-secondary" 
+                className="btn btn-primary" 
                 style={{ 
-                  width: 'auto', 
-                  padding: '10px 18px', 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: '8px', 
-                  borderColor: fw.googleSheetsUrl ? 'var(--primary-hover)' : 'rgba(255,255,255,0.1)' 
+                  background: 'linear-gradient(135deg, #00e676 0%, #00b0ff 100%)',
+                  border: 'none',
                 }} 
-                onClick={() => setShowSheetsModal(true)}
+                onClick={handleSyncGoogleSheets}
+                disabled={isSyncingSheets}
               >
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                  <line x1="3" y1="9" x2="21" y2="9"></line>
-                  <line x1="9" y1="21" x2="9" y2="9"></line>
-                </svg>
-                {fw.googleSheetsUrl ? "Planilha Vinculada" : "Vincular Planilha"}
-              </button>
-              {fw.googleSheetsUrl && (
-                <button 
-                  type="button" 
-                  className="btn btn-primary" 
-                  style={{ 
-                    width: 'auto', 
-                    padding: '10px 18px', 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    gap: '8px', 
-                    background: 'linear-gradient(135deg, #00e676 0%, #00b0ff 100%)',
-                    border: 'none'
-                  }} 
-                  onClick={handleSyncGoogleSheets}
-                  disabled={isSyncingSheets}
+                <svg 
+                  xmlns="http://www.w3.org/2000/svg" 
+                  width="14" height="14" 
+                  viewBox="0 0 24 24" 
+                  fill="none" 
+                  stroke="currentColor" 
+                  strokeWidth="2.5" 
+                  strokeLinecap="round" 
+                  strokeLinejoin="round"
+                  className={isSyncingSheets ? "spin-icon" : ""}
                 >
-                  <svg 
-                    xmlns="http://www.w3.org/2000/svg" 
-                    width="16" height="16" 
-                    viewBox="0 0 24 24" 
-                    fill="none" 
-                    stroke="currentColor" 
-                    strokeWidth="2.5" 
-                    strokeLinecap="round" 
-                    strokeLinejoin="round"
-                    className={isSyncingSheets ? "spin-icon" : ""}
-                  >
-                    <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
-                  </svg>
-                  {isSyncingSheets ? "Enviando..." : "Sincronizar Planilha"}
-                </button>
-              )}
-            </>
-          )}
-          <button className="btn btn-primary" style={{ width: 'auto', padding: '10px 18px' }} onClick={() => setShowTalhaoModal(true)}>
-            + Novo Talhão
-          </button>
-        </div>
+                  <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+                </svg>
+                {isSyncingSheets ? "Enviando..." : "Sincronizar"}
+              </button>
+            )}
+          </>
+        )}
+        <button 
+          className={`btn btn-primary ${isProjectOdd ? 'btn-span-2' : ''}`} 
+          onClick={() => setShowTalhaoModal(true)}
+        >
+          + Novo Talhão
+        </button>
       </div>
 
       {/* Expanded Filter Panel */}
@@ -638,42 +634,40 @@ export const FieldWorkDetail = () => {
                       </p>
                     )}
                   </div>
-                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                  <div className="talhao-actions-grid">
                     <button 
-                      className="btn btn-secondary" 
-                      style={{ width: 'auto', padding: '6px 12px', fontSize: '10.5px' }}
+                      className="btn btn-secondary btn-span-2" 
                       onClick={() => navigate(`/setup/${fw.id}/${talhao.id}`)}
                     >
-                      + Nova Parcela
+                      + Parcela
                     </button>
                     {talhaoParcels.length > 0 && (
                       <>
                         <button 
                           className="btn btn-secondary" 
-                          style={{ width: 'auto', padding: '6px 12px', fontSize: '10.5px', borderColor: '#2e7d32', color: '#a5d6a7', background: 'rgba(46, 125, 50, 0.08)' }}
+                          style={{ borderColor: '#2e7d32', color: '#a5d6a7', background: 'rgba(46, 125, 50, 0.08)' }}
                           onClick={() => setTalhaoDashboardId(talhao.id)}
                         >
                           Dashboard
                         </button>
                         <button 
                           className="btn btn-secondary" 
-                          style={{ width: 'auto', padding: '6px 12px', fontSize: '10.5px', borderColor: '#00838f', color: '#80deea', background: 'rgba(0, 131, 143, 0.08)' }}
+                          style={{ borderColor: '#00838f', color: '#80deea', background: 'rgba(0, 131, 143, 0.08)' }}
                           onClick={() => handleExportTalhao(talhao.id, talhao.nome)}
                         >
-                          Exportar Excel
+                          Excel
                         </button>
                       </>
                     )}
                     <button 
                       className="btn btn-secondary" 
-                      style={{ width: 'auto', padding: '6px 12px', fontSize: '10.5px', borderColor: 'var(--primary-hover)', color: 'var(--primary-hover)' }}
+                      style={{ borderColor: 'var(--primary-hover)', color: 'var(--primary-hover)' }}
                       onClick={() => handleEditTalhao(talhao)}
                     >
                       Editar
                     </button>
                     <button 
                       className="btn btn-danger" 
-                      style={{ width: 'auto', padding: '6px 12px', fontSize: '10.5px' }}
                       onClick={() => handleDeleteTalhao(talhao.id, talhao.nome)}
                     >
                       Excluir

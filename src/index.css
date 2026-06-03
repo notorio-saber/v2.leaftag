@@ -402,3 +402,53 @@ body.light-theme option {
   background-color: var(--bg-color) !important;
   color: var(--text-main) !important;
 }
+
+/* Dashboard Action Grid Toolbar */
+.dashboard-actions-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  width: 100%;
+  margin-bottom: 20px;
+}
+
+.dashboard-actions-grid .btn {
+  padding: 10px 12px !important;
+  font-size: 10px !important;
+  height: 40px !important;
+}
+
+.btn-span-2 {
+  grid-column: span 2;
+}
+
+/* Talhao Card Action Grid */
+.talhao-actions-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+  width: 100%;
+  margin-top: 10px;
+}
+
+.talhao-actions-grid .btn {
+  padding: 8px 6px !important;
+  font-size: 9.5px !important;
+  height: 34px !important;
+}
+
+@media (min-width: 768px) {
+  .dashboard-actions-grid {
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)) !important;
+  }
+  .btn-span-2 {
+    grid-column: span 1 !important;
+  }
+  .talhao-actions-grid {
+    grid-template-columns: repeat(auto-fit, minmax(95px, 1fr)) !important;
+    flex: 1 1 300px;
+    width: auto;
+    margin-top: 0;
+  }
+}
+
