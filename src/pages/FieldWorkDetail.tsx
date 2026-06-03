@@ -18,7 +18,11 @@ export const FieldWorkDetail = () => {
   const [newTalhaoName, setNewTalhaoName] = useState('');
   const [newTalhaoArea, setNewTalhaoArea] = useState('');
   const [newTalhaoObs, setNewTalhaoObs] = useState('');
+  const [showFilterPanel, setShowFilterPanel] = useState(false);
   const [dateFilter, setDateFilter] = useState('');
+  const [talhaoFilter, setTalhaoFilter] = useState('');
+  const [stratumFilter, setStratumFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
 
   const [editingTalhao, setEditingTalhao] = useState<any>(null);
   const [editTalhaoName, setEditTalhaoName] = useState('');
@@ -51,20 +55,43 @@ export const FieldWorkDetail = () => {
   const fwTalhoes = talhoes.filter(t => t.fieldWorkId === id);
   const parcels = inventories.filter(i => i.fieldWorkId === id);
 
-  const filteredParcels = dateFilter
-    ? parcels.filter(p => {
-        const formattedFilter = new Date(dateFilter + 'T12:00:00').toLocaleDateString('pt-BR');
-        return p.dataInicio === formattedFilter || p.ultimaColeta === formattedFilter;
-      })
-    : parcels;
+  // Group strata for this fieldwork
+  const fwStrata = strata.filter(s => s.fieldWorkId === id);
 
-  // Group parcels by talhaoId
+  const filteredParcels = parcels.filter(p => {
+    if (dateFilter) {
+      const formattedFilter = new Date(dateFilter + 'T12:00:00').toLocaleDateString('pt-BR');
+      if (p.dataInicio !== formattedFilter && p.ultimaColeta !== formattedFilter) return false;
+    }
+    if (talhaoFilter) {
+      if (talhaoFilter === 'sem-talhao') {
+        if (p.talhaoId) return false;
+      } else if (p.talhaoId !== talhaoFilter) {
+        return false;
+      }
+    }
+    if (stratumFilter && p.stratumId !== stratumFilter) return false;
+    if (statusFilter && p.status !== statusFilter) return false;
+    return true;
+  });
+
+  const isFilterActive = dateFilter || talhaoFilter || stratumFilter || statusFilter;
+
+  // List all talhões that match the talhaoFilter or contain filtered parcels
+  const filteredTalhoesList = talhaoFilter
+    ? fwTalhoes.filter(t => t.id === talhaoFilter)
+    : fwTalhoes.filter(t => {
+        if (dateFilter || stratumFilter || statusFilter) {
+          return filteredParcels.some(p => p.talhaoId === t.id);
+        }
+        return true;
+      });
+
   // Group parcels by talhaoId
   const parcelsByTalhao = filteredParcels.filter(p => p.talhaoId);
   const legacyParcels = filteredParcels.filter(p => !p.talhaoId);
 
   // Calculate total area (ha)
-  const fwStrata = strata.filter(s => s.fieldWorkId === id);
   const totalStrataArea = fwStrata.reduce((acc, s) => acc + (s.area || 0), 0);
   const totalTalhaoArea = fwTalhoes.reduce((acc, t) => acc + (t.area || 0), 0);
   const totalArea = totalStrataArea > 0 ? totalStrataArea : totalTalhaoArea;
@@ -302,11 +329,6 @@ export const FieldWorkDetail = () => {
                 display: 'inline-flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                width: '28px',
-                height: '28px',
-                borderRadius: '50%',
-                background: isSynced ? 'rgba(76, 175, 80, 0.08)' : 'rgba(255, 152, 0, 0.08)',
-                border: isSynced ? '1px solid rgba(76, 175, 80, 0.25)' : '1px solid rgba(255, 152, 0, 0.25)',
                 color: isSynced ? '#81c784' : '#ffb74d',
                 transition: 'all 0.3s ease',
                 cursor: 'default'
@@ -344,34 +366,33 @@ export const FieldWorkDetail = () => {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '28px 0 16px', flexWrap: 'wrap', gap: '16px' }}>
         <div>
           <h2 style={{ fontSize: '16px', fontWeight: '700', letterSpacing: '-0.02em', margin: 0 }}>Talhões ({fwTalhoes.length}) • Parcelas ({parcels.length})</h2>
-          {dateFilter && (
+          {isFilterActive && (
             <span style={{ fontSize: '12px', color: 'var(--primary-hover)', fontWeight: 'bold', display: 'block', marginTop: '4px' }}>
-              Filtrado: {new Date(dateFilter + 'T12:00:00').toLocaleDateString('pt-BR')} ({filteredParcels.length} parcelas)
+              Filtro Ativo ({filteredParcels.length} parcelas encontradas)
             </span>
           )}
         </div>
         <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
-          {/* Date Filter Input */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.03)', padding: '4px 10px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.06)' }}>
-            <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: '800', textTransform: 'uppercase' }}>Filtrar Dia:</span>
-            <input 
-              type="date" 
-              className="input-field" 
-              style={{ marginBottom: 0, padding: '4px 8px', borderRadius: '6px', fontSize: '12px', width: 'auto', height: '30px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', color: '#fff' }} 
-              value={dateFilter} 
-              onChange={e => setDateFilter(e.target.value)} 
-            />
-            {dateFilter && (
-              <button 
-                type="button" 
-                className="btn btn-secondary" 
-                style={{ width: 'auto', padding: '2px 8px', fontSize: '10px', height: '24px', lineHeight: 1 }} 
-                onClick={() => setDateFilter('')}
-              >
-                Limpar
-              </button>
-            )}
-          </div>
+          {/* Filter Button */}
+          <button 
+            type="button" 
+            className="btn btn-secondary" 
+            style={{ 
+              width: 'auto', 
+              padding: '10px 18px', 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '8px', 
+              borderColor: isFilterActive ? 'var(--primary-hover)' : 'rgba(255,255,255,0.1)',
+              background: isFilterActive ? 'rgba(76, 175, 80, 0.05)' : 'transparent'
+            }} 
+            onClick={() => setShowFilterPanel(!showFilterPanel)}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+            </svg>
+            Filtrar {isFilterActive && "•"}
+          </button>
           {parcels.length > 0 && (
             <>
               <button className="btn btn-secondary" style={{ width: 'auto', padding: '10px 18px' }} onClick={handleExportAll}>
@@ -436,6 +457,103 @@ export const FieldWorkDetail = () => {
           </button>
         </div>
       </div>
+
+      {/* Expanded Filter Panel */}
+      {showFilterPanel && (
+        <div className="glass-card" style={{
+          marginTop: '12px',
+          marginBottom: '20px',
+          padding: '20px',
+          background: 'rgba(255, 255, 255, 0.02)',
+          border: '1px solid rgba(255, 255, 255, 0.05)',
+          borderRadius: '16px',
+          width: '100%'
+        }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px' }}>
+            
+            {/* Date Filter */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <label style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Data de Coleta</label>
+              <input 
+                type="date" 
+                className="input-field" 
+                style={{ marginBottom: 0, padding: '8px 12px', height: '38px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', color: '#fff' }} 
+                value={dateFilter} 
+                onChange={e => setDateFilter(e.target.value)} 
+              />
+            </div>
+
+            {/* Talhao Filter */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <label style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Talhão</label>
+              <select 
+                className="input-field" 
+                style={{ marginBottom: 0, padding: '8px 12px', height: '38px', borderRadius: '10px', background: 'rgba(0,0,0,0.3)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }} 
+                value={talhaoFilter} 
+                onChange={e => setTalhaoFilter(e.target.value)}
+              >
+                <option value="">-- Todos --</option>
+                <option value="sem-talhao">Sem Talhão</option>
+                {fwTalhoes.map(t => (
+                  <option key={t.id} value={t.id}>{t.nome}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Stratum Filter */}
+            {fwStrata.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Estrato</label>
+                <select 
+                  className="input-field" 
+                  style={{ marginBottom: 0, padding: '8px 12px', height: '38px', borderRadius: '10px', background: 'rgba(0,0,0,0.3)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }} 
+                  value={stratumFilter} 
+                  onChange={e => setStratumFilter(e.target.value)}
+                >
+                  <option value="">-- Todos --</option>
+                  {fwStrata.map(s => (
+                    <option key={s.id} value={s.id}>{s.nome}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Status Filter */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <label style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Status</label>
+              <select 
+                className="input-field" 
+                style={{ marginBottom: 0, padding: '8px 12px', height: '38px', borderRadius: '10px', background: 'rgba(0,0,0,0.3)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }} 
+                value={statusFilter} 
+                onChange={e => setStatusFilter(e.target.value)}
+              >
+                <option value="">-- Todos --</option>
+                <option value="Aberto">Aberto</option>
+                <option value="Em Andamento">Em Andamento</option>
+                <option value="Concluído">Concluído</option>
+              </select>
+            </div>
+
+          </div>
+
+          {isFilterActive && (
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '16px' }}>
+              <button 
+                className="btn btn-secondary" 
+                style={{ width: 'auto', padding: '6px 16px', fontSize: '12px' }}
+                onClick={() => {
+                  setDateFilter('');
+                  setTalhaoFilter('');
+                  setStratumFilter('');
+                  setStatusFilter('');
+                }}
+              >
+                Limpar Filtros
+              </button>
+            </div>
+          )}
+        </div>
+      )}
       
       {/* GIS and Dashboard shortcuts */}
       {parcels.length > 0 && (
@@ -450,18 +568,35 @@ export const FieldWorkDetail = () => {
       )}
 
       {/* Main Talhões hierarchical layout */}
-      {fwTalhoes.length === 0 && legacyParcels.length === 0 ? (
+      {filteredTalhoesList.length === 0 && legacyParcels.length === 0 ? (
         <div className="glass-card" style={{ textAlign: 'center', padding: '48px 32px' }}>
-          <h3 style={{ color: 'var(--text-muted)', marginBottom: '8px' }}>Nenhum talhão criado</h3>
-          <p style={{ color: '#888', fontSize: '14px', marginBottom: '24px' }}>Comece adicionando seu primeiro talhão de manejo!</p>
-          <button className="btn btn-primary" style={{ maxWidth: '240px', margin: '0 auto' }} onClick={() => setShowTalhaoModal(true)}>
-            Criar Primeiro Talhão
-          </button>
+          {isFilterActive ? (
+            <>
+              <h3 style={{ color: 'var(--text-muted)', marginBottom: '8px' }}>Nenhum resultado</h3>
+              <p style={{ color: '#888', fontSize: '14px', marginBottom: '24px' }}>Nenhum talhão ou parcela corresponde aos filtros ativos.</p>
+              <button className="btn btn-secondary" style={{ maxWidth: '240px', margin: '0 auto' }} onClick={() => {
+                setDateFilter('');
+                setTalhaoFilter('');
+                setStratumFilter('');
+                setStatusFilter('');
+              }}>
+                Limpar Filtros
+              </button>
+            </>
+          ) : (
+            <>
+              <h3 style={{ color: 'var(--text-muted)', marginBottom: '8px' }}>Nenhum talhão criado</h3>
+              <p style={{ color: '#888', fontSize: '14px', marginBottom: '24px' }}>Comece adicionando seu primeiro talhão de manejo!</p>
+              <button className="btn btn-primary" style={{ maxWidth: '240px', margin: '0 auto' }} onClick={() => setShowTalhaoModal(true)}>
+                Criar Primeiro Talhão
+              </button>
+            </>
+          )}
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
           {/* List all talhões */}
-          {fwTalhoes.map(talhao => {
+          {filteredTalhoesList.map(talhao => {
             const talhaoParcels = parcelsByTalhao.filter(p => p.talhaoId === talhao.id);
             return (
               <div 

@@ -23,6 +23,24 @@ interface InventoryContextType {
   isSynced: boolean;
 }
 
+const cleanObject = (obj: any): any => {
+  if (obj === null || obj === undefined) return obj;
+  if (Array.isArray(obj)) {
+    return obj.map(item => typeof item === 'object' ? cleanObject(item) : item);
+  }
+  if (typeof obj === 'object') {
+    const cleaned: any = {};
+    Object.keys(obj).forEach(key => {
+      const val = obj[key];
+      if (val !== undefined) {
+        cleaned[key] = typeof val === 'object' ? cleanObject(val) : val;
+      }
+    });
+    return cleaned;
+  }
+  return obj;
+};
+
 const InventoryContext = createContext<InventoryContextType | undefined>(undefined);
 
 export const InventoryProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
@@ -125,7 +143,7 @@ export const InventoryProvider: React.FC<{ children: ReactNode }> = ({ children 
   const saveInventory = async (newInv: Inventory) => {
     if (!currentUser || !uidToUse) return;
     const docRef = doc(db, `users/${uidToUse}/inventories`, newInv.id.toString());
-    await setDoc(docRef, newInv);
+    await setDoc(docRef, cleanObject(newInv));
   };
 
   const deleteInventory = async (id: number) => {
@@ -141,7 +159,7 @@ export const InventoryProvider: React.FC<{ children: ReactNode }> = ({ children 
   const createFieldWork = async (fw: FieldWork) => {
     if (!currentUser || !uidToUse) return;
     const docRef = doc(db, `users/${uidToUse}/fieldWorks`, fw.id);
-    await setDoc(docRef, fw);
+    await setDoc(docRef, cleanObject(fw));
   };
 
   const deleteFieldWork = async (id: string) => {
@@ -175,7 +193,7 @@ export const InventoryProvider: React.FC<{ children: ReactNode }> = ({ children 
   const createTalhao = async (t: Talhao) => {
     if (!currentUser || !uidToUse) return;
     const docRef = doc(db, `users/${uidToUse}/talhoes`, t.id);
-    await setDoc(docRef, t);
+    await setDoc(docRef, cleanObject(t));
   };
 
   const deleteTalhao = async (id: string) => {
@@ -197,7 +215,7 @@ export const InventoryProvider: React.FC<{ children: ReactNode }> = ({ children 
   const createStratum = async (s: Stratum) => {
     if (!currentUser || !uidToUse) return;
     const docRef = doc(db, `users/${uidToUse}/strata`, s.id);
-    await setDoc(docRef, s);
+    await setDoc(docRef, cleanObject(s));
   };
 
   const deleteStratum = async (id: string) => {

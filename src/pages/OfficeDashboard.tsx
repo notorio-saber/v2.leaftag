@@ -4,6 +4,8 @@ import { useInventory } from '../context/InventoryContext';
 import { useAuth } from '../context/AuthContext';
 import * as XLSX from 'xlsx';
 import { StatisticalDashboard } from '../components/StatisticalDashboard';
+import { db } from '../lib/firebase';
+import { doc, getDoc, updateDoc, setDoc, deleteDoc } from 'firebase/firestore';
 import { 
   calculateShannonIndex, 
   calculateSimpsonIndex, 
@@ -15,7 +17,88 @@ import {
 export const OfficeDashboard = () => {
   const navigate = useNavigate();
   const { fieldWorks, talhoes, inventories, strata, createStratum, deleteStratum, saveInventory, isSynced, createTalhao, deleteTalhao, createFieldWork } = useInventory();
-  const { currentUser, signOut } = useAuth();
+  const { currentUser, signOut, status, uidToUse, theme, toggleTheme } = useAuth();
+
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [showTeamModal, setShowTeamModal] = useState(false);
+  const [collaborators, setCollaborators] = useState<string[]>([]);
+  const [newEmail, setNewEmail] = useState('');
+  const [isTeamLoading, setIsTeamLoading] = useState(false);
+  const isOwner = currentUser && currentUser.uid === uidToUse && (status === 'active' || status === 'admin');
+
+  useEffect(() => {
+    if (!currentUser || (status !== 'active' && status !== 'admin')) return;
+    if (currentUser.uid !== uidToUse) return;
+
+    const loadCollaborators = async () => {
+      try {
+        const docRef = doc(db, 'users', currentUser.uid);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          setCollaborators(docSnap.data().collaborators || []);
+        }
+      } catch (e) {
+        console.error("Erro ao carregar colaboradores:", e);
+      }
+    };
+    loadCollaborators();
+  }, [currentUser, showTeamModal, uidToUse, status]);
+
+  const handleAddCollaborator = async () => {
+    if (!currentUser) return;
+    const emailToTrim = newEmail.trim().toLowerCase();
+    if (!emailToTrim) return alert("Digite um e-mail válido.");
+    
+    if (collaborators.includes(emailToTrim)) {
+      return alert("Este e-mail já faz parte do seu time.");
+    }
+    
+    if (status !== 'admin' && collaborators.length >= 2) {
+      return alert("Você atingiu o limite máximo de 2 colaboradores no seu time.");
+    }
+
+    setIsTeamLoading(true);
+    const updatedCollaborators = [...collaborators, emailToTrim];
+    try {
+      const docRef = doc(db, 'users', currentUser.uid);
+      await updateDoc(docRef, { collaborators: updatedCollaborators });
+      
+      // Salva mapeamento para login robusto
+      await setDoc(doc(db, 'collaborators_mapping', emailToTrim), { ownerUid: currentUser.uid });
+
+      setCollaborators(updatedCollaborators);
+      setNewEmail('');
+      alert("Colaborador adicionado com sucesso!");
+    } catch (e) {
+      console.error(e);
+      alert("Erro ao adicionar colaborador. Tente novamente.");
+    } finally {
+      setIsTeamLoading(false);
+    }
+  };
+
+  const handleRemoveCollaborator = async (emailToRemove: string) => {
+    if (!currentUser) return;
+    if (!confirm(`Deseja realmente remover o e-mail ${emailToRemove} do seu time?`)) return;
+
+    setIsTeamLoading(true);
+    const updatedCollaborators = collaborators.filter(email => email !== emailToRemove);
+    try {
+      const docRef = doc(db, 'users', currentUser.uid);
+      await updateDoc(docRef, { collaborators: updatedCollaborators });
+      
+      // Remove o mapeamento do banco
+      await deleteDoc(doc(db, 'collaborators_mapping', emailToRemove));
+
+      setCollaborators(updatedCollaborators);
+      alert("Colaborador removido com sucesso!");
+    } catch (e) {
+      console.error(e);
+      alert("Erro ao remover colaborador. Tente novamente.");
+    } finally {
+      setIsTeamLoading(false);
+    }
+  };
 
   const [activeFwId, setActiveFwId] = useState<string>('');
   const [searchProjectQuery, setSearchProjectQuery] = useState('');
@@ -28,7 +111,11 @@ export const OfficeDashboard = () => {
   const [showParcelDashboardId, setShowParcelDashboardId] = useState<number | null>(null);
   const [selectedTalhaoId, setSelectedTalhaoId] = useState<string | null>(null);
   const [showProjectDashboard, setShowProjectDashboard] = useState(false);
+  const [showFilterPanel, setShowFilterPanel] = useState(false);
   const [dateFilter, setDateFilter] = useState('');
+  const [talhaoFilter, setTalhaoFilter] = useState('');
+  const [stratumFilter, setStratumFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
 
   // States for Strata Creation Modal
   const [showStratumModal, setShowStratumModal] = useState(false);
@@ -166,17 +253,32 @@ export const OfficeDashboard = () => {
     return getKpisForParcels(talhaoParcels);
   }, [talhaoParcels]);
 
+  const isFilterActive = dateFilter || talhaoFilter || stratumFilter || statusFilter;
+
   const filteredParcelsList = useMemo(() => {
     let list = activeParcels;
     if (selectedTalhaoId) {
       list = list.filter(p => p.talhaoId === selectedTalhaoId);
     }
+    if (talhaoFilter) {
+      if (talhaoFilter === 'sem-talhao') {
+        list = list.filter(p => !p.talhaoId);
+      } else {
+        list = list.filter(p => p.talhaoId === talhaoFilter);
+      }
+    }
     if (dateFilter) {
       const formattedFilter = new Date(dateFilter + 'T12:00:00').toLocaleDateString('pt-BR');
       list = list.filter(p => p.dataInicio === formattedFilter || p.ultimaColeta === formattedFilter);
     }
+    if (stratumFilter) {
+      list = list.filter(p => p.stratumId === stratumFilter);
+    }
+    if (statusFilter) {
+      list = list.filter(p => p.status === statusFilter);
+    }
     return list;
-  }, [activeParcels, selectedTalhaoId, dateFilter]);
+  }, [activeParcels, selectedTalhaoId, talhaoFilter, dateFilter, stratumFilter, statusFilter]);
 
   // Stratified inventory calculations
   const stratifiedStats = useMemo(() => {
@@ -488,11 +590,6 @@ export const OfficeDashboard = () => {
                     display: 'inline-flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    width: '20px',
-                    height: '20px',
-                    borderRadius: '50%',
-                    background: isSynced ? 'rgba(76, 175, 80, 0.08)' : 'rgba(255, 152, 0, 0.08)',
-                    border: isSynced ? '1px solid rgba(76, 175, 80, 0.25)' : '1px solid rgba(255, 152, 0, 0.25)',
                     color: isSynced ? '#81c784' : '#ffb74d',
                     transition: 'all 0.3s ease',
                     cursor: 'default'
@@ -608,18 +705,33 @@ export const OfficeDashboard = () => {
         </div>
 
         {/* Profile Footer */}
-        <div style={{ padding: '20px 24px', borderTop: '1px solid rgba(255,255,255,0.05)', background: 'rgba(0,0,0,0.1)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div>
-              <span style={{ fontSize: '12px', color: '#fff', fontWeight: 'bold', display: 'block' }}>{currentUser?.displayName || 'Escritório'}</span>
-              <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{currentUser?.email}</span>
+        <div style={{ padding: '16px 20px', borderTop: '1px solid rgba(255,255,255,0.05)', background: 'rgba(0,0,0,0.15)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <span style={{ fontSize: '12.5px', color: '#fff', fontWeight: 'bold', display: 'block', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{currentUser?.displayName || 'Escritório'}</span>
+              <span style={{ fontSize: '10.5px', color: 'var(--text-muted)', display: 'block', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{currentUser?.email}</span>
             </div>
-            <button 
-              onClick={signOut}
-              style={{ background: 'transparent', border: 'none', color: '#ff4d6d', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', textTransform: 'uppercase' }}
-            >
-              Sair
-            </button>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexShrink: 0 }}>
+              <button 
+                onClick={() => setShowSettingsModal(true)}
+                style={{ 
+                  background: 'transparent', 
+                  border: 'none', 
+                  color: 'var(--text-muted)', 
+                  cursor: 'pointer', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center',
+                  padding: '4px'
+                }}
+                title="Configurações"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="3"></circle>
+                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -890,27 +1002,125 @@ export const OfficeDashboard = () => {
               <div className="glass-card" style={{ padding: 24, border: '1px solid rgba(255,255,255,0.05)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
                   <h3 style={{ fontSize: '16px', fontWeight: '800', margin: 0 }}>Parcelas Cadastradas ({filteredParcelsList.length})</h3>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.03)', padding: '4px 10px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.06)' }}>
-                    <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: '800', textTransform: 'uppercase' }}>Filtrar Dia:</span>
-                    <input 
-                      type="date" 
-                      className="input-field" 
-                      style={{ marginBottom: 0, padding: '4px 8px', borderRadius: '6px', fontSize: '12px', width: 'auto', height: '30px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', color: '#fff' }} 
-                      value={dateFilter} 
-                      onChange={e => setDateFilter(e.target.value)} 
-                    />
-                    {dateFilter && (
-                      <button 
-                        type="button" 
-                        className="btn btn-secondary" 
-                        style={{ width: 'auto', padding: '2px 8px', fontSize: '10px', height: '24px', lineHeight: 1 }} 
-                        onClick={() => setDateFilter('')}
-                      >
-                        Limpar
-                      </button>
+                  {/* Filter Button */}
+                  <button 
+                    type="button" 
+                    className="btn btn-secondary" 
+                    style={{ 
+                      width: 'auto', 
+                      padding: '8px 16px', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '8px', 
+                      borderColor: isFilterActive ? 'var(--primary-hover)' : 'rgba(255,255,255,0.1)',
+                      background: isFilterActive ? 'rgba(76, 175, 80, 0.05)' : 'transparent',
+                      fontSize: '12px'
+                    }} 
+                    onClick={() => setShowFilterPanel(!showFilterPanel)}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+                    </svg>
+                    Filtrar {isFilterActive && "•"}
+                  </button>
+                </div>
+
+                {/* Expanded Filter Panel */}
+                {showFilterPanel && (
+                  <div className="glass-card" style={{
+                    marginTop: '12px',
+                    marginBottom: '20px',
+                    padding: '20px',
+                    background: 'rgba(255, 255, 255, 0.02)',
+                    border: '1px solid rgba(255, 255, 255, 0.05)',
+                    borderRadius: '16px',
+                    width: '100%'
+                  }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px' }}>
+                      
+                      {/* Date Filter */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <label style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Data de Coleta</label>
+                        <input 
+                          type="date" 
+                          className="input-field" 
+                          style={{ marginBottom: 0, padding: '8px 12px', height: '38px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', color: '#fff' }} 
+                          value={dateFilter} 
+                          onChange={e => setDateFilter(e.target.value)} 
+                        />
+                      </div>
+
+                      {/* Talhao Filter */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <label style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Talhão</label>
+                        <select 
+                          className="input-field" 
+                          style={{ marginBottom: 0, padding: '8px 12px', height: '38px', borderRadius: '10px', background: 'rgba(0,0,0,0.3)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }} 
+                          value={talhaoFilter} 
+                          onChange={e => setTalhaoFilter(e.target.value)}
+                        >
+                          <option value="">-- Todos --</option>
+                          <option value="sem-talhao">Sem Talhão</option>
+                          {activeTalhoes.map(t => (
+                            <option key={t.id} value={t.id}>{t.nome}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Stratum Filter */}
+                      {activeStrata.length > 0 && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          <label style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Estrato</label>
+                          <select 
+                            className="input-field" 
+                            style={{ marginBottom: 0, padding: '8px 12px', height: '38px', borderRadius: '10px', background: 'rgba(0,0,0,0.3)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }} 
+                            value={stratumFilter} 
+                            onChange={e => setStratumFilter(e.target.value)}
+                          >
+                            <option value="">-- Todos --</option>
+                            {activeStrata.map(s => (
+                              <option key={s.id} value={s.id}>{s.nome}</option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+
+                      {/* Status Filter */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <label style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Status</label>
+                        <select 
+                          className="input-field" 
+                          style={{ marginBottom: 0, padding: '8px 12px', height: '38px', borderRadius: '10px', background: 'rgba(0,0,0,0.3)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }} 
+                          value={statusFilter} 
+                          onChange={e => setStatusFilter(e.target.value)}
+                        >
+                          <option value="">-- Todos --</option>
+                          <option value="Aberto">Aberto</option>
+                          <option value="Em Andamento">Em Andamento</option>
+                          <option value="Concluído">Concluído</option>
+                        </select>
+                      </div>
+
+                    </div>
+
+                    {isFilterActive && (
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '16px' }}>
+                        <button 
+                          className="btn btn-secondary" 
+                          style={{ width: 'auto', padding: '6px 16px', fontSize: '12px' }}
+                          onClick={() => {
+                            setDateFilter('');
+                            setTalhaoFilter('');
+                            setStratumFilter('');
+                            setStatusFilter('');
+                          }}
+                        >
+                          Limpar Filtros
+                        </button>
+                      </div>
                     )}
                   </div>
-                </div>
+                )}
 
                 {selectedTalhaoId && (
                   <div style={{ marginBottom: '20px' }}>
@@ -1622,6 +1832,223 @@ export const OfficeDashboard = () => {
           inventories={activeParcels.filter(p => p.id === showParcelDashboardId)} 
           onClose={() => setShowParcelDashboardId(null)} 
         />
+      )}
+
+    {/* Modal de Configurações Unificado */}
+      {showSettingsModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100000, padding: '20px', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
+          <div className="glass-card" style={{ width: '100%', maxWidth: '440px', marginBottom: 0, display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ color: 'var(--primary-hover)', fontSize: '20px', fontWeight: '800', margin: 0 }}>Configurações</h3>
+              <button onClick={() => setShowSettingsModal(false)} style={{ background: 'transparent', color: 'white', border: 'none', fontSize: '24px', cursor: 'pointer' }}>×</button>
+            </div>
+            
+            {/* User Profile Info */}
+            <div style={{ background: 'rgba(255,255,255,0.02)', padding: '12px 16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Conta</span>
+              <span style={{ fontSize: '15px', color: '#fff', fontWeight: 'bold', display: 'block', marginTop: '4px' }}>{currentUser?.displayName || 'Escritório'}</span>
+              <span style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block' }}>{currentUser?.email}</span>
+            </div>
+
+            {/* Theme Toggle Button */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '12px 16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+              <div>
+                <span style={{ fontSize: '13px', color: '#fff', fontWeight: 'bold', display: 'block' }}>Tema do Aplicativo</span>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Alternar entre modo claro e escuro</span>
+              </div>
+              <button 
+                className="btn btn-secondary" 
+                onClick={toggleTheme}
+                style={{ 
+                  width: 'auto', 
+                  padding: '6px 14px', 
+                  fontSize: '11.5px', 
+                  borderColor: theme === 'dark' ? '#ffb74d' : '#f57c00', 
+                  color: theme === 'dark' ? '#ffb74d' : '#f57c00',
+                  background: 'rgba(255, 255, 255, 0.02)'
+                }}
+              >
+                {theme === 'dark' ? '☀️ Modo Claro' : '🌙 Modo Escuro'}
+              </button>
+            </div>
+
+            {/* Action List */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              
+              {/* Minha Equipe (Only if owner or active) */}
+              {currentUser && (
+                <button 
+                  className="btn btn-secondary" 
+                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', borderColor: 'var(--primary-color)', color: 'var(--primary-color)' }}
+                  onClick={() => {
+                    setShowTeamModal(true);
+                  }}
+                >
+                  <span>👥 Minha Equipe</span>
+                  <span style={{ fontSize: '11px', opacity: 0.7 }}>{collaborators.length} membros</span>
+                </button>
+              )}
+
+              {/* Modo Campo Switch */}
+              <button 
+                className="btn btn-secondary" 
+                style={{ display: 'flex', justifyContent: 'flex-start', width: '100%', borderColor: '#00e676', color: '#00e676', background: 'rgba(0, 230, 118, 0.08)' }}
+                onClick={() => {
+                  localStorage.setItem('preferredMode', 'field');
+                  navigate('/');
+                }}
+              >
+                🌲 Ir para Modo Campo
+              </button>
+
+              {/* Painel Admin (If Admin) */}
+              {status === 'admin' && (
+                <button 
+                  className="btn btn-secondary" 
+                  style={{ display: 'flex', justifyContent: 'flex-start', width: '100%', borderColor: '#ffb74d', color: '#ffb74d' }}
+                  onClick={() => {
+                    navigate('/admin');
+                  }}
+                >
+                  🛡️ Painel de Administrador
+                </button>
+              )}
+
+            </div>
+
+            <div style={{ display: 'flex', gap: '12px', marginTop: '12px' }}>
+              <button 
+                className="btn btn-danger" 
+                style={{ flex: 1 }}
+                onClick={() => {
+                  signOut();
+                  setShowSettingsModal(false);
+                }}
+              >
+                Sair da Conta
+              </button>
+              <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setShowSettingsModal(false)}>Fechar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Team management modal inside office view */}
+      {showTeamModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100001, padding: '20px', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
+            <div className="glass-card" style={{ width: '100%', maxWidth: '460px', marginBottom: 0 }}>
+              {isOwner ? (
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                    <h3 style={{ color: 'var(--primary-hover)', fontSize: '20px', fontWeight: '800', margin: 0 }}>Minha Equipe</h3>
+                    <button onClick={() => setShowTeamModal(false)} style={{ background: 'transparent', color: 'white', border: 'none', fontSize: '24px', cursor: 'pointer' }}>×</button>
+                  </div>
+                  <p style={{ color: 'var(--text-muted)', fontSize: '13px', lineHeight: 1.5, marginBottom: '20px' }}>
+                    {status === 'admin' 
+                      ? 'Adicione colaboradores pelo e-mail do Google. Eles terão acesso completo para visualizar, criar e coletar dados na sua mesma conta simultaneamente.'
+                      : 'Adicione até 2 colaboradores pelo e-mail do Google. Eles terão acesso completo para visualizar, criar e coletar dados na sua mesma conta simultaneamente.'}
+                  </p>
+
+                  <div style={{ marginBottom: '20px' }}>
+                    <span style={{ fontSize: '11px', color: 'var(--primary-hover)', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '0.8px', display: 'block', marginBottom: '8px' }}>
+                      {status === 'admin' 
+                        ? `Colaboradores Adicionados (${collaborators.length})`
+                        : `Colaboradores Adicionados (${collaborators.length}/2)`}
+                    </span>
+                    {collaborators.length === 0 ? (
+                      <p style={{ color: 'var(--text-muted)', fontSize: '13px', fontStyle: 'italic', margin: '4px 0' }}>
+                        Nenhum colaborador adicionado ainda.
+                      </p>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {collaborators.map(email => (
+                          <div key={email} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '10px 14px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                            <span style={{ fontSize: '13.5px', color: '#fff' }}>{email}</span>
+                            <button 
+                              className="btn btn-danger" 
+                              style={{ width: 'auto', padding: '4px 10px', fontSize: '10px', height: 'auto' }}
+                              onClick={() => handleRemoveCollaborator(email)}
+                              disabled={isTeamLoading}
+                            >
+                              Remover
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {(status === 'admin' || collaborators.length < 2) && (
+                    <div style={{ marginBottom: '16px' }}>
+                      <label className="input-label">Adicionar Colaborador (E-mail Google)</label>
+                      <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
+                        <input 
+                          type="email"
+                          className="input-field" 
+                          placeholder="Ex: joao.silva@gmail.com" 
+                          value={newEmail} 
+                          onChange={e => setNewEmail(e.target.value)} 
+                          style={{ marginBottom: 0, flex: 1 }} 
+                        />
+                        <button 
+                          className="btn btn-primary" 
+                          style={{ width: 'auto', padding: '0 18px', height: '42px', fontSize: '12px' }}
+                          onClick={handleAddCollaborator}
+                          disabled={isTeamLoading}
+                        >
+                          Adicionar
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '24px' }}>
+                    <button className="btn btn-secondary" style={{ width: 'auto' }} onClick={() => setShowTeamModal(false)}>Fechar</button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                    <h3 style={{ color: 'var(--primary-hover)', fontSize: '20px', fontWeight: '800', margin: 0 }}>Gerenciamento de Equipe</h3>
+                    <button onClick={() => setShowTeamModal(false)} style={{ background: 'transparent', color: 'white', border: 'none', fontSize: '24px', cursor: 'pointer' }}>×</button>
+                  </div>
+                  <div style={{ height: '3px', background: 'var(--primary-color)', width: '48px', marginBottom: '20px', borderRadius: '4px' }}></div>
+                  <p style={{ color: '#fff', fontSize: '14.5px', fontWeight: 'bold', lineHeight: 1.5, marginBottom: '12px' }}>
+                    Recurso Exclusivo para Contas Ativas
+                  </p>
+                  <p style={{ color: 'var(--text-muted)', fontSize: '13px', lineHeight: 1.5, marginBottom: '24px' }}>
+                    A funcionalidade de adicionar e gerenciar colaboradores é exclusiva para o administrador principal da equipe (contas ativas).
+                    <br/><br/>
+                    Como colaborador, você já tem acesso total aos talhões e dados da sua equipe, mas não pode gerenciar outros colaboradores.
+                    Se você deseja ativar uma conta própria para gerenciar sua equipe mestre, entre em contato conosco.
+                  </p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <a 
+                      href="https://wa.me/5547920022746?text=Olá!%20Gostaria%20de%20ativar%20uma%20conta%20mestre%20no%20LeafTag%20para%20gerenciar%20minha%20própria%20equipe."
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="btn"
+                      style={{ 
+                        textDecoration: 'none', 
+                        display: 'inline-flex', 
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        backgroundColor: 'rgba(37, 211, 102, 0.15)', 
+                        border: '1px solid rgba(37, 211, 102, 0.45)', 
+                        color: '#25D366',
+                        boxShadow: '0 4px 15px rgba(37, 211, 102, 0.1)',
+                        fontWeight: 'bold',
+                        padding: '12px 16px'
+                      }}
+                    >
+                      Falar no WhatsApp
+                    </a>
+                    <button className="btn btn-secondary" style={{ width: '100%' }} onClick={() => setShowTeamModal(false)}>Fechar</button>
+                  </div>
+                </>
+              )}
+            </div>
+         </div>
       )}
 
     </div>

@@ -344,11 +344,6 @@ export const InventoryDetail = () => {
                 display: 'inline-flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                width: '28px',
-                height: '28px',
-                borderRadius: '50%',
-                background: isSynced ? 'rgba(76, 175, 80, 0.08)' : 'rgba(255, 152, 0, 0.08)',
-                border: isSynced ? '1px solid rgba(76, 175, 80, 0.25)' : '1px solid rgba(255, 152, 0, 0.25)',
                 color: isSynced ? '#81c784' : '#ffb74d',
                 transition: 'all 0.3s ease',
                 cursor: 'default'

@@ -11,6 +11,8 @@ interface AuthContextType {
   loginWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
   uidToUse: string;
+  theme: 'dark' | 'light';
+  toggleTheme: () => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -19,7 +21,9 @@ const AuthContext = createContext<AuthContextType>({
   loading: true,
   loginWithGoogle: async () => {},
   signOut: async () => {},
-  uidToUse: ''
+  uidToUse: '',
+  theme: 'dark',
+  toggleTheme: () => {}
 });
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -27,6 +31,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [status, setStatus] = useState<'pending' | 'active' | 'admin' | null>(null);
   const [loading, setLoading] = useState(true);
   const [uidToUse, setUidToUse] = useState<string>('');
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    return (localStorage.getItem('theme') as 'dark' | 'light') || 'dark';
+  });
+
+  useEffect(() => {
+    if (theme === 'light') {
+      document.body.classList.add('light-theme');
+    } else {
+      document.body.classList.remove('light-theme');
+    }
+    localStorage.setItem('theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme(prev => prev === 'dark' ? 'light' : 'dark');
+  };
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -134,7 +154,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ currentUser, status, loading, loginWithGoogle, signOut, uidToUse }}>
+    <AuthContext.Provider value={{ currentUser, status, loading, loginWithGoogle, signOut, uidToUse, theme, toggleTheme }}>
       {children}
     </AuthContext.Provider>
   );
