@@ -128,7 +128,7 @@ export const TextKeyboardModal: React.FC<TextKeyboardModalProps> = ({
               {isUppercase ? char.toUpperCase() : char.toLowerCase()}
             </button>
           ))}
-          <button type="button" className="keyboard-key" style={actionKeyStyle('#ff4d6d', 'rgba(239, 35, 60, 0.1)', 'rgba(239, 35, 60, 0.35)')} onClick={handleBackspace}>
+          <button type="button" className="keyboard-key" style={actionKeyStyle()} onClick={handleBackspace}>
             Apagar
           </button>
         </div>
@@ -136,7 +136,7 @@ export const TextKeyboardModal: React.FC<TextKeyboardModalProps> = ({
         {/* Row 4: Clean Bottom Navigation (Limpar, Espaço) */}
         <div style={rowStyle}>
           <button type="button" className="keyboard-key" style={clearStyle} onClick={handleClear}>Limpar</button>
-          <button type="button" className="keyboard-key" style={{ ...keyStyle, flex: 4, background: 'rgba(255, 255, 255, 0.08)' }} onClick={handleSpace}>Espaço</button>
+          <button type="button" className="keyboard-key" style={{ ...keyStyle, flex: 4, background: 'var(--border-color)' }} onClick={handleSpace}>Espaço</button>
         </div>
       </div>
     </div>
@@ -156,9 +156,9 @@ const keyStyle: React.CSSProperties = {
   fontSize: '18px', /* Larger font */
   fontWeight: '700',
   borderRadius: '12px',
-  background: 'rgba(255, 255, 255, 0.04)',
-  border: '1px solid rgba(255, 255, 255, 0.08)',
-  color: 'white',
+  background: 'var(--card-bg)',
+  border: '1px solid var(--border-color)',
+  color: 'var(--text-main)',
   padding: 0,
   cursor: 'pointer',
   display: 'flex',
@@ -167,25 +167,24 @@ const keyStyle: React.CSSProperties = {
   userSelect: 'none',
   outline: 'none',
   fontFamily: "'Plus Jakarta Sans', sans-serif",
-  transition: 'all 0.2s ease',
-  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)'
+  transition: 'all 0.2s ease'
 };
 
 const shiftKeyStyle = (active: boolean): React.CSSProperties => ({
   ...keyStyle,
-  background: active ? 'rgba(46, 125, 50, 0.25)' : 'rgba(255, 255, 255, 0.06)',
-  border: active ? '1px solid rgba(46, 125, 50, 0.45)' : '1px solid rgba(255, 255, 255, 0.08)',
-  color: active ? '#a5d6a7' : 'white',
+  background: active ? 'rgba(46, 125, 50, 0.25)' : 'var(--card-bg)',
+  border: active ? '1px solid var(--primary-hover)' : '1px solid var(--border-color)',
+  color: active ? 'var(--primary-hover)' : 'var(--text-main)',
   fontWeight: 'bold',
   fontSize: '12.5px',
   flex: '1.3'
 });
 
-const actionKeyStyle = (color: string, bg: string, border: string): React.CSSProperties => ({
+const actionKeyStyle = (): React.CSSProperties => ({
   ...keyStyle,
-  color,
-  background: bg,
-  border: `1px solid ${border}`,
+  color: 'var(--danger-hover)',
+  background: 'rgba(239, 35, 60, 0.12)',
+  border: '1px solid rgba(239, 35, 60, 0.35)',
   fontSize: '12.5px',
   flex: '1.6'
 });
@@ -195,7 +194,7 @@ const shortcutStyle: React.CSSProperties = {
   height: '42px', /* More compact for suffixes */
   background: 'rgba(46, 125, 50, 0.12)',
   border: '1px solid rgba(46, 125, 50, 0.35)',
-  color: '#a5d6a7',
+  color: 'var(--primary-hover)',
   fontSize: '14.5px',
   fontWeight: 'bold'
 };
@@ -203,7 +202,7 @@ const shortcutStyle: React.CSSProperties = {
 const clearStyle: React.CSSProperties = {
   ...keyStyle,
   fontSize: '12px',
-  background: 'rgba(255, 255, 255, 0.01)',
-  border: '1px solid rgba(255, 255, 255, 0.05)',
+  background: 'var(--card-bg)',
+  border: '1px solid var(--border-color)',
   color: 'var(--text-muted)'
 };

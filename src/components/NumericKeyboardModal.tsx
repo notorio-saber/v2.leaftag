@@ -105,35 +105,34 @@ const keyStyle: React.CSSProperties = {
   fontSize: '22px', /* Larger font */
   fontWeight: '700',
   borderRadius: '12px',
-  background: 'rgba(255, 255, 255, 0.05)',
-  border: '1px solid rgba(255, 255, 255, 0.08)',
-  color: 'white',
+  background: 'var(--card-bg)',
+  border: '1px solid var(--border-color)',
+  color: 'var(--text-main)',
   padding: 0,
   cursor: 'pointer',
   outline: 'none',
   fontFamily: "'Plus Jakarta Sans', sans-serif",
-  transition: 'all 0.2s ease',
-  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)'
+  transition: 'all 0.2s ease'
 };
 
 const specialKeyStyle: React.CSSProperties = {
   ...keyStyle,
-  background: 'rgba(255, 255, 255, 0.02)',
-  color: 'var(--text-muted)'
+  background: 'var(--border-color)',
+  color: 'var(--text-main)'
 };
 
 const dangerKeyStyle: React.CSSProperties = {
   ...keyStyle,
   fontSize: '14.5px',
   background: 'rgba(239, 35, 60, 0.12)',
-  border: '1px solid rgba(239, 35, 60, 0.3)',
-  color: '#ff4d6d'
+  border: '1px solid rgba(239, 35, 60, 0.35)',
+  color: 'var(--danger-hover)'
 };
 
 const clearKeyStyle: React.CSSProperties = {
   ...keyStyle,
   fontSize: '14.5px',
-  background: 'rgba(255, 255, 255, 0.02)',
-  border: '1px solid rgba(255, 255, 255, 0.06)',
+  background: 'var(--card-bg)',
+  border: '1px solid var(--border-color)',
   color: 'var(--text-muted)'
 };
