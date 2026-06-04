@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useInventory } from '../context/InventoryContext';
 import * as XLSX from 'xlsx';
@@ -115,6 +115,15 @@ export const InventoryDetail = () => {
   // Tipo de ordenação da visualização local
   const [sortType, setSortType] = useState<'original' | 'height' | 'thickness'>('original');
 
+  // Estado para toast de notificação
+  const [toast, setToast] = useState<string | null>(null);
+  
+  const showToast = (message: string) => {
+    setToast(message);
+    const id = setTimeout(() => setToast(null), 2500);
+    return id;
+  };
+
   // Auxiliar para obter a altura máxima do indivíduo (considera fustes se bifurcado)
   const getTreeMaxHeight = (ind: any) => {
     let maxHt = parseFloat(ind.ht || '0');
@@ -127,6 +136,27 @@ export const InventoryDetail = () => {
     }
     return maxHt;
   };
+
+  // Auxiliar para determinar se a altura foi de fato medida
+  const hasHeightMeasured = (ind: any) => {
+    const ht = parseFloat(ind.ht || '0');
+    const hc = parseFloat(ind.hc || '0');
+    if (!isNaN(ht) && ht > 0) return true;
+    if (!isNaN(hc) && hc > 0) return true;
+    if (ind.multipleStems && ind.stems) {
+      return ind.stems.some((s: any) => {
+        const h = parseFloat(s.altura || '0');
+        return !isNaN(h) && h > 0;
+      });
+    }
+    return false;
+  };
+
+  // Contagem de indivíduos com altura medida
+  const measuredHeightsCount = useMemo(() => {
+    if (!inventory || !inventory.dados) return 0;
+    return inventory.dados.filter(hasHeightMeasured).length;
+  }, [inventory]);
 
   // Auxiliar para obter o diâmetro/circunferência máxima do indivíduo (considera fustes se bifurcado)
   const getTreeMaxThickness = (ind: any) => {
@@ -268,6 +298,7 @@ export const InventoryDetail = () => {
       freshInv.dados[targetIdx] = editingInd;
       saveInventory(freshInv);
       setEditingInd(null);
+      showToast("Alterações salvas com sucesso!");
     }
   };
 
@@ -280,6 +311,7 @@ export const InventoryDetail = () => {
     if (targetIdx >= 0) {
       freshInv.dados[targetIdx] = editingInd;
       saveInventory(freshInv);
+      showToast(`Árvore #${editingInd.numeroIndividuo} salva!`);
     }
     
     // Switch to next/prev individual
@@ -555,7 +587,7 @@ export const InventoryDetail = () => {
                     letterSpacing: '0.5px'
                   }}
                 >
-                  Mais Altas ↓
+                  Mais Altas ↓ ({measuredHeightsCount})
                 </button>
                 <button 
                   onClick={() => setSortType('thickness')} 
@@ -669,23 +701,61 @@ export const InventoryDetail = () => {
                   <div key={col.id} style={{ marginBottom: '14px' }}>
                     <label className="input-label">{col.nome}</label>
                     {col.tipo === 'select' ? (
-                      <select
-                        className="input-field"
-                        style={{ 
-                          marginBottom: 0, 
-                          marginTop: '4px',
-                          appearance: 'none',
-                          background: 'rgba(0,0,0,0.25) url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'white\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'%3e%3cpolyline points=\'6 9 12 15 18 9\'%3e%3c/polyline%3e%3c/svg%3e") no-repeat right 12px center',
-                          backgroundSize: '16px'
-                        }}
-                        value={editingInd[col.id] || ''}
-                        onChange={e => setEditingInd({...editingInd, [col.id]: e.target.value})}
-                      >
-                        <option value="" style={{ background: 'var(--bg-color)', color: 'var(--text-muted)' }}>-- Selecione --</option>
-                        {(col.opcoes || []).map((o: string) => (
-                          <option key={o} value={o} style={{ background: 'var(--bg-color)', color: 'var(--text-main)' }}>{o}</option>
-                        ))}
-                      </select>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '6px' }}>
+                        {(col.opcoes || []).map((o: string) => {
+                          const currentVal = editingInd[col.id] || '';
+                          const selected = currentVal ? currentVal.split(', ').map((s: string) => s.trim()) : [];
+                          const isSelected = selected.includes(o);
+                          return (
+                            <button
+                              key={o}
+                              type="button"
+                              onClick={() => {
+                                let nextSelected: string[];
+                                if (isSelected) {
+                                  nextSelected = selected.filter((item: string) => item !== o);
+                                } else {
+                                  nextSelected = [...selected, o];
+                                }
+                                setEditingInd({ ...editingInd, [col.id]: nextSelected.join(', ') });
+                              }}
+                              style={{
+                                background: isSelected ? 'rgba(46, 125, 50, 0.18)' : 'rgba(255, 255, 255, 0.03)',
+                                border: isSelected ? '1px solid var(--primary-hover)' : '1px solid rgba(255, 255, 255, 0.08)',
+                                color: isSelected ? 'var(--primary-hover)' : 'var(--text-muted)',
+                                padding: '6px 12px',
+                                fontSize: '11px',
+                                borderRadius: '8px',
+                                cursor: 'pointer',
+                                fontWeight: 'bold',
+                                transition: 'all 0.2s ease',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.5px'
+                              }}
+                            >
+                              {o}
+                            </button>
+                          );
+                        })}
+                        <button
+                          type="button"
+                          onClick={() => setEditingInd({ ...editingInd, [col.id]: '' })}
+                          style={{
+                            background: 'rgba(239, 35, 60, 0.08)',
+                            border: '1px solid rgba(239, 35, 60, 0.2)',
+                            color: '#ff8a80',
+                            padding: '6px 12px',
+                            fontSize: '11px',
+                            borderRadius: '8px',
+                            cursor: 'pointer',
+                            fontWeight: 'bold',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.5px'
+                          }}
+                        >
+                          Limpar
+                        </button>
+                      </div>
                     ) : (
                       <input 
                         type={col.tipo === 'number' ? 'number' : 'text'} 
@@ -861,6 +931,33 @@ export const InventoryDetail = () => {
       )}
 
       {showDashboard && <StatisticalDashboard inventories={[inventory]} onClose={() => setShowDashboard(false)} />}
+
+      {toast && (
+        <div style={{
+          position: 'fixed',
+          bottom: '24px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          background: 'rgba(46, 125, 50, 0.95)',
+          color: '#ffffff',
+          padding: '12px 24px',
+          borderRadius: '12px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          zIndex: 1100,
+          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.25), 0 0 15px rgba(46, 125, 50, 0.2)',
+          fontSize: '13px',
+          fontWeight: 'bold',
+          backdropFilter: 'blur(8px)',
+          animation: 'fadeInUp 0.3s ease'
+        }}>
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+          {toast}
+        </div>
+      )}
     </div>
   );
 };

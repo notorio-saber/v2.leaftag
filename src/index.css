@@ -452,3 +452,39 @@ body.light-theme option {
   }
 }
 
+body.light-theme .btn-primary {
+  background: var(--primary-color) !important;
+  border-color: var(--primary-color) !important;
+  color: #ffffff !important;
+}
+
+body.light-theme .btn-primary:hover {
+  background: var(--primary-hover) !important;
+  border-color: var(--primary-hover) !important;
+  color: #ffffff !important;
+}
+
+body.light-theme .btn-danger {
+  background: #d90429 !important;
+  border-color: #d90429 !important;
+  color: #ffffff !important;
+}
+
+body.light-theme .btn-danger:hover {
+  background: #b3001e !important;
+  border-color: #b3001e !important;
+  color: #ffffff !important;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 20px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+

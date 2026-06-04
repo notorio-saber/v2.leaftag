@@ -62,6 +62,14 @@ export const CollectData = () => {
   const [tempPrevIndData, setTempPrevIndData] = useState<any>(null);
   const [reviewIndIndex, setReviewIndIndex] = useState<number | null>(null);
 
+  // Estado para toast de notificação
+  const [toast, setToast] = useState<string | null>(null);
+  const showToast = (message: string) => {
+    setToast(message);
+    const id = setTimeout(() => setToast(null), 2500);
+    return id;
+  };
+
   const [activeNumField, setActiveNumField] = useState<{
     title: string;
     value: string;
@@ -88,27 +96,31 @@ export const CollectData = () => {
 
   // Auto-focus or open custom virtual keyboards based on type on step change
   useEffect(() => {
-    if (currentCol) {
-      if (currentCol.tipo === 'number') {
-        setActiveTextField(null);
-        setActiveNumField({
-          title: currentCol.nome,
-          value: formData[currentCol.id] || '',
-          onSave: (val) => setFormData((prev: any) => ({ ...prev, [currentCol.id]: val }))
-        });
-      } else if (currentCol.tipo === 'text' || currentCol.tipo === 'textarea') {
-        setActiveNumField(null);
-        setActiveTextField({
-          title: currentCol.nome,
-          value: formData[currentCol.id] || '',
-          onSave: (val) => setFormData((prev: any) => ({ ...prev, [currentCol.id]: val }))
-        });
-      } else {
-        setActiveNumField(null);
-        setActiveTextField(null);
-      }
+    if (!currentCol) return;
+    
+    // Close existing keyboards
+    setActiveNumField(null);
+    setActiveTextField(null);
+
+    // Skip auto keyboard trigger for coordinates, options and photos
+    if (['coordenadas', 'foto'].includes(currentCol.id) || currentCol.tipo === 'select') {
+      return;
     }
-  }, [stepIndex, isGpsLoading]);
+
+    if (currentCol.tipo === 'number') {
+      setActiveNumField({
+        title: currentCol.nome,
+        value: formData[currentCol.id] || '',
+        onSave: (val) => setFormData((prev: any) => ({ ...prev, [currentCol.id]: val }))
+      });
+    } else {
+      setActiveTextField({
+        title: currentCol.nome,
+        value: formData[currentCol.id] || '',
+        onSave: (val) => setFormData((prev: any) => ({ ...prev, [currentCol.id]: val }))
+      });
+    }
+  }, [stepIndex, currentCol]);
 
   const getGps = async () => {
     setIsGpsLoading(true);
@@ -148,9 +160,21 @@ export const CollectData = () => {
     }
   };
 
-  // Função para salvar seleção de múltipla escolha sem avançar automaticamente
+  // Função para salvar seleção de múltipla escolha sem avançar automaticamente (toggle multi-select)
   const selectOptionValue = (val: string) => {
-    setFormData((prev: any) => ({ ...prev, [currentCol.id]: val }));
+    setFormData((prev: any) => {
+      const currentVal = prev[currentCol.id] || '';
+      const selected = currentVal ? currentVal.split(', ').map((s: string) => s.trim()) : [];
+      
+      let nextSelected: string[];
+      if (selected.includes(val)) {
+        nextSelected = selected.filter((item: string) => item !== val);
+      } else {
+        nextSelected = [...selected, val];
+      }
+      
+      return { ...prev, [currentCol.id]: nextSelected.join(', ') };
+    });
   };
 
   const getPrevStepIndex = (currentIndex: number): number => {
@@ -201,7 +225,7 @@ export const CollectData = () => {
         await saveInventory(freshInv);
       }
       setEditingPrevInd(false);
-      alert("Alterações salvas com sucesso!");
+      showToast("Alterações salvas com sucesso!");
     } catch (err) {
       console.error("Erro no handleSavePrevInd:", err);
     }
@@ -576,7 +600,7 @@ export const CollectData = () => {
                   width: '100%' 
                 }}>
                   {(currentCol.opcoes || []).map((opt: string) => {
-                    const isSelected = formData[currentCol.id] === opt;
+                    const isSelected = (formData[currentCol.id] || '').split(', ').map((s: string) => s.trim()).includes(opt);
                     return (
                       <button
                         key={opt}
@@ -960,23 +984,61 @@ export const CollectData = () => {
                           {value || 'Sem fotos'}
                         </div>
                       ) : col.tipo === 'select' ? (
-                        <select
-                          className="input-field"
-                          style={{ 
-                            marginBottom: 0, 
-                            marginTop: '4px',
-                            appearance: 'none',
-                            background: 'rgba(0,0,0,0.25) url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'white\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'%3e%3cpolyline points=\'6 9 12 15 18 9\'%3e%3c/polyline%3e%3c/svg%3e") no-repeat right 12px center',
-                            backgroundSize: '16px'
-                          }}
-                          value={value || ''}
-                          onChange={e => setTempPrevIndData({ ...tempPrevIndData, [col.id]: e.target.value })}
-                        >
-                          <option value="" style={{ background: 'var(--bg-color)', color: 'var(--text-muted)' }}>-- Selecione --</option>
-                          {(col.opcoes || []).map((o: string) => (
-                            <option key={o} value={o} style={{ background: 'var(--bg-color)', color: 'var(--text-main)' }}>{o}</option>
-                          ))}
-                        </select>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '6px' }}>
+                          {(col.opcoes || []).map((o: string) => {
+                            const currentVal = value || '';
+                            const selected = currentVal ? currentVal.split(', ').map((s: string) => s.trim()) : [];
+                            const isSelected = selected.includes(o);
+                            return (
+                              <button
+                                key={o}
+                                type="button"
+                                onClick={() => {
+                                  let nextSelected: string[];
+                                  if (isSelected) {
+                                    nextSelected = selected.filter((item: string) => item !== o);
+                                  } else {
+                                    nextSelected = [...selected, o];
+                                  }
+                                  setTempPrevIndData({ ...tempPrevIndData, [col.id]: nextSelected.join(', ') });
+                                }}
+                                style={{
+                                  background: isSelected ? 'rgba(46, 125, 50, 0.18)' : 'rgba(255, 255, 255, 0.03)',
+                                  border: isSelected ? '1px solid var(--primary-hover)' : '1px solid rgba(255, 255, 255, 0.08)',
+                                  color: isSelected ? 'var(--primary-hover)' : 'var(--text-muted)',
+                                  padding: '6px 12px',
+                                  fontSize: '11px',
+                                  borderRadius: '8px',
+                                  cursor: 'pointer',
+                                  fontWeight: 'bold',
+                                  transition: 'all 0.2s ease',
+                                  textTransform: 'uppercase',
+                                  letterSpacing: '0.5px'
+                                }}
+                              >
+                                {o}
+                              </button>
+                            );
+                          })}
+                          <button
+                            type="button"
+                            onClick={() => setTempPrevIndData({ ...tempPrevIndData, [col.id]: '' })}
+                            style={{
+                              background: 'rgba(239, 35, 60, 0.08)',
+                              border: '1px solid rgba(239, 35, 60, 0.2)',
+                              color: '#ff8a80',
+                              padding: '6px 12px',
+                              fontSize: '11px',
+                              borderRadius: '8px',
+                              cursor: 'pointer',
+                              fontWeight: 'bold',
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.5px'
+                            }}
+                          >
+                            Limpar
+                          </button>
+                        </div>
                       ) : (
                         <input 
                           type={col.tipo === 'number' ? 'number' : 'text'} 
@@ -1140,6 +1202,32 @@ export const CollectData = () => {
             </div>
 
           </div>
+        </div>
+      )}
+      {toast && (
+        <div style={{
+          position: 'fixed',
+          bottom: '24px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          background: 'rgba(46, 125, 50, 0.95)',
+          color: '#ffffff',
+          padding: '12px 24px',
+          borderRadius: '12px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          zIndex: 1100,
+          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.25), 0 0 15px rgba(46, 125, 50, 0.2)',
+          fontSize: '13px',
+          fontWeight: 'bold',
+          backdropFilter: 'blur(8px)',
+          animation: 'fadeInUp 0.3s ease'
+        }}>
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+          {toast}
         </div>
       )}
     </>
