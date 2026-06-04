@@ -53,7 +53,8 @@ export const FieldWorkDetail = () => {
 
   // Filter talões and parcelas belonging to this field work
   const fwTalhoes = talhoes.filter(t => t.fieldWorkId === id);
-  const parcels = inventories.filter(i => i.fieldWorkId === id);
+  const parcels = inventories.filter(i => i.fieldWorkId === id && i.template !== 'cubagem');
+  const cubageSessions = inventories.filter(i => i.fieldWorkId === id && i.template === 'cubagem');
 
   // Helper variables for button layout responsiveness
   const showExportAndSheets = parcels.length > 0;
@@ -716,6 +717,67 @@ export const FieldWorkDetail = () => {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Cubagem Florestal Section */}
+      <div style={{ margin: '36px 0 16px' }}>
+        <h2 style={{ fontSize: '18px', fontWeight: '800', letterSpacing: '-0.02em', color: 'var(--primary-hover)' }}>
+          Cubagem Florestal (Árvores Cubadas)
+        </h2>
+        <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginTop: '4px', marginBottom: '16px' }}>
+          Realize a cubagem detalhada de árvores individuais usando os métodos Smalian, Huber ou Newton.
+        </p>
+        <button 
+          className="btn btn-primary" 
+          style={{ width: 'auto', padding: '10px 20px', marginBottom: '16px' }}
+          onClick={() => navigate(`/cubagem/setup/${fw.id}`)}
+        >
+          + Nova Cubagem Florestal
+        </button>
+      </div>
+
+      {cubageSessions.length === 0 ? (
+        <div className="glass-card" style={{ textAlign: 'center', padding: '30px', borderStyle: 'dashed' }}>
+          <p style={{ color: 'var(--text-muted)', fontSize: '14.5px' }}>Nenhuma sessão de cubagem iniciada para este trabalho.</p>
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+          {cubageSessions.map(inv => {
+            const currentTal = talhoes.find(t => t.id === inv.talhaoId);
+            // Calculate total volume of the session
+            const totalVol = inv.dados.reduce((acc: number, tree: any) => acc + (tree.volumeTotal || 0), 0);
+            return (
+              <div 
+                key={inv.id} 
+                className="inventory-card" 
+                onClick={() => {
+                    setCurrentInventory(inv);
+                    navigate(`/cubagem/collect/${inv.id}`);
+                }}
+                style={{ cursor: 'pointer', borderLeft: '4px solid #00e676 !important' }}
+              >
+                <div className="inventory-card-title" style={{ fontSize: '16px' }}>{inv.nome}</div>
+                <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                  {currentTal ? `Talhão: ${currentTal.nome}` : 'Sem Talhão'}
+                </div>
+                <div className="inventory-stats" style={{ marginTop: '10px', paddingTop: '10px' }}>
+                  <div className="stat-item">
+                    <span className="stat-value" style={{ fontSize: '16px' }}>{inv.dados.length}</span>
+                    <span className="stat-label" style={{ fontSize: '8px' }}>Árvores</span>
+                  </div>
+                  <div className="stat-item">
+                    <span className="stat-value" style={{ fontSize: '16px' }}>{totalVol.toFixed(3)}</span>
+                    <span className="stat-label" style={{ fontSize: '8px' }}>Vol Total (m³)</span>
+                  </div>
+                  <div className="stat-item">
+                    <span className="stat-value" style={{ fontSize: '16px' }}>{inv.dados.length > 0 ? (totalVol / inv.dados.length).toFixed(3) : '0.000'}</span>
+                    <span className="stat-label" style={{ fontSize: '8px' }}>Vol Médio (m³)</span>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
 

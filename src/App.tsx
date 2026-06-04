@@ -7,6 +7,8 @@ import { FieldWorkDetail } from './pages/FieldWorkDetail';
 import { Login } from './pages/Login';
 import { PendingAccess } from './pages/PendingAccess';
 import { AdminAccounts } from './pages/AdminAccounts';
+import { CubagemSetup } from './pages/CubagemSetup';
+import { CubagemCollect } from './pages/CubagemCollect';
 import './App.css';
 import { useInventory } from './context/InventoryContext';
 import { useAuth } from './context/AuthContext';
@@ -677,6 +679,9 @@ function App() {
         <Route path="/detail/:id" element={<ProtectedRoute><InventoryDetail /></ProtectedRoute>} />
         <Route path="/admin" element={<ProtectedRoute><AdminAccounts /></ProtectedRoute>} />
         <Route path="/office" element={<ProtectedRoute><OfficeDashboard /></ProtectedRoute>} />
+        <Route path="/cubagem/setup/:fieldWorkId" element={<ProtectedRoute><CubagemSetup /></ProtectedRoute>} />
+        <Route path="/cubagem/setup/:fieldWorkId/:talhaoId" element={<ProtectedRoute><CubagemSetup /></ProtectedRoute>} />
+        <Route path="/cubagem/collect/:inventoryId" element={<ProtectedRoute><CubagemCollect /></ProtectedRoute>} />
       </Routes>
     </BrowserRouter>
   );

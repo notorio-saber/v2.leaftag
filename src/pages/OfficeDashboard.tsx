@@ -161,7 +161,7 @@ export const OfficeDashboard = () => {
   }, [activeFw]);
 
   const activeParcels = useMemo(() => {
-    return inventories.filter(i => i.fieldWorkId === activeFwId);
+    return inventories.filter(i => i.fieldWorkId === activeFwId && i.template !== 'cubagem');
   }, [inventories, activeFwId]);
 
   const activeTalhoes = useMemo(() => {
@@ -675,7 +675,7 @@ export const OfficeDashboard = () => {
           </span>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {filteredFieldWorks.map(fw => {
-              const count = inventories.filter(i => i.fieldWorkId === fw.id).length;
+              const count = inventories.filter(i => i.fieldWorkId === fw.id && i.template !== 'cubagem').length;
               const isActive = fw.id === activeFwId;
               return (
                 <div 
