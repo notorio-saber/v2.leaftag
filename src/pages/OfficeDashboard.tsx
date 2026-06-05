@@ -4,6 +4,7 @@ import { useInventory } from '../context/InventoryContext';
 import { useAuth } from '../context/AuthContext';
 import * as XLSX from 'xlsx';
 import { StatisticalDashboard } from '../components/StatisticalDashboard';
+import { SortimentoTab } from '../components/SortimentoTab';
 import { db } from '../lib/firebase';
 import { doc, getDoc, updateDoc, setDoc, deleteDoc } from 'firebase/firestore';
 import { 
@@ -128,7 +129,7 @@ export const OfficeDashboard = () => {
 
   const [activeFwId, setActiveFwId] = useState<string>('');
   const [searchProjectQuery, setSearchProjectQuery] = useState('');
-  const [activeTab, setActiveTab] = useState<'talhoes' | 'parcelas' | 'estratos' | 'cubagem' | 'extrapolacao' | 'processamentos'>('talhoes');
+  const [activeTab, setActiveTab] = useState<'talhoes' | 'parcelas' | 'estratos' | 'cubagem' | 'extrapolacao' | 'processamentos' | 'sortimento'>('talhoes');
   const [extraTab, setExtraTab] = useState<'parcelas' | 'talhoes' | 'estratos' | 'trabalho'>('parcelas');
   const [cubageSortOrder, setCubageSortOrder] = useState<'asc' | 'desc' | null>('desc');
   
@@ -2781,6 +2782,21 @@ export const OfficeDashboard = () => {
               >
                 Processamentos ({activeProcessings.length})
               </button>
+              <button 
+                onClick={() => setActiveTab('sortimento')}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  borderBottom: activeTab === 'sortimento' ? '2px solid var(--primary-color)' : '2px solid transparent',
+                  color: activeTab === 'sortimento' ? 'var(--primary-hover)' : 'var(--text-muted)',
+                  padding: '12px 20px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold',
+                  fontSize: '14.5px'
+                }}
+              >
+                Sortimento
+              </button>
             </div>
 
             {/* TAB CONTENT */}
@@ -3806,6 +3822,12 @@ export const OfficeDashboard = () => {
                   </div>
                 )}
               </div>
+            ) : activeTab === 'sortimento' ? (
+              <SortimentoTab 
+                activeFw={activeFw} 
+                inventories={inventories} 
+                activeTalhoes={activeTalhoes} 
+              />
             ) : null}
 
             {/* Modal de Novo Processamento */}

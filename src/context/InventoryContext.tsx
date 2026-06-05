@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
-import type { Inventory, FieldWork, Talhao, Stratum, HeightModel, VolumeModel, InventoryProcessing } from '../types';
+import type { Inventory, FieldWork, Talhao, Stratum, HeightModel, VolumeModel, InventoryProcessing, SortimentRule, SortimentResult } from '../types';
 import { db } from '../lib/firebase';
 import { collection, doc, onSnapshot, setDoc, deleteDoc } from 'firebase/firestore';
 import { useAuth } from './AuthContext';
@@ -30,6 +30,12 @@ interface InventoryContextType {
   processings: InventoryProcessing[];
   saveProcessing: (proc: InventoryProcessing) => Promise<void>;
   deleteProcessing: (id: string) => Promise<void>;
+  sortimentRules: SortimentRule[];
+  sortimentResults: SortimentResult[];
+  saveSortimentRule: (rule: SortimentRule) => Promise<void>;
+  deleteSortimentRule: (id: string) => Promise<void>;
+  saveSortimentResult: (result: SortimentResult) => Promise<void>;
+  deleteSortimentResult: (id: string) => Promise<void>;
   isSynced: boolean;
 }
 
@@ -171,8 +177,10 @@ export const InventoryProvider: React.FC<{ children: ReactNode }> = ({ children 
   const [strata, setStrata] = useState<Stratum[]>([]);
   const [heightModels, setHeightModels] = useState<HeightModel[]>([]);
   const [volumeModels, setVolumeModels] = useState<VolumeModel[]>([]);
-  const [currentInventory, setCurrentInventory] = useState<Inventory | null>(null);
   const [processings, setProcessings] = useState<InventoryProcessing[]>([]);
+  const [currentInventory, setCurrentInventory] = useState<Inventory | null>(null);
+  const [sortimentRules, setSortimentRules] = useState<SortimentRule[]>([]);
+  const [sortimentResults, setSortimentResults] = useState<SortimentResult[]>([]);
 
   const [fwPending, setFwPending] = useState(false);
   const [talPending, setTalPending] = useState(false);
@@ -181,8 +189,10 @@ export const InventoryProvider: React.FC<{ children: ReactNode }> = ({ children 
   const [hmPending, setHmPending] = useState(false);
   const [vmPending, setVmPending] = useState(false);
   const [processPending, setProcessPending] = useState(false);
+  const [rulesPending, setRulesPending] = useState(false);
+  const [resultsPending, setResultsPending] = useState(false);
 
-  const isSynced = !fwPending && !talPending && !invPending && !strataPending && !hmPending && !vmPending && !processPending;
+  const isSynced = !fwPending && !talPending && !invPending && !strataPending && !hmPending && !vmPending && !processPending && !rulesPending && !resultsPending;
 
   // Firestore Snapshot (Realtime + Offline IndexedDB)
   useEffect(() => {
@@ -193,12 +203,16 @@ export const InventoryProvider: React.FC<{ children: ReactNode }> = ({ children 
       setStrata([]);
       setHeightModels([]);
       setVolumeModels([]);
+      setProcessings([]);
       setFwPending(false);
       setTalPending(false);
       setInvPending(false);
       setStrataPending(false);
-      setHmPending(false);
       setVmPending(false);
+      setRulesPending(false);
+      setResultsPending(false);
+      setSortimentRules([]);
+      setSortimentResults([]);
       return;
     }
 
@@ -299,6 +313,32 @@ export const InventoryProvider: React.FC<{ children: ReactNode }> = ({ children 
       console.error("Erro no Sync do Processings Firestore:", error);
     });
 
+    const rulesRef = collection(db, `users/${uidToUse}/sortimentRules`);
+    const unsubscribeRules = onSnapshot(rulesRef, { includeMetadataChanges: true }, (snapshot) => {
+      setRulesPending(snapshot.metadata.hasPendingWrites);
+      const data: SortimentRule[] = [];
+      snapshot.forEach(doc => {
+        data.push(doc.data() as SortimentRule);
+      });
+      data.sort((a,b) => a.prioridade - b.prioridade);
+      setSortimentRules(data);
+    }, (error) => {
+      console.error("Erro no Sync do SortimentRules Firestore:", error);
+    });
+
+    const resultsRef = collection(db, `users/${uidToUse}/sortimentResults`);
+    const unsubscribeResults = onSnapshot(resultsRef, { includeMetadataChanges: true }, (snapshot) => {
+      setResultsPending(snapshot.metadata.hasPendingWrites);
+      const data: SortimentResult[] = [];
+      snapshot.forEach(doc => {
+        data.push(doc.data() as SortimentResult);
+      });
+      data.sort((a,b) => b.dataProcessamento.localeCompare(a.dataProcessamento));
+      setSortimentResults(data);
+    }, (error) => {
+      console.error("Erro no Sync do SortimentResults Firestore:", error);
+    });
+
     return () => {
       unsubscribeFw();
       unsubscribeTal();
@@ -307,6 +347,8 @@ export const InventoryProvider: React.FC<{ children: ReactNode }> = ({ children 
       unsubscribeHm();
       unsubscribeVm();
       unsubscribeProcess();
+      unsubscribeRules();
+      unsubscribeResults();
     };
   }, [currentUser, uidToUse]);
 
@@ -446,6 +488,30 @@ export const InventoryProvider: React.FC<{ children: ReactNode }> = ({ children 
     await deleteDoc(docRef);
   };
 
+  const saveSortimentRule = async (rule: SortimentRule) => {
+    if (!currentUser || !uidToUse) return;
+    const docRef = doc(db, `users/${uidToUse}/sortimentRules`, rule.id);
+    await setDoc(docRef, cleanObject(rule));
+  };
+
+  const deleteSortimentRule = async (id: string) => {
+    if (!currentUser || !uidToUse) return;
+    const docRef = doc(db, `users/${uidToUse}/sortimentRules`, id);
+    await deleteDoc(docRef);
+  };
+
+  const saveSortimentResult = async (result: SortimentResult) => {
+    if (!currentUser || !uidToUse) return;
+    const docRef = doc(db, `users/${uidToUse}/sortimentResults`, result.id);
+    await setDoc(docRef, cleanObject(result));
+  };
+
+  const deleteSortimentResult = async (id: string) => {
+    if (!currentUser || !uidToUse) return;
+    const docRef = doc(db, `users/${uidToUse}/sortimentResults`, id);
+    await deleteDoc(docRef);
+  };
+
   const duplicateFieldWork = async (originalId: string) => {
     if (!currentUser || !uidToUse) return;
 
@@ -534,6 +600,12 @@ export const InventoryProvider: React.FC<{ children: ReactNode }> = ({ children 
         processings,
         saveProcessing,
         deleteProcessing,
+        sortimentRules,
+        sortimentResults,
+        saveSortimentRule,
+        deleteSortimentRule,
+        saveSortimentResult,
+        deleteSortimentResult,
         isSynced
       }}
     >

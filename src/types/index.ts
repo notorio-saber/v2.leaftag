@@ -246,3 +246,60 @@ export interface InventoryProcessing {
   trabalho: TrabalhoConsolidation;
 }
 
+export interface SortimentRule {
+  id: string;
+  ownerUid?: string;
+  nome: string;
+  descricao?: string;
+  comprimentoToraM: number;
+  diametroMinimoPontaFinaCm: number;
+  diametroMaximoPontaFinaCm?: number;
+  prioridade: number;
+  precoPorM3?: number;
+  cor: string;
+  ativo: boolean;
+  createdAt: string;
+}
+
+export interface SortimentToraResult {
+  id: string;
+  produtoNome: string;
+  ruleId: string;
+  ordem: number;
+  alturaInicialM: number;
+  alturaFinalM: number;
+  comprimentoM: number;
+  diametroInicialCm: number;
+  diametroFinalCm: number;
+  volumeM3: number;
+  valorEstimado: number;
+  status: string;
+}
+
+export interface SortimentResumoProduto {
+  produtoNome: string;
+  quantidadeToras: number;
+  volumeM3: number;
+  valorEstimado: number;
+}
+
+export interface SortimentResult {
+  id: string;
+  fieldWorkId: string;
+  inventoryId: number;
+  cubageTreeId: string;
+  treeNumber: number;
+  especie: string;
+  dataProcessamento: string;
+  rulesSnapshot: SortimentRule[];
+  logs: string[];
+  volumeTotalArvore: number;
+  volumeSortidoTotal: number;
+  volumeResiduo: number;
+  valorTotalEstimado: number;
+  toras: SortimentToraResult[];
+  resumoPorProduto: SortimentResumoProduto[];
+  useSemCasca: boolean;
+}
+
+
