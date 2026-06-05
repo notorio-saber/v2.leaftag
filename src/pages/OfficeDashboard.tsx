@@ -16,7 +16,7 @@ import {
 
 export const OfficeDashboard = () => {
   const navigate = useNavigate();
-  const { fieldWorks, talhoes, inventories, strata, createStratum, deleteStratum, saveInventory, isSynced, createTalhao, deleteTalhao, createFieldWork } = useInventory();
+  const { fieldWorks, talhoes, inventories, strata, createStratum, deleteStratum, saveInventory, isSynced, createTalhao, deleteTalhao, createFieldWork, heightModels, volumeModels } = useInventory();
   const { currentUser, signOut, status, uidToUse, theme, toggleTheme } = useAuth();
 
   const [showSettingsModal, setShowSettingsModal] = useState(false);
@@ -134,6 +134,242 @@ export const OfficeDashboard = () => {
   const [googleSheetsUrlInput, setGoogleSheetsUrlInput] = useState('');
   const [isSyncingSheets, setIsSyncingSheets] = useState(false);
 
+  // Estados para processamento profissional no escritório
+  const [selectedHeightModelId, setSelectedHeightModelId] = useState<string>('none');
+  const [selectedVolumeModelId, setSelectedVolumeModelId] = useState<string>('legacy');
+  const [processingFatorForma, setProcessingFatorForma] = useState<string>('0.7');
+
+  // Helper para obter DAP a partir de cap ou dap
+  const getDapOfTreeOrStem = (item: any) => {
+    if (item.dap !== undefined && item.dap !== null && item.dap !== '') {
+      const dVal = parseFloat(item.dap);
+      if (!isNaN(dVal)) return dVal;
+    }
+    if (item.cap !== undefined && item.cap !== null && item.cap !== '') {
+      const cVal = parseFloat(item.cap);
+      if (!isNaN(cVal)) return cVal / Math.PI;
+    }
+    return 0;
+  };
+
+  // Helper para limpar resultados de cálculo
+  const cleanResult = (val: number) => {
+    if (isNaN(val) || !isFinite(val)) return 0;
+    return Math.max(0, val);
+  };
+
+  // Avalia modelo hipsométrico (retorna H em metros)
+  const evaluateHeightModel = (model: any, dap: number): number => {
+    if (dap <= 0) return 0;
+    const { beta0, beta1, beta2, expressaoCustom } = model.coeficientes;
+    
+    switch (model.tipoModelo) {
+      case 'linear':
+        return beta0 + beta1 * dap;
+      case 'logaritmico':
+      case 'henriksen':
+        return beta0 + beta1 * Math.log(dap);
+      case 'curtis':
+        return Math.exp(beta0 + beta1 / dap);
+      case 'trorey':
+        return beta0 + beta1 * dap + (beta2 || 0) * Math.pow(dap, 2);
+      case 'personalizado':
+        if (!expressaoCustom) return 0;
+        try {
+          const vars = {
+            DAP: dap,
+            beta0: beta0,
+            beta1: beta1 || 0,
+            beta2: beta2 || 0,
+            beta3: model.coeficientes.beta3 || 0
+          };
+          const fn = new Function(...Object.keys(vars), `return ${expressaoCustom}`);
+          return fn(...Object.values(vars));
+        } catch (err) {
+          console.error('Erro ao avaliar modelo hipsométrico personalizado:', err);
+          return 0;
+        }
+      default:
+        return 0;
+    }
+  };
+
+  // Avalia modelo volumétrico (retorna V em m³)
+  const evaluateVolumeModel = (model: any, dap: number, h: number): number => {
+    if (dap <= 0) return 0;
+    const { beta0, beta1, beta2, beta3, expressaoCustom } = model.coeficientes;
+
+    switch (model.tipoModelo) {
+      case 'fator_forma':
+        const g = (Math.PI * Math.pow(dap / 100, 2)) / 4;
+        return g * h * beta0;
+      case 'schumacher_hall':
+        if (h <= 0) return 0;
+        return beta0 * Math.pow(dap, beta1 || 0) * Math.pow(h, beta2 || 0);
+      case 'spurr':
+        return beta0 + (beta1 || 0) * Math.pow(dap, 2) * h;
+      case 'stoate':
+        return beta0 + (beta1 || 0) * Math.pow(dap, 2) + (beta2 || 0) * Math.pow(dap, 2) * h + (beta3 || 0) * h;
+      case 'husch':
+        return beta0 * Math.pow(dap, beta1 || 0);
+      case 'personalizado':
+        if (!expressaoCustom) return 0;
+        try {
+          const vars = {
+            DAP: dap,
+            H: h,
+            beta0: beta0,
+            beta1: beta1 || 0,
+            beta2: beta2 || 0,
+            beta3: beta3 || 0
+          };
+          const fn = new Function(...Object.keys(vars), `return ${expressaoCustom}`);
+          return fn(...Object.values(vars));
+        } catch (err) {
+          console.error('Erro ao avaliar modelo volumétrico personalizado:', err);
+          return 0;
+        }
+      default:
+        return 0;
+    }
+  };
+
+  // Função principal para processar a parcela inteira no painel de auditoria do escritório
+  const handleProcessParcelDataInOffice = async (targetParcel: any) => {
+    if (!targetParcel) return;
+
+    const hm = selectedHeightModelId !== 'none' ? heightModels.find(m => m.id === selectedHeightModelId) : null;
+    let vm: any = null;
+    let isLegacyVolume = false;
+    let legacyFf = 0.7;
+
+    if (selectedVolumeModelId === 'legacy') {
+      isLegacyVolume = true;
+      legacyFf = parseFloat(processingFatorForma);
+      if (isNaN(legacyFf) || legacyFf <= 0) {
+        alert('Fator de forma comercial inválido.');
+        return;
+      }
+    } else {
+      vm = volumeModels.find(m => m.id === selectedVolumeModelId);
+      if (!vm) {
+        alert('Modelo volumétrico não encontrado.');
+        return;
+      }
+    }
+
+    const updatedDados = targetParcel.dados.map((ind: any) => {
+      const tree = { ...ind };
+      
+      let isHeightMeasured = false;
+      let usedHeight = 0;
+      let calculatedVol = 0;
+
+      if (tree.multipleStems && tree.stems && tree.stems.length > 0) {
+        let sumVol = 0;
+        let maxStemHt = 0;
+        let hasAnyEstimate = false;
+
+        const updatedStems = tree.stems.map((stem: any) => {
+          const stemCopy = { ...stem };
+          const stemDap = getDapOfTreeOrStem(stemCopy);
+          let stemHt = parseFloat(stemCopy.altura || '0');
+          let stemHtMedidaOuEstimada: 'medida' | 'estimada' = 'medida';
+
+          if (isNaN(stemHt) || stemHt <= 0) {
+            const globalHt = parseFloat(tree.ht || '0');
+            if (!isNaN(globalHt) && globalHt > 0) {
+              stemHt = globalHt;
+            }
+          }
+
+          if ((isNaN(stemHt) || stemHt <= 0) && hm) {
+            stemHt = evaluateHeightModel(hm, stemDap);
+            stemHt = cleanResult(stemHt);
+            stemHtMedidaOuEstimada = 'estimada';
+            hasAnyEstimate = true;
+          } else if (isNaN(stemHt) || stemHt <= 0) {
+            stemHt = 0;
+          }
+
+          stemCopy.alturaProcessada = Number(stemHt.toFixed(2));
+          stemCopy.alturaMedidaOuEstimada = stemHtMedidaOuEstimada;
+
+          if (stemHt > maxStemHt) {
+            maxStemHt = stemHt;
+          }
+
+          let stemVol = 0;
+          if (isLegacyVolume) {
+            const g = (Math.PI * Math.pow(stemDap / 100, 2)) / 4;
+            stemVol = g * stemHt * legacyFf;
+          } else if (vm) {
+            stemVol = evaluateVolumeModel(vm, stemDap, stemHt);
+          }
+          stemVol = cleanResult(stemVol);
+          stemCopy.volumeProcessado = Number(stemVol.toFixed(4));
+          sumVol += stemVol;
+
+          return stemCopy;
+        });
+
+        usedHeight = maxStemHt;
+        calculatedVol = sumVol;
+        isHeightMeasured = !hasAnyEstimate && tree.stems.every((s: any) => parseFloat(s.altura) > 0);
+        tree.stems = updatedStems;
+
+      } else {
+        const treeDap = getDapOfTreeOrStem(tree);
+        let treeHt = parseFloat(tree.ht || '0');
+        let htMedidaOuEstimada: 'medida' | 'estimada' = 'medida';
+
+        if ((isNaN(treeHt) || treeHt <= 0) && hm) {
+          treeHt = evaluateHeightModel(hm, treeDap);
+          treeHt = cleanResult(treeHt);
+          htMedidaOuEstimada = 'estimada';
+        } else if (isNaN(treeHt) || treeHt <= 0) {
+          treeHt = 0;
+        } else {
+          isHeightMeasured = true;
+        }
+
+        usedHeight = treeHt;
+
+        if (isLegacyVolume) {
+          const g = (Math.PI * Math.pow(treeDap / 100, 2)) / 4;
+          calculatedVol = g * treeHt * legacyFf;
+        } else if (vm) {
+          calculatedVol = evaluateVolumeModel(vm, treeDap, treeHt);
+        }
+        calculatedVol = cleanResult(calculatedVol);
+        isHeightMeasured = htMedidaOuEstimada === 'medida';
+      }
+
+      tree.alturaUtilizada = Number(usedHeight.toFixed(2));
+      tree.alturaMedidaOuEstimada = isHeightMeasured ? 'medida' : 'estimada';
+      tree.volumeCalculado = Number(calculatedVol.toFixed(4));
+
+      const hmDesc = hm ? `Hipsometria: ${hm.nome} (${hm.tipoModelo})` : 'Hipsometria: Não utilizada';
+      const vmDesc = isLegacyVolume ? `Volume: Fator de Forma (${legacyFf})` : `Volume: ${vm.nome} (${vm.tipoModelo})`;
+      tree.modeloUtilizado = `${hmDesc} | ${vmDesc}`;
+
+      return tree;
+    });
+
+    const updatedInventory = {
+      ...targetParcel,
+      dados: updatedDados
+    };
+
+    try {
+      await saveInventory(updatedInventory);
+      alert('Processamento profissional concluído na parcela com sucesso!');
+    } catch (e) {
+      console.error(e);
+      alert('Erro ao salvar dados processados na parcela.');
+    }
+  };
+
   // Filter projects by search
   const filteredFieldWorks = useMemo(() => {
     return fieldWorks.filter(fw => 
@@ -197,19 +433,20 @@ export const OfficeDashboard = () => {
         const spName = (ind.nomePopular || ind.nomeCientifico || 'Não Identificada').trim();
         spCount[spName] = (spCount[spName] || 0) + 1;
 
-        let maxHtObj = ind.ht ? parseFloat(ind.ht.toString()) : 0;
-        let stemsProps: { cap: number, ht: number }[] = [];
+        let maxHtObj = ind.alturaUtilizada !== undefined ? ind.alturaUtilizada : (ind.ht ? parseFloat(ind.ht.toString()) : 0);
+        let stemsProps: { cap: number, ht: number, volumeProcessado?: number }[] = [];
         
         if (ind.multipleStems && ind.stems) {
           ind.stems.forEach((s: any) => {
             stemsProps.push({
               cap: parseFloat((s.cap||'0').toString()),
-              ht: parseFloat((s.altura||'0').toString())
+              ht: s.alturaProcessada !== undefined ? s.alturaProcessada : parseFloat((s.altura||'0').toString()),
+              volumeProcessado: s.volumeProcessado
             });
           });
         } else {
           const mainDap = processCapDap(ind.cap, ind.dap);
-          const ht = parseFloat((ind.ht||'0').toString());
+          const ht = ind.alturaUtilizada !== undefined ? ind.alturaUtilizada : parseFloat((ind.ht||'0').toString());
           if (mainDap > 0) {
             stemsProps.push({ cap: ind.cap ? parseFloat(ind.cap.toString()) : mainDap*Math.PI, ht: ht });
           }
@@ -217,7 +454,16 @@ export const OfficeDashboard = () => {
         
         stemsProps.forEach(stem => {
           const g = calculateBasalArea(stem.cap);
-          const v = calculateVolume(g, stem.ht || maxHtObj, factorForma);
+          let v = 0;
+          if (ind.volumeCalculado !== undefined) {
+            if (ind.multipleStems) {
+              v = stem.volumeProcessado !== undefined ? stem.volumeProcessado : calculateVolume(g, stem.ht || maxHtObj, factorForma);
+            } else {
+              v = ind.volumeCalculado;
+            }
+          } else {
+            v = calculateVolume(g, stem.ht || maxHtObj, factorForma);
+          }
           totalG += g;
           totalV += v;
         });
@@ -302,19 +548,20 @@ export const OfficeDashboard = () => {
         };
 
         p.dados.forEach(ind => {
-          let maxHtObj = ind.ht ? parseFloat(ind.ht.toString()) : 0;
-          let stemsProps: { cap: number, ht: number }[] = [];
+          let maxHtObj = ind.alturaUtilizada !== undefined ? ind.alturaUtilizada : (ind.ht ? parseFloat(ind.ht.toString()) : 0);
+          let stemsProps: { cap: number, ht: number, volumeProcessado?: number }[] = [];
           
           if (ind.multipleStems && ind.stems) {
             ind.stems.forEach((st: any) => {
               stemsProps.push({
                 cap: parseFloat((st.cap||'0').toString()),
-                ht: parseFloat((st.altura||'0').toString())
+                ht: st.alturaProcessada !== undefined ? st.alturaProcessada : parseFloat((st.altura||'0').toString()),
+                volumeProcessado: st.volumeProcessado
               });
             });
           } else {
             const mainDap = processCapDap(ind.cap, ind.dap);
-            const ht = parseFloat((ind.ht||'0').toString());
+            const ht = ind.alturaUtilizada !== undefined ? ind.alturaUtilizada : parseFloat((ind.ht||'0').toString());
             if (mainDap > 0) {
               stemsProps.push({ cap: ind.cap ? parseFloat(ind.cap.toString()) : mainDap*Math.PI, ht: ht });
             }
@@ -322,7 +569,16 @@ export const OfficeDashboard = () => {
           
           stemsProps.forEach(stem => {
             const g = calculateBasalArea(stem.cap);
-            const v = calculateVolume(g, stem.ht || maxHtObj, factorForma);
+            let v = 0;
+            if (ind.volumeCalculado !== undefined) {
+              if (ind.multipleStems) {
+                v = stem.volumeProcessado !== undefined ? stem.volumeProcessado : calculateVolume(g, stem.ht || maxHtObj, factorForma);
+              } else {
+                v = ind.volumeCalculado;
+              }
+            } else {
+              v = calculateVolume(g, stem.ht || maxHtObj, factorForma);
+            }
             vParcel += v;
           });
         });
@@ -543,14 +799,33 @@ export const OfficeDashboard = () => {
         ...ind,
       };
 
-      delete baseData.stems;
-      delete baseData.multipleStems;
-      delete baseData.id;
+      // Deletar chaves internas de processamento profissional para colocar com nomes amigáveis no final
+      delete baseData.alturaUtilizada;
+      delete baseData.alturaMedidaOuEstimada;
+      delete baseData.volumeCalculado;
+      delete baseData.modeloUtilizado;
 
       const g = calculateBasalArea(parseFloat(ind.cap || 0));
       baseData['Area_Basal (m2)'] = g.toFixed(4);
-      baseData['Volume (m3)'] = calculateVolume(g, parseFloat(ind.ht || 0), 0.7).toFixed(4);
+      
+      if (ind.volumeCalculado !== undefined) {
+        baseData['Volume (m3)'] = ind.volumeCalculado;
+      } else {
+        baseData['Volume (m3)'] = calculateVolume(g, parseFloat(ind.ht || 0), 0.7).toFixed(4);
+      }
+      
       baseData['DAP_Equivalente (cm)'] = ind.cap ? (parseFloat(ind.cap) / Math.PI).toFixed(2) : '0';
+
+      if (ind.alturaUtilizada !== undefined) {
+        baseData['Altura Utilizada (m)'] = ind.alturaUtilizada;
+        baseData['Altura Medida/Estimada'] = ind.alturaMedidaOuEstimada === 'medida' ? 'Medida' : 'Estimada';
+      }
+      if (ind.volumeCalculado !== undefined) {
+        baseData['Volume Calculado (m3)'] = ind.volumeCalculado;
+      }
+      if (ind.modeloUtilizado) {
+        baseData['Modelo Utilizado'] = ind.modeloUtilizado;
+      }
       return baseData;
     });
 
@@ -1522,6 +1797,87 @@ export const OfficeDashboard = () => {
                 )}
               </div>
 
+              {/* Processamento Profissional (Modelos Florestais) no Escritório */}
+              {auditParcel.dados.length > 0 && (
+                <div style={{ 
+                  background: 'rgba(255, 255, 255, 0.02)', 
+                  border: '1px solid rgba(255, 255, 255, 0.06)', 
+                  padding: '20px', 
+                  borderRadius: '16px', 
+                  marginBottom: '20px' 
+                }}>
+                  <h4 style={{ margin: '0 0 12px 0', fontSize: '15px', fontWeight: '800', color: 'var(--primary-hover)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span>⚡</span> Processamento Profissional (Modelos Florestais)
+                  </h4>
+                  <p style={{ color: 'var(--text-muted)', fontSize: '12.5px', lineHeight: '1.4', margin: '0 0 16px 0' }}>
+                    Estime alturas faltantes e volumes de fustes individuais utilizando equações cadastradas na sua biblioteca de modelos.
+                  </p>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', marginBottom: '16px' }}>
+                    {/* Etapa 1: Hipsometria */}
+                    <div>
+                      <label className="input-label" style={{ fontWeight: 'bold', fontSize: '11.5px' }}>ETAPA 1: Selecionar Modelo Hipsométrico (Altura)</label>
+                      <select
+                        className="input-field"
+                        style={{ marginBottom: 0, marginTop: '4px', fontSize: '13px', height: '38px' }}
+                        value={selectedHeightModelId}
+                        onChange={e => setSelectedHeightModelId(e.target.value)}
+                      >
+                        <option value="none">Não utilizar modelo (ignorar estimativa)</option>
+                        {heightModels.map(m => (
+                          <option key={m.id} value={m.id}>
+                            {m.nome} (🌲 {m.especie} | 📍 {m.regiao})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Etapa 2: Volumetria */}
+                    <div>
+                      <label className="input-label" style={{ fontWeight: 'bold', fontSize: '11.5px' }}>ETAPA 2: Selecionar Modelo Volumétrico (Volume)</label>
+                      <select
+                        className="input-field"
+                        style={{ marginBottom: 0, marginTop: '4px', fontSize: '13px', height: '38px' }}
+                        value={selectedVolumeModelId}
+                        onChange={e => setSelectedVolumeModelId(e.target.value)}
+                      >
+                        <option value="legacy">Fator de Forma Comercial (Legacy)</option>
+                        {volumeModels.map(m => (
+                          <option key={m.id} value={m.id}>
+                            {m.nome} (🌲 {m.especie} | 📍 {m.regiao})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Fator de forma se selecionado legacy */}
+                    {selectedVolumeModelId === 'legacy' && (
+                      <div>
+                        <label className="input-label" style={{ fontSize: '11.5px' }}>Fator de Forma Comercial (Legacy) *</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          className="input-field"
+                          style={{ marginBottom: 0, marginTop: '4px', fontSize: '13px', height: '38px' }}
+                          value={processingFatorForma}
+                          onChange={e => setProcessingFatorForma(e.target.value)}
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                    <button
+                      className="btn btn-primary"
+                      style={{ width: 'auto', padding: '8px 20px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                      onClick={() => handleProcessParcelDataInOffice(auditParcel)}
+                    >
+                      <span>⚡</span> Executar Processamento e Salvar na Parcela
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div style={{ background: 'rgba(0,230,118,0.04)', border: '1px solid rgba(0,230,118,0.2)', padding: '12px 18px', borderRadius: '12px', fontSize: '13px', color: '#a5d6a7', marginBottom: '20px' }}>
                 👉 <strong>Modo Somente Leitura (Audit Panel)</strong>: Este espaço destina-se apenas à verificação e auditoria de consistência das árvores cadastradas em campo. Modificações ou exclusões acidentais estão bloqueadas no ambiente de escritório.
               </div>
@@ -1886,6 +2242,21 @@ export const OfficeDashboard = () => {
                 >
                   <span>👥 Minha Equipe</span>
                   <span style={{ fontSize: '11px', opacity: 0.7 }}>{collaborators.length} membros</span>
+                </button>
+              )}
+
+              {/* Modelos de Altura e Volume */}
+              {currentUser && (
+                <button 
+                  className="btn btn-secondary" 
+                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', borderColor: '#a5d6a7', color: '#a5d6a7' }}
+                  onClick={() => {
+                    setShowSettingsModal(false);
+                    navigate('/modelos');
+                  }}
+                >
+                  <span>📐 Modelos (Altura / Volume)</span>
+                  <span style={{ fontSize: '11px', opacity: 0.7 }}>Gerenciar</span>
                 </button>
               )}
 

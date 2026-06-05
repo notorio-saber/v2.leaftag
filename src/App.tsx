@@ -15,6 +15,7 @@ import { useAuth } from './context/AuthContext';
 import { doc, getDoc, updateDoc, setDoc, deleteDoc } from 'firebase/firestore';
 import { db } from './lib/firebase';
 import { OfficeDashboard } from './pages/OfficeDashboard';
+import { ModelosManagement } from './pages/ModelosManagement';
 
 // Permite apenas admin e active
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -615,6 +616,7 @@ const Home = () => {
                 </button>
               )}
 
+
               {/* Painel do Escritório (Desktop Only) */}
               {(status === 'active' || status === 'admin') && (
                 <button 
@@ -682,6 +684,7 @@ function App() {
         <Route path="/cubagem/setup/:fieldWorkId" element={<ProtectedRoute><CubagemSetup /></ProtectedRoute>} />
         <Route path="/cubagem/setup/:fieldWorkId/:talhaoId" element={<ProtectedRoute><CubagemSetup /></ProtectedRoute>} />
         <Route path="/cubagem/collect/:inventoryId" element={<ProtectedRoute><CubagemCollect /></ProtectedRoute>} />
+        <Route path="/modelos" element={<ProtectedRoute><ModelosManagement /></ProtectedRoute>} />
       </Routes>
     </BrowserRouter>
   );

@@ -63,6 +63,32 @@ export const StatisticalDashboard: React.FC<DashboardProps> = ({ inventories, on
     let totalV = 0;
     let totalFustes = 0;
 
+    // Detect if trees are already processed by professional models
+    const firstProcessedTree = allInd.find(t => t.volumeCalculado !== undefined);
+    const isProcessed = !!firstProcessedTree;
+
+    let hModelName = 'Não Utilizado';
+    let vModelName = 'Fator de Forma (Legacy)';
+    let measuredHtCount = 0;
+    let estimatedHtCount = 0;
+
+    if (isProcessed) {
+      const modelDesc = firstProcessedTree?.modeloUtilizado || '';
+      if (modelDesc) {
+        const parts = modelDesc.split(' | ');
+        if (parts[0]) hModelName = parts[0].replace('Hipsometria: ', '');
+        if (parts[1]) vModelName = parts[1].replace('Volume: ', '');
+      }
+
+      allInd.forEach(ind => {
+        if (ind.alturaMedidaOuEstimada === 'medida') {
+          measuredHtCount++;
+        } else if (ind.alturaMedidaOuEstimada === 'estimada') {
+          estimatedHtCount++;
+        }
+      });
+    }
+
     // Helper process CAP/DAP logic
     const processCapDap = (capVal?: any, dapVal?: any) => {
        let d = 0;
@@ -84,8 +110,9 @@ export const StatisticalDashboard: React.FC<DashboardProps> = ({ inventories, on
 
       // Height
       let maxHtObj = 0;
-      if (ind.ht) {
-        maxHtObj = parseFloat(ind.ht.toString());
+      const htVal = isProcessed ? ind.alturaUtilizada : parseFloat(ind.ht || '0');
+      if (htVal) {
+        maxHtObj = parseFloat(htVal.toString());
         if (!isNaN(maxHtObj) && maxHtObj > 0) {
           const htGroup = Math.floor(maxHtObj / alturaInterval) * alturaInterval;
           const htLabel = `${htGroup} - ${htGroup + alturaInterval}m`;
@@ -94,20 +121,25 @@ export const StatisticalDashboard: React.FC<DashboardProps> = ({ inventories, on
       }
 
       // Stems / CAP
-      let stemsProps: { dap: number, cap: number, ht: number }[] = [];
+      let stemsProps: { dap: number, cap: number, ht: number, volumeProcessado?: number }[] = [];
       if (ind.multipleStems && ind.stems) {
          ind.stems.forEach(s => {
            stemsProps.push({ 
              dap: processCapDap(s.cap, undefined), 
              cap: parseFloat((s.cap||'0').toString()), 
-             ht: parseFloat((s.altura||'0').toString()) 
+             ht: parseFloat((s.altura||'0').toString()),
+             volumeProcessado: s.volumeProcessado
            });
          });
       } else {
          const mainDap = processCapDap(ind.cap, ind.dap);
          const ht = parseFloat((ind.ht||'0').toString());
          if (mainDap > 0) {
-            stemsProps.push({ dap: mainDap, cap: ind.cap ? parseFloat(ind.cap.toString()) : mainDap*Math.PI, ht: ht });
+            stemsProps.push({ 
+              dap: mainDap, 
+              cap: ind.cap ? parseFloat(ind.cap.toString()) : mainDap*Math.PI, 
+              ht: ht 
+            });
          }
       }
 
@@ -120,8 +152,20 @@ export const StatisticalDashboard: React.FC<DashboardProps> = ({ inventories, on
            distDiametric[diamLabel] = (distDiametric[diamLabel] || 0) + 1;
 
            // Calculate Metrics
-           const g = calculateBasalArea(stem.cap);
-           const v = calculateVolume(g, stem.ht || maxHtObj, fatorForma);
+           let g = 0;
+           let v = 0;
+
+           if (isProcessed) {
+             g = calculateBasalArea(stem.cap);
+             if (ind.multipleStems) {
+               v = stem.volumeProcessado !== undefined ? stem.volumeProcessado : calculateVolume(g, stem.ht || maxHtObj, fatorForma);
+             } else {
+               v = ind.volumeCalculado !== undefined ? ind.volumeCalculado : calculateVolume(g, stem.ht || maxHtObj, fatorForma);
+             }
+           } else {
+             g = calculateBasalArea(stem.cap);
+             v = calculateVolume(g, stem.ht || maxHtObj, fatorForma);
+           }
            
            distBasal[diamLabel] = (distBasal[diamLabel] || 0) + g;
            distVolume[diamLabel] = (distVolume[diamLabel] || 0) + v;
@@ -168,7 +212,12 @@ export const StatisticalDashboard: React.FC<DashboardProps> = ({ inventories, on
       basalFinal,
       volumeFinal,
       alturaFinal,
-      speciesFinal 
+      speciesFinal,
+      isProcessed,
+      hModelName,
+      vModelName,
+      measuredHtCount,
+      estimatedHtCount
     };
   }, [inventories, classInterval, alturaInterval, fatorForma]);
 
@@ -373,8 +422,10 @@ export const StatisticalDashboard: React.FC<DashboardProps> = ({ inventories, on
           alignItems: 'end',
           border: '1px solid rgba(255, 255, 255, 0.06)'
         }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <label style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '0.5px' }}>Fator de Forma Geral (v)</label>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', opacity: stats.isProcessed ? 0.5 : 1 }}>
+            <label style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '0.5px' }}>
+              Fator de Forma Geral (v) {stats.isProcessed && <span style={{ color: '#ff8a80', fontSize: '9px', textTransform: 'none' }}>(Inativo)</span>}
+            </label>
             <input 
               type="number" 
               step="0.01" 
@@ -382,6 +433,7 @@ export const StatisticalDashboard: React.FC<DashboardProps> = ({ inventories, on
               style={{ marginBottom: 0, padding: '10px 14px', borderRadius: '12px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.08)' }} 
               value={fatorForma} 
               onChange={e => setFatorForma(parseFloat(e.target.value) || 0.7)} 
+              disabled={stats.isProcessed}
             />
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -435,6 +487,47 @@ export const StatisticalDashboard: React.FC<DashboardProps> = ({ inventories, on
             )}
           </button>
         </div>
+
+        {/* Modelos Florestais Utilizados (Processamento Profissional) */}
+        {stats.isProcessed && (
+          <div className="glass-card" style={{
+            marginBottom: '24px',
+            padding: '20px',
+            borderRadius: '20px',
+            border: '1px solid rgba(46, 125, 50, 0.25)',
+            background: 'linear-gradient(135deg, rgba(46, 125, 50, 0.06) 0%, rgba(255, 255, 255, 0.01) 100%)',
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '24px',
+            justifyContent: 'space-between'
+          }}>
+            <div style={{ flex: '1 1 200px' }}>
+              <span style={{ fontSize: '11px', color: 'var(--primary-hover)', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '0.5px', display: 'block', marginBottom: '6px' }}>
+                Modelo Hipsométrico (Altura)
+              </span>
+              <span style={{ fontSize: '15px', color: '#fff', fontWeight: 'bold' }}>
+                {stats.hModelName}
+              </span>
+            </div>
+            <div style={{ flex: '1 1 200px' }}>
+              <span style={{ fontSize: '11px', color: 'var(--primary-hover)', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '0.5px', display: 'block', marginBottom: '6px' }}>
+                Modelo Volumétrico (Volume)
+              </span>
+              <span style={{ fontSize: '15px', color: '#fff', fontWeight: 'bold' }}>
+                {stats.vModelName}
+              </span>
+            </div>
+            <div style={{ flex: '1 1 200px' }}>
+              <span style={{ fontSize: '11px', color: 'var(--primary-hover)', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '0.5px', display: 'block', marginBottom: '6px' }}>
+                Alturas Amostradas
+              </span>
+              <div style={{ display: 'flex', gap: '16px', fontSize: '14px', fontWeight: 'bold', color: '#fff' }}>
+                <div>📐 Medidas: <span style={{ color: '#a5d6a7' }}>{stats.measuredHtCount}</span></div>
+                <div>📊 Estimadas: <span style={{ color: '#ffb74d' }}>{stats.estimatedHtCount}</span></div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Top High Level Stats (Premium Grids) */}
         <div style={{ 

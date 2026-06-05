@@ -28,6 +28,23 @@ export const InventoryDetail = () => {
   const [isZipping, setIsZipping] = useState(false);
   const [showDashboard, setShowDashboard] = useState(false);
 
+
+
+  // Helper para obter DAP a partir de cap ou dap
+  const getDapOfTreeOrStem = (item: any) => {
+    if (item.dap !== undefined && item.dap !== null && item.dap !== '') {
+      const dVal = parseFloat(item.dap);
+      if (!isNaN(dVal)) return dVal;
+    }
+    if (item.cap !== undefined && item.cap !== null && item.cap !== '') {
+      const cVal = parseFloat(item.cap);
+      if (!isNaN(cVal)) return cVal / Math.PI;
+    }
+    return 0;
+  };
+
+
+
   const [showEditParcelModal, setShowEditParcelModal] = useState(false);
   const [editParcelName, setEditParcelName] = useState('');
   const [editParcelArea, setEditParcelArea] = useState('');
@@ -251,36 +268,86 @@ export const InventoryDetail = () => {
       delete baseData.multipleStems;
       delete baseData.id;
 
+      // Deletar chaves internas de processamento profissional para colocar com nomes amigáveis no final
+      delete baseData.alturaUtilizada;
+      delete baseData.alturaMedidaOuEstimada;
+      delete baseData.volumeCalculado;
+      delete baseData.modeloUtilizado;
+
       let maxCap = ind.cap;
-      let maxHt = ind.ht;
 
       if (selectedCalcs.fustes && ind.multipleStems && ind.stems) {
         baseData['Qtd Fustes'] = ind.stems.length;
         let areaBasalTotal = 0;
+        let volumeTotal = 0;
         ind.stems.forEach((stem: any, i: number) => {
           baseData[`Fuste_${i+1}_CAP`] = stem.cap;
-          baseData[`Fuste_${i+1}_Altura`] = stem.altura;
+          
+          if (stem.alturaProcessada !== undefined) {
+            baseData[`Fuste_${i+1}_Altura`] = stem.alturaProcessada;
+            baseData[`Fuste_${i+1}_Altura_MedidaOuEstimada`] = stem.alturaMedidaOuEstimada === 'medida' ? 'Medida' : 'Estimada';
+          } else {
+            baseData[`Fuste_${i+1}_Altura`] = stem.altura;
+          }
+
           if (selectedCalcs.areaBasal) {
             const capNum = parseFloat(stem.cap || '0');
             const g = calculateBasalArea(capNum);
             baseData[`Fuste_${i+1}_AreaBasal`] = g.toFixed(4);
             areaBasalTotal += g;
             if(capNum > (maxCap||0)) maxCap = capNum;
-            if(parseFloat(stem.altura||'0') > (maxHt||0)) maxHt = parseFloat(stem.altura);
+          }
+
+          if (selectedCalcs.volume) {
+            if (stem.volumeProcessado !== undefined) {
+              baseData[`Fuste_${i+1}_Volume`] = stem.volumeProcessado;
+              volumeTotal += stem.volumeProcessado;
+            } else {
+              const capNum = parseFloat(stem.cap || '0');
+              const g = calculateBasalArea(capNum);
+              const stemVol = calculateVolume(g, parseFloat(stem.altura || '0'), parseFloat(fatorForma));
+              baseData[`Fuste_${i+1}_Volume`] = stemVol.toFixed(4);
+              volumeTotal += stemVol;
+            }
           }
         });
         if (selectedCalcs.areaBasal) baseData['Area_Basal_Total (m2)'] = areaBasalTotal.toFixed(4);
-        if (selectedCalcs.volume) baseData['Volume_Total (m3)'] = calculateVolume(areaBasalTotal, maxHt, parseFloat(fatorForma)).toFixed(4);
-      } else if (ind.cap) {
+        if (selectedCalcs.volume) {
+          baseData['Volume_Total (m3)'] = ind.volumeCalculado !== undefined ? ind.volumeCalculado : volumeTotal.toFixed(4);
+        }
+      } else if (ind.cap || ind.dap) {
+        const treeDap = getDapOfTreeOrStem(ind);
+        const g = (Math.PI * Math.pow(treeDap / 100, 2)) / 4;
+
         if (selectedCalcs.areaBasal) {
-          const g = calculateBasalArea(parseFloat(ind.cap));
           baseData['Area_Basal (m2)'] = g.toFixed(4);
-          if (selectedCalcs.volume) baseData['Volume (m3)'] = calculateVolume(g, parseFloat(ind.ht || 0), parseFloat(fatorForma)).toFixed(4);
+        }
+
+        if (selectedCalcs.volume) {
+          if (ind.volumeCalculado !== undefined) {
+            baseData['Volume (m3)'] = ind.volumeCalculado;
+          } else {
+            baseData['Volume (m3)'] = calculateVolume(g, parseFloat(ind.ht || 0), parseFloat(fatorForma)).toFixed(4);
+          }
         }
       }
-      if (selectedCalcs.dapEquivalente && maxCap) {
-        baseData['DAP_Equivalente (cm)'] = (parseFloat(maxCap) / Math.PI).toFixed(2);
+
+      if (selectedCalcs.dapEquivalente && (ind.cap || ind.dap)) {
+        baseData['DAP_Equivalente (cm)'] = getDapOfTreeOrStem(ind).toFixed(2);
       }
+
+      // Adicionar colunas de processamento oficial formatadas
+      if (ind.alturaUtilizada !== undefined) {
+        baseData['Altura Utilizada (m)'] = ind.alturaUtilizada;
+        baseData['Altura Medida/Estimada'] = ind.alturaMedidaOuEstimada === 'medida' ? 'Medida' : 'Estimada';
+      }
+      if (ind.volumeCalculado !== undefined) {
+        baseData['Volume Calculado (m3)'] = ind.volumeCalculado;
+      }
+      if (ind.modeloUtilizado) {
+        baseData['Modelo Utilizado'] = ind.modeloUtilizado;
+      }
+
       return baseData;
     });
 

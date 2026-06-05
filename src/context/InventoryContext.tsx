@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
-import type { Inventory, FieldWork, Talhao, Stratum } from '../types';
+import type { Inventory, FieldWork, Talhao, Stratum, HeightModel, VolumeModel } from '../types';
 import { db } from '../lib/firebase';
 import { collection, doc, onSnapshot, setDoc, deleteDoc } from 'firebase/firestore';
 import { useAuth } from './AuthContext';
@@ -10,6 +10,8 @@ interface InventoryContextType {
   talhoes: Talhao[];
   inventories: Inventory[];
   strata: Stratum[];
+  heightModels: HeightModel[];
+  volumeModels: VolumeModel[];
   currentInventory: Inventory | null;
   setCurrentInventory: (inv: Inventory | null) => void;
   saveInventory: (inv: Inventory) => Promise<void>;
@@ -20,6 +22,10 @@ interface InventoryContextType {
   deleteTalhao: (id: string) => Promise<void>;
   createStratum: (s: Stratum) => Promise<void>;
   deleteStratum: (id: string) => Promise<void>;
+  createHeightModel: (hm: HeightModel) => Promise<void>;
+  deleteHeightModel: (id: string) => Promise<void>;
+  createVolumeModel: (vm: VolumeModel) => Promise<void>;
+  deleteVolumeModel: (id: string) => Promise<void>;
   isSynced: boolean;
 }
 
@@ -49,14 +55,18 @@ export const InventoryProvider: React.FC<{ children: ReactNode }> = ({ children 
   const [talhoes, setTalhoes] = useState<Talhao[]>([]);
   const [inventories, setInventories] = useState<Inventory[]>([]);
   const [strata, setStrata] = useState<Stratum[]>([]);
+  const [heightModels, setHeightModels] = useState<HeightModel[]>([]);
+  const [volumeModels, setVolumeModels] = useState<VolumeModel[]>([]);
   const [currentInventory, setCurrentInventory] = useState<Inventory | null>(null);
 
   const [fwPending, setFwPending] = useState(false);
   const [talPending, setTalPending] = useState(false);
   const [invPending, setInvPending] = useState(false);
   const [strataPending, setStrataPending] = useState(false);
+  const [hmPending, setHmPending] = useState(false);
+  const [vmPending, setVmPending] = useState(false);
 
-  const isSynced = !fwPending && !talPending && !invPending && !strataPending;
+  const isSynced = !fwPending && !talPending && !invPending && !strataPending && !hmPending && !vmPending;
 
   // Firestore Snapshot (Realtime + Offline IndexedDB)
   useEffect(() => {
@@ -65,10 +75,14 @@ export const InventoryProvider: React.FC<{ children: ReactNode }> = ({ children 
       setTalhoes([]);
       setInventories([]);
       setStrata([]);
+      setHeightModels([]);
+      setVolumeModels([]);
       setFwPending(false);
       setTalPending(false);
       setInvPending(false);
       setStrataPending(false);
+      setHmPending(false);
+      setVmPending(false);
       return;
     }
 
@@ -124,11 +138,39 @@ export const InventoryProvider: React.FC<{ children: ReactNode }> = ({ children 
       console.error("Erro no Sync do Strata Firestore:", error);
     });
 
+    const hmRef = collection(db, `users/${uidToUse}/heightModels`);
+    const unsubscribeHm = onSnapshot(hmRef, { includeMetadataChanges: true }, (snapshot) => {
+      setHmPending(snapshot.metadata.hasPendingWrites);
+      const data: HeightModel[] = [];
+      snapshot.forEach(doc => {
+        data.push(doc.data() as HeightModel);
+      });
+      data.sort((a,b) => b.criadoEm.localeCompare(a.criadoEm));
+      setHeightModels(data);
+    }, (error) => {
+      console.error("Erro no Sync do HeightModels Firestore:", error);
+    });
+
+    const vmRef = collection(db, `users/${uidToUse}/volumeModels`);
+    const unsubscribeVm = onSnapshot(vmRef, { includeMetadataChanges: true }, (snapshot) => {
+      setVmPending(snapshot.metadata.hasPendingWrites);
+      const data: VolumeModel[] = [];
+      snapshot.forEach(doc => {
+        data.push(doc.data() as VolumeModel);
+      });
+      data.sort((a,b) => b.criadoEm.localeCompare(a.criadoEm));
+      setVolumeModels(data);
+    }, (error) => {
+      console.error("Erro no Sync do VolumeModels Firestore:", error);
+    });
+
     return () => {
       unsubscribeFw();
       unsubscribeTal();
       unsubscribeInv();
       unsubscribeStrata();
+      unsubscribeHm();
+      unsubscribeVm();
     };
   }, [currentUser, uidToUse]);
 
@@ -232,6 +274,30 @@ export const InventoryProvider: React.FC<{ children: ReactNode }> = ({ children 
     }
   };
 
+  const createHeightModel = async (hm: HeightModel) => {
+    if (!currentUser || !uidToUse) return;
+    const docRef = doc(db, `users/${uidToUse}/heightModels`, hm.id);
+    await setDoc(docRef, cleanObject(hm));
+  };
+
+  const deleteHeightModel = async (id: string) => {
+    if (!currentUser || !uidToUse) return;
+    const docRef = doc(db, `users/${uidToUse}/heightModels`, id);
+    await deleteDoc(docRef);
+  };
+
+  const createVolumeModel = async (vm: VolumeModel) => {
+    if (!currentUser || !uidToUse) return;
+    const docRef = doc(db, `users/${uidToUse}/volumeModels`, vm.id);
+    await setDoc(docRef, cleanObject(vm));
+  };
+
+  const deleteVolumeModel = async (id: string) => {
+    if (!currentUser || !uidToUse) return;
+    const docRef = doc(db, `users/${uidToUse}/volumeModels`, id);
+    await deleteDoc(docRef);
+  };
+
   return (
     <InventoryContext.Provider
       value={{
@@ -239,6 +305,8 @@ export const InventoryProvider: React.FC<{ children: ReactNode }> = ({ children 
         talhoes,
         inventories,
         strata,
+        heightModels,
+        volumeModels,
         currentInventory,
         setCurrentInventory,
         saveInventory,
@@ -249,6 +317,10 @@ export const InventoryProvider: React.FC<{ children: ReactNode }> = ({ children 
         deleteTalhao,
         createStratum,
         deleteStratum,
+        createHeightModel,
+        deleteHeightModel,
+        createVolumeModel,
+        deleteVolumeModel,
         isSynced
       }}
     >
