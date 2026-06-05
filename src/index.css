@@ -401,13 +401,45 @@ body.light-theme [style*="color: #fff"],
 body.light-theme [style*="color: #ffffff"],
 body.light-theme [style*="color:#fff"],
 body.light-theme [style*="color:#ffffff"],
-body.light-theme [style*="color: rgb(255, 255, 255)"] {
+body.light-theme [style*="color: rgb(255, 255, 255)"],
+body.light-theme [style*="color: white"],
+body.light-theme [style*="color:white"] {
   color: var(--text-main) !important;
 }
 
 body.light-theme [style*="background: #020503"],
 body.light-theme [style*="background:#020503"] {
   background: var(--bg-color) !important;
+}
+
+/* Sidebar Light Theme overrides */
+body.light-theme .office-sidebar {
+  background: rgba(255, 255, 255, 0.45) !important;
+  border-right: 1px solid rgba(0, 0, 0, 0.08) !important;
+}
+
+body.light-theme .office-sidebar > div:first-child {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08) !important;
+}
+
+body.light-theme .office-sidebar > div:last-child {
+  border-top: 1px solid rgba(0, 0, 0, 0.08) !important;
+  background: rgba(0, 0, 0, 0.04) !important;
+}
+
+/* Project context menu dropdown in light theme */
+body.light-theme .office-sidebar div[style*="background: #1a1a1a"],
+body.light-theme .office-sidebar div[style*="background:#1a1a1a"] {
+  background: rgba(255, 255, 255, 0.9) !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1) !important;
+  backdrop-filter: blur(16px);
+  WebkitBackdropFilter: blur(16px);
+}
+
+body.light-theme .office-sidebar div[style*="background: #1a1a1a"] button:hover,
+body.light-theme .office-sidebar div[style*="background:#1a1a1a"] button:hover {
+  background-color: rgba(0, 0, 0, 0.05) !important;
 }
 
 body.light-theme select {
