@@ -2911,8 +2911,8 @@ export const OfficeDashboard = () => {
       )}
 
       {editingFw && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100000, padding: '20px' }}>
-           <div className="glass-card" style={{ width: '100%', maxWidth: '400px', borderRadius: '0px' }}>
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100000, padding: '20px', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
+           <div className="glass-card" style={{ width: '100%', maxWidth: '400px', background: '#141c18', border: '1px solid rgba(255, 255, 255, 0.12)', boxShadow: '0 20px 40px rgba(0,0,0,0.6)', borderRadius: '16px', padding: '24px' }}>
               <h3 style={{ margin: 0, fontSize: '18px', color: 'var(--primary-hover)', fontWeight: '800' }}>Editar Trabalho</h3>
               <input className="input-field" placeholder="Nome (Ex: Inventário 2026)" value={editName} onChange={e => setEditName(e.target.value)} style={{ marginTop: '16px' }} />
               <input className="input-field" placeholder="Local / Fazenda" value={editLocal} onChange={e => setEditLocal(e.target.value)} />
