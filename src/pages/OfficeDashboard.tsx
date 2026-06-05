@@ -925,6 +925,42 @@ export const OfficeDashboard = () => {
           </div>
         </div>
 
+        {/* Biblioteca de Modelos Button */}
+        <div style={{ padding: '12px 24px 4px' }}>
+          <button 
+            onClick={() => navigate('/modelos')}
+            style={{
+              width: '100%',
+              background: 'linear-gradient(135deg, rgba(0, 230, 118, 0.15) 0%, rgba(0, 176, 255, 0.15) 100%)',
+              border: '1px solid rgba(0, 230, 118, 0.35)',
+              borderRadius: '12px',
+              color: '#ffffff',
+              padding: '12px 16px',
+              fontSize: '13px',
+              fontWeight: '700',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '10px',
+              transition: 'all 0.2s ease',
+              boxShadow: '0 4px 12px rgba(0, 230, 118, 0.05)'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.border = '1px solid #00e676';
+              e.currentTarget.style.transform = 'translateY(-1px)';
+              e.currentTarget.style.boxShadow = '0 6px 16px rgba(0, 230, 118, 0.15)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.border = '1px solid rgba(0, 230, 118, 0.35)';
+              e.currentTarget.style.transform = 'none';
+              e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 230, 118, 0.05)';
+            }}
+          >
+            <span>📐 Biblioteca de Equações</span>
+          </button>
+        </div>
+
         {/* Project search */}
         <div style={{ padding: '8px 24px' }}>
           <div style={{ position: 'relative' }}>
@@ -1809,9 +1845,18 @@ export const OfficeDashboard = () => {
                   <h4 style={{ margin: '0 0 12px 0', fontSize: '15px', fontWeight: '800', color: 'var(--primary-hover)', display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span>⚡</span> Processamento Profissional (Modelos Florestais)
                   </h4>
-                  <p style={{ color: 'var(--text-muted)', fontSize: '12.5px', lineHeight: '1.4', margin: '0 0 16px 0' }}>
-                    Estime alturas faltantes e volumes de fustes individuais utilizando equações cadastradas na sua biblioteca de modelos.
-                  </p>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '0 0 16px 0', flexWrap: 'wrap', gap: '8px' }}>
+                    <p style={{ color: 'var(--text-muted)', fontSize: '12.5px', lineHeight: '1.4', margin: 0, flex: 1 }}>
+                      Estime alturas faltantes e volumes de fustes individuais utilizando equações cadastradas na sua biblioteca de modelos.
+                    </p>
+                    <button 
+                      className="btn btn-secondary" 
+                      style={{ fontSize: '12px', padding: '6px 12px', height: 'auto', width: 'auto', borderColor: 'var(--primary-hover)', color: 'var(--primary-hover)', background: 'transparent' }}
+                      onClick={() => navigate('/modelos')}
+                    >
+                      📐 Gerenciar Biblioteca
+                    </button>
+                  </div>
 
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', marginBottom: '16px' }}>
                     {/* Etapa 1: Hipsometria */}

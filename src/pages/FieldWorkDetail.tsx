@@ -32,6 +32,7 @@ export const FieldWorkDetail = () => {
   const [showSheetsModal, setShowSheetsModal] = useState(false);
   const [googleSheetsUrlInput, setGoogleSheetsUrlInput] = useState('');
   const [isSyncingSheets, setIsSyncingSheets] = useState(false);
+  const [activeSubTab, setActiveSubTab] = useState<'inventario' | 'cubagem'>('inventario');
 
   const fw = fieldWorks.find(f => f.id === id);
 
@@ -369,7 +370,54 @@ export const FieldWorkDetail = () => {
         </button>
       </div>
 
-      {/* Title / Summary */}
+      {/* Sub-tab Switcher */}
+      <div style={{ 
+        display: 'flex', 
+        gap: '4px', 
+        marginTop: '16px', 
+        marginBottom: '24px',
+        borderBottom: '1px solid rgba(255,255,255,0.08)',
+        paddingBottom: '4px'
+      }}>
+        <button 
+          onClick={() => setActiveSubTab('inventario')}
+          style={{
+            background: 'none',
+            border: 'none',
+            color: activeSubTab === 'inventario' ? 'var(--primary-hover)' : 'var(--text-muted)',
+            borderBottom: activeSubTab === 'inventario' ? '3px solid var(--primary-hover)' : 'none',
+            padding: '8px 16px',
+            cursor: 'pointer',
+            fontWeight: 'bold',
+            fontSize: '14.5px',
+            transition: 'all 0.2s ease',
+            outline: 'none'
+          }}
+        >
+          📋 Parcelas & Talhões ({parcels.length})
+        </button>
+        <button 
+          onClick={() => setActiveSubTab('cubagem')}
+          style={{
+            background: 'none',
+            border: 'none',
+            color: activeSubTab === 'cubagem' ? '#00e676' : 'var(--text-muted)',
+            borderBottom: activeSubTab === 'cubagem' ? '3px solid #00e676' : 'none',
+            padding: '8px 16px',
+            cursor: 'pointer',
+            fontWeight: 'bold',
+            fontSize: '14.5px',
+            transition: 'all 0.2s ease',
+            outline: 'none'
+          }}
+        >
+          🌲 Cubagem Florestal ({cubageSessions.length})
+        </button>
+      </div>
+
+      {activeSubTab === 'inventario' && (
+        <>
+          {/* Title / Summary */}
       <div style={{ margin: '28px 0 16px' }}>
         <h2 style={{ fontSize: '16px', fontWeight: '700', letterSpacing: '-0.02em', margin: 0 }}>
           Talhões ({fwTalhoes.length}) • Parcelas ({parcels.length})
@@ -719,23 +767,27 @@ export const FieldWorkDetail = () => {
           )}
         </div>
       )}
+        </>
+      )}
 
-      {/* Cubagem Florestal Section */}
-      <div style={{ margin: '36px 0 16px' }}>
-        <h2 style={{ fontSize: '18px', fontWeight: '800', letterSpacing: '-0.02em', color: 'var(--primary-hover)' }}>
-          Cubagem Florestal (Árvores Cubadas)
-        </h2>
-        <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginTop: '4px', marginBottom: '16px' }}>
-          Realize a cubagem detalhada de árvores individuais usando os métodos Smalian, Huber ou Newton.
-        </p>
-        <button 
-          className="btn btn-primary" 
-          style={{ width: 'auto', padding: '10px 20px', marginBottom: '16px' }}
-          onClick={() => navigate(`/cubagem/setup/${fw.id}`)}
-        >
-          + Nova Cubagem Florestal
-        </button>
-      </div>
+      {activeSubTab === 'cubagem' && (
+        <>
+          {/* Cubagem Florestal Section */}
+          <div style={{ margin: '12px 0 16px' }}>
+            <h2 style={{ fontSize: '18px', fontWeight: '800', letterSpacing: '-0.02em', color: '#00e676' }}>
+              Cubagem Florestal (Árvores Cubadas)
+            </h2>
+            <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginTop: '4px', marginBottom: '16px' }}>
+              Realize a cubagem detalhada de árvores individuais usando os métodos Smalian, Huber ou Newton.
+            </p>
+            <button 
+              className="btn btn-primary" 
+              style={{ width: 'auto', padding: '10px 20px', marginBottom: '16px', background: 'linear-gradient(135deg, #00e676 0%, #00b0ff 100%)', border: 'none' }}
+              onClick={() => navigate(`/cubagem/setup/${fw.id}`)}
+            >
+              + Nova Cubagem Florestal
+            </button>
+          </div>
 
       {cubageSessions.length === 0 ? (
         <div className="glass-card" style={{ textAlign: 'center', padding: '30px', borderStyle: 'dashed' }}>
@@ -779,6 +831,8 @@ export const FieldWorkDetail = () => {
             );
           })}
         </div>
+      )}
+        </>
       )}
 
       {/* Delete Field Work button */}

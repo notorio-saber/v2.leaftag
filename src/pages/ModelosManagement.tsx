@@ -55,10 +55,10 @@ export const ModelosManagement: React.FC = () => {
   // Filtragem dos Modelos
   const filteredHeightModels = heightModels.filter(model => {
     const matchesSearch = 
-      model.nome.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      model.especie.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      model.regiao.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (model.tipoModelo && model.tipoModelo.toLowerCase().includes(searchQuery.toLowerCase()));
+      (model.nome || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (model.especie || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (model.regiao || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (model.tipoModelo || '').toLowerCase().includes(searchQuery.toLowerCase());
     const matchesEspecie = !filterEspecie || model.especie === filterEspecie;
     const matchesRegiao = !filterRegiao || model.regiao === filterRegiao;
     return matchesSearch && matchesEspecie && matchesRegiao;
@@ -66,10 +66,10 @@ export const ModelosManagement: React.FC = () => {
 
   const filteredVolumeModels = volumeModels.filter(model => {
     const matchesSearch = 
-      model.nome.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      model.especie.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      model.regiao.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (model.tipoModelo && model.tipoModelo.toLowerCase().includes(searchQuery.toLowerCase()));
+      (model.nome || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (model.especie || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (model.regiao || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (model.tipoModelo || '').toLowerCase().includes(searchQuery.toLowerCase());
     const matchesEspecie = !filterEspecie || model.especie === filterEspecie;
     const matchesRegiao = !filterRegiao || model.regiao === filterRegiao;
     return matchesSearch && matchesEspecie && matchesRegiao;
@@ -88,6 +88,116 @@ export const ModelosManagement: React.FC = () => {
     setBeta3('');
     setCustomExpression('');
     setEditingModelId(null);
+  };
+
+  // Carrega modelos florestais padrão da literatura
+  const handleLoadDefaults = async () => {
+    if (!window.confirm("Deseja carregar 6 modelos florestais clássicos da literatura (Pinus, Eucalipto e Geral) na sua biblioteca?")) {
+      return;
+    }
+    try {
+      const defaultHeights: HeightModel[] = [
+        {
+          id: `hm-default-curtis-pinus-${Date.now()}`,
+          nome: "Curtis - Pinus taeda",
+          especie: "Pinus taeda",
+          regiao: "Sul",
+          tipoModelo: "curtis",
+          coeficientes: {
+            beta0: 2.85,
+            beta1: -14.2
+          },
+          fonteBibliografica: "Curtis, R.O. (1967)",
+          observacoes: "Modelo regional amplamente utilizado para Pinus na região Sul.",
+          criadoEm: new Date().toISOString()
+        },
+        {
+          id: `hm-default-henriksen-euc-${Date.now()}`,
+          nome: "Henriksen - Eucalyptus grandis",
+          especie: "Eucalyptus grandis",
+          regiao: "Sudeste",
+          tipoModelo: "henriksen",
+          coeficientes: {
+            beta0: 1.25,
+            beta1: 6.82
+          },
+          fonteBibliografica: "Henriksen, H. A. (1950)",
+          observacoes: "Modelo logarítmico padrão para Eucalyptus grandis.",
+          criadoEm: new Date().toISOString()
+        },
+        {
+          id: `hm-default-linear-geral-${Date.now()}`,
+          nome: "Modelo Linear Geral",
+          especie: "Todas",
+          regiao: "Geral",
+          tipoModelo: "linear",
+          coeficientes: {
+            beta0: 4.5,
+            beta1: 0.85
+          },
+          fonteBibliografica: "Geral",
+          observacoes: "Equação linear simples para estimativa de altura.",
+          criadoEm: new Date().toISOString()
+        }
+      ];
+
+      const defaultVolumes: VolumeModel[] = [
+        {
+          id: `vm-default-sh-pinus-${Date.now()}`,
+          nome: "Schumacher-Hall - Pinus taeda",
+          especie: "Pinus taeda",
+          regiao: "Sul",
+          tipoModelo: "schumacher_hall",
+          coeficientes: {
+            beta0: 0.000055,
+            beta1: 1.885,
+            beta2: 1.052
+          },
+          fonteBibliografica: "Schumacher & Hall (1933)",
+          observacoes: "Equação clássica de volume comercial para Pinus.",
+          criadoEm: new Date().toISOString()
+        },
+        {
+          id: `vm-default-spurr-euc-${Date.now()}`,
+          nome: "Spurr - Eucalyptus grandis",
+          especie: "Eucalyptus grandis",
+          regiao: "Sudeste",
+          tipoModelo: "spurr",
+          coeficientes: {
+            beta0: 0.0052,
+            beta1: 0.000038
+          },
+          fonteBibliografica: "Spurr, S.H. (1952)",
+          observacoes: "Modelo de Spurr para volume individual de Eucalyptus grandis.",
+          criadoEm: new Date().toISOString()
+        },
+        {
+          id: `vm-default-ff-geral-${Date.now()}`,
+          nome: "Fator de Forma (0.7)",
+          especie: "Todas",
+          regiao: "Geral",
+          tipoModelo: "fator_forma",
+          coeficientes: {
+            beta0: 0.7
+          },
+          fonteBibliografica: "Literatura",
+          observacoes: "Cálculo volumétrico clássico com fator de forma comercial igual a 0.7.",
+          criadoEm: new Date().toISOString()
+        }
+      ];
+
+      for (const hm of defaultHeights) {
+        await createHeightModel(hm);
+      }
+      for (const vm of defaultVolumes) {
+        await createVolumeModel(vm);
+      }
+
+      alert("Modelos de exemplo carregados com sucesso na sua biblioteca!");
+    } catch (err) {
+      console.error(err);
+      alert("Erro ao carregar modelos padrão.");
+    }
   };
 
   // Abre formulário para novo
@@ -446,8 +556,24 @@ export const ModelosManagement: React.FC = () => {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '16px' }}>
         {activeTab === 'height' ? (
           filteredHeightModels.length === 0 ? (
-            <div className="glass-card" style={{ gridColumn: '1/-1', textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
-              Nenhum modelo hipsométrico encontrado.
+            <div className="glass-card" style={{ gridColumn: '1/-1', textAlign: 'center', padding: '50px 30px', border: '1px dashed rgba(255,255,255,0.1)' }}>
+              <p style={{ color: 'var(--text-muted)', fontSize: '15px', marginBottom: '20px' }}>
+                Nenhum modelo hipsométrico encontrado.
+              </p>
+              {heightModels.length === 0 && (
+                <div>
+                  <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginBottom: '24px', maxWidth: '480px', margin: '0 auto 24px auto', lineHeight: '1.5' }}>
+                    Sua biblioteca está vazia. Comece criando um modelo personalizado ou carregue as equações de exemplo da literatura florestal para testes imediatos.
+                  </p>
+                  <button 
+                    className="btn btn-secondary"
+                    style={{ borderColor: 'var(--primary-color)', color: 'var(--primary-color)', width: 'auto', padding: '10px 24px', background: 'rgba(0, 230, 118, 0.04)' }}
+                    onClick={handleLoadDefaults}
+                  >
+                    ⚡ Carregar Modelos Padrão (Pinus, Eucalipto)
+                  </button>
+                </div>
+              )}
             </div>
           ) : (
             filteredHeightModels.map(model => (
@@ -515,8 +641,24 @@ export const ModelosManagement: React.FC = () => {
           )
         ) : (
           filteredVolumeModels.length === 0 ? (
-            <div className="glass-card" style={{ gridColumn: '1/-1', textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
-              Nenhum modelo volumétrico encontrado.
+            <div className="glass-card" style={{ gridColumn: '1/-1', textAlign: 'center', padding: '50px 30px', border: '1px dashed rgba(255,255,255,0.1)' }}>
+              <p style={{ color: 'var(--text-muted)', fontSize: '15px', marginBottom: '20px' }}>
+                Nenhum modelo volumétrico encontrado.
+              </p>
+              {volumeModels.length === 0 && (
+                <div>
+                  <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginBottom: '24px', maxWidth: '480px', margin: '0 auto 24px auto', lineHeight: '1.5' }}>
+                    Sua biblioteca está vazia. Comece criando um modelo personalizado ou carregue as equações de exemplo da literatura florestal para testes imediatos.
+                  </p>
+                  <button 
+                    className="btn btn-secondary"
+                    style={{ borderColor: 'var(--primary-color)', color: 'var(--primary-color)', width: 'auto', padding: '10px 24px', background: 'rgba(0, 230, 118, 0.04)' }}
+                    onClick={handleLoadDefaults}
+                  >
+                    ⚡ Carregar Modelos Padrão (Pinus, Eucalipto)
+                  </button>
+                </div>
+              )}
             </div>
           ) : (
             filteredVolumeModels.map(model => (
