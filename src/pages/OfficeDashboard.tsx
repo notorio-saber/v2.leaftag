@@ -1088,7 +1088,7 @@ export const OfficeDashboard = () => {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {filteredFieldWorks.map(fw => {
               const countTalhoes = talhoes.filter(t => t.fieldWorkId === fw.id).length;
-              const countParcelas = inventories.filter(i => i.fieldWorkId === fw.id && i.template === 'inventario').length;
+              const countParcelas = inventories.filter(i => i.fieldWorkId === fw.id && i.template !== 'cubagem').length;
               const countArvores = inventories
                 .filter(i => i.fieldWorkId === fw.id)
                 .reduce((acc, curr) => acc + (curr.dados ? curr.dados.length : 0), 0);

@@ -415,7 +415,7 @@ const Home = () => {
             <div className="inventory-list">
               {fieldWorks.map(fw => {
                 const fwTalhoes = talhoes.filter(t => t.fieldWorkId === fw.id).length;
-                const fwParcelas = inventories.filter(i => i.fieldWorkId === fw.id && i.template === 'inventario').length;
+                const fwParcelas = inventories.filter(i => i.fieldWorkId === fw.id && i.template !== 'cubagem').length;
                 const fwArvores = inventories
                   .filter(i => i.fieldWorkId === fw.id)
                   .reduce((acc, curr) => acc + (curr.dados ? curr.dados.length : 0), 0);
