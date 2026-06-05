@@ -102,7 +102,8 @@ export const OfficeDashboard = () => {
 
   const [activeFwId, setActiveFwId] = useState<string>('');
   const [searchProjectQuery, setSearchProjectQuery] = useState('');
-  const [activeTab, setActiveTab] = useState<'talhoes' | 'parcelas' | 'estratos' | 'cubagem'>('talhoes');
+  const [activeTab, setActiveTab] = useState<'talhoes' | 'parcelas' | 'estratos' | 'cubagem' | 'extrapolacao'>('talhoes');
+  const [extraTab, setExtraTab] = useState<'parcelas' | 'talhoes' | 'estratos' | 'trabalho'>('parcelas');
   const [cubageSortOrder, setCubageSortOrder] = useState<'asc' | 'desc' | null>('desc');
   
   // States for sub-dashboards and audits
@@ -500,6 +501,224 @@ export const OfficeDashboard = () => {
   const activeStrata = useMemo(() => {
     return strata.filter(s => s.fieldWorkId === activeFwId);
   }, [strata, activeFwId]);
+
+  const extrapolationData = useMemo(() => {
+    if (!activeFw) return null;
+
+    // 1. Processed Parcels
+    const processedParcels = activeParcels.map(inv => {
+      const isProcessed = inv.dados && inv.dados.length > 0 && inv.dados.some(t => t.volumeCalculado !== undefined);
+      if (!isProcessed) {
+        return {
+          id: inv.id,
+          nome: inv.nome,
+          talhaoId: inv.talhaoId,
+          stratumId: inv.stratumId,
+          isProcessed: false,
+          areaParcela: inv.areaParcela || 0,
+          fatorExpansao: 0,
+          volumeTotalParcela: 0,
+          areaBasalTotalParcela: 0,
+          numeroArvoresParcela: 0,
+          volumePorHa: 0,
+          areaBasalPorHa: 0,
+          densidadePorHa: 0
+        };
+      }
+
+      const areaParcela = inv.areaParcela || 0;
+      const fatorExpansao = areaParcela > 0 ? (10000 / areaParcela) : 0;
+      
+      const volumeTotalParcela = inv.dados.reduce((acc, curr) => acc + (curr.volumeCalculado || 0), 0);
+      
+      let areaBasalTotalParcela = 0;
+      inv.dados.forEach(tree => {
+        if (tree.multipleStems && tree.stems) {
+          tree.stems.forEach(stem => {
+            areaBasalTotalParcela += calculateBasalArea(stem.cap || 0);
+          });
+        } else {
+          if (tree.cap !== undefined && tree.cap !== null) {
+            areaBasalTotalParcela += calculateBasalArea(parseFloat(tree.cap));
+          } else if (tree.dap !== undefined && tree.dap !== null) {
+            areaBasalTotalParcela += calculateBasalArea(parseFloat(tree.dap), true);
+          }
+        }
+      });
+
+      const numeroArvoresParcela = inv.dados.length;
+
+      const volumePorHa = volumeTotalParcela * fatorExpansao;
+      const areaBasalPorHa = areaBasalTotalParcela * fatorExpansao;
+      const densidadePorHa = numeroArvoresParcela * fatorExpansao;
+
+      return {
+        id: inv.id,
+        nome: inv.nome,
+        talhaoId: inv.talhaoId,
+        stratumId: inv.stratumId,
+        isProcessed: true,
+        areaParcela,
+        fatorExpansao,
+        volumeTotalParcela,
+        areaBasalTotalParcela,
+        numeroArvoresParcela,
+        volumePorHa,
+        areaBasalPorHa,
+        densidadePorHa,
+        dados: inv.dados
+      };
+    });
+
+    const onlyProcessed = processedParcels.filter(p => p.isProcessed);
+
+    // 2. Agrupamento por Talhão
+    const talhoesResults = activeTalhoes.map(t => {
+      const tParcels = onlyProcessed.filter(p => p.talhaoId === t.id);
+      const numParcelas = tParcels.length;
+      const areaAmostradaTotal = tParcels.reduce((acc, curr) => acc + curr.areaParcela, 0);
+      const areaTalhaoHa = t.area || 0;
+
+      let volumeMedioPorHa = 0;
+      let areaBasalMedioPorHa = 0;
+      let densidadeMedioPorHa = 0;
+      let dapMedio = 0;
+      let alturaMedio = 0;
+
+      if (numParcelas > 0) {
+        volumeMedioPorHa = tParcels.reduce((acc, curr) => acc + curr.volumePorHa, 0) / numParcelas;
+        areaBasalMedioPorHa = tParcels.reduce((acc, curr) => acc + curr.areaBasalPorHa, 0) / numParcelas;
+        densidadeMedioPorHa = tParcels.reduce((acc, curr) => acc + curr.densidadePorHa, 0) / numParcelas;
+
+        let sumDap = 0;
+        let sumHt = 0;
+        let treeCount = 0;
+
+        tParcels.forEach(p => {
+          p.dados?.forEach(tree => {
+            let treeDap = 0;
+            if (tree.multipleStems && tree.stems) {
+              let sumG = 0;
+              tree.stems.forEach(stem => {
+                sumG += calculateBasalArea(stem.cap || 0);
+              });
+              treeDap = Math.sqrt(4 * sumG / Math.PI) * 100;
+            } else {
+              if (tree.dap !== undefined && tree.dap !== null && tree.dap !== '') {
+                treeDap = parseFloat(tree.dap);
+              } else if (tree.cap !== undefined && tree.cap !== null && tree.cap !== '') {
+                treeDap = parseFloat(tree.cap) / Math.PI;
+              }
+            }
+            const ht = tree.alturaUtilizada !== undefined ? tree.alturaUtilizada : parseFloat((tree.ht || '0').toString());
+            
+            if (treeDap > 0) {
+              sumDap += treeDap;
+              sumHt += ht;
+              treeCount++;
+            }
+          });
+        });
+
+        if (treeCount > 0) {
+          dapMedio = sumDap / treeCount;
+          alturaMedio = sumHt / treeCount;
+        }
+      }
+
+      const volumeTotalTalhao = volumeMedioPorHa * areaTalhaoHa;
+
+      return {
+        id: t.id,
+        nome: t.nome,
+        numParcelas,
+        areaAmostradaTotal,
+        areaTalhaoHa,
+        volumeMedioPorHa,
+        areaBasalMedioPorHa,
+        densidadeMedioPorHa,
+        dapMedio,
+        alturaMedio,
+        volumeTotalTalhao
+      };
+    });
+
+    // 3. Agrupamento por Estrato
+    const strataResults = activeStrata.map(s => {
+      const sParcels = onlyProcessed.filter(p => p.stratumId === s.id);
+      const numParcelas = sParcels.length;
+      const areaAmostradaTotal = sParcels.reduce((acc, curr) => acc + curr.areaParcela, 0);
+      const areaEstratoHa = s.area || 0;
+
+      let volumeMedioPorHa = 0;
+      let areaBasalMedioPorHa = 0;
+      let densidadeMedioPorHa = 0;
+
+      if (numParcelas > 0) {
+        volumeMedioPorHa = sParcels.reduce((acc, curr) => acc + curr.volumePorHa, 0) / numParcelas;
+        areaBasalMedioPorHa = sParcels.reduce((acc, curr) => acc + curr.areaBasalPorHa, 0) / numParcelas;
+        densidadeMedioPorHa = sParcels.reduce((acc, curr) => acc + curr.densidadePorHa, 0) / numParcelas;
+      }
+
+      const volumeTotalEstrato = volumeMedioPorHa * areaEstratoHa;
+
+      return {
+        id: s.id,
+        nome: s.nome,
+        numParcelas,
+        areaAmostradaTotal,
+        areaEstratoHa,
+        volumeMedioPorHa,
+        areaBasalMedioPorHa,
+        densidadeMedioPorHa,
+        volumeTotalEstrato
+      };
+    });
+
+    // 4. Agrupamento do Trabalho Total
+    const numTotalParcelas = onlyProcessed.length;
+    const areaTotalAmostrada = onlyProcessed.reduce((acc, curr) => acc + curr.areaParcela, 0);
+    const numTotalArvoresMedidas = onlyProcessed.reduce((acc, curr) => acc + curr.numeroArvoresParcela, 0);
+
+    const areaTotalInventariada = activeStrata.length > 0
+      ? activeStrata.reduce((acc, curr) => acc + (curr.area || 0), 0)
+      : activeTalhoes.reduce((acc, curr) => acc + (curr.area || 0), 0);
+
+    let volumeMedioGeralPorHa = 0;
+    let areaBasalMediaPorHa = 0;
+    let densidadeMediaPorHa = 0;
+
+    if (numTotalParcelas > 0) {
+      volumeMedioGeralPorHa = onlyProcessed.reduce((acc, curr) => acc + curr.volumePorHa, 0) / numTotalParcelas;
+      areaBasalMediaPorHa = onlyProcessed.reduce((acc, curr) => acc + curr.areaBasalPorHa, 0) / numTotalParcelas;
+      densidadeMediaPorHa = onlyProcessed.reduce((acc, curr) => acc + curr.densidadePorHa, 0) / numTotalParcelas;
+    }
+
+    let volumeTotalEstimado = 0;
+    if (activeStrata.length > 0) {
+      volumeTotalEstimado = strataResults.reduce((acc, curr) => acc + curr.volumeTotalEstrato, 0);
+    } else if (activeTalhoes.length > 0) {
+      volumeTotalEstimado = talhoesResults.reduce((acc, curr) => acc + curr.volumeTotalTalhao, 0);
+    } else {
+      volumeTotalEstimado = volumeMedioGeralPorHa * areaTotalInventariada;
+    }
+
+    return {
+      processedParcels,
+      talhoesResults,
+      strataResults,
+      trabalho: {
+        areaTotalInventariada,
+        areaTotalAmostrada,
+        numTotalParcelas,
+        numTotalArvoresMedidas,
+        volumeMedioGeralPorHa,
+        volumeTotalEstimado,
+        areaBasalMediaPorHa,
+        densidadeMediaPorHa
+      }
+    };
+  }, [activeFw, activeParcels, activeTalhoes, activeStrata, inventories, strata, talhoes]);
 
   const activeCubageSessions = useMemo(() => {
     return inventories.filter(i => i.fieldWorkId === activeFwId && i.template === 'cubagem');
@@ -1561,6 +1780,21 @@ export const OfficeDashboard = () => {
               >
                 Cubagem ({allCubagedTrees.length})
               </button>
+              <button 
+                onClick={() => setActiveTab('extrapolacao')}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  borderBottom: activeTab === 'extrapolacao' ? '2px solid var(--primary-color)' : '2px solid transparent',
+                  color: activeTab === 'extrapolacao' ? 'var(--primary-hover)' : 'var(--text-muted)',
+                  padding: '12px 20px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold',
+                  fontSize: '14.5px'
+                }}
+              >
+                Extrapolação
+              </button>
             </div>
 
             {/* TAB CONTENT */}
@@ -2134,6 +2368,216 @@ export const OfficeDashboard = () => {
                     </table>
                   </div>
                 )}
+              </div>
+            ) : activeTab === 'extrapolacao' ? (
+              /* EXTRAPOLATION VIEW CONTENT */
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                
+                {/* SUB TABS */}
+                <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '10px' }}>
+                  {(['parcelas', 'talhoes', 'estratos', 'trabalho'] as const).map(tab => (
+                    <button
+                      key={tab}
+                      onClick={() => setExtraTab(tab)}
+                      style={{
+                        background: extraTab === tab ? 'var(--primary-color)' : 'rgba(255, 255, 255, 0.02)',
+                        border: '1px solid rgba(255,255,255,0.08)',
+                        borderRadius: '8px',
+                        color: extraTab === tab ? '#fff' : 'var(--text-muted)',
+                        padding: '8px 16px',
+                        cursor: 'pointer',
+                        fontWeight: 'bold',
+                        fontSize: '13px',
+                        transition: 'all 0.2s',
+                        textTransform: 'capitalize'
+                      }}
+                    >
+                      {tab === 'trabalho' ? 'Trabalho Total' : tab}
+                    </button>
+                  ))}
+                </div>
+
+                {extrapolationData && (
+                  <div>
+                    {extraTab === 'parcelas' && (
+                      <div className="glass-card" style={{ padding: 0, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.05)' }}>
+                        <div style={{ overflowX: 'auto' }}>
+                          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                            <thead>
+                              <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', background: 'rgba(0,0,0,0.1)' }}>
+                                <th style={{ padding: '16px 20px', textAlign: 'left', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Parcela</th>
+                                <th style={{ padding: '16px 20px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Área (m²)</th>
+                                <th style={{ padding: '16px 20px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Fator Expansão</th>
+                                <th style={{ padding: '16px 20px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Vol. Total (m³)</th>
+                                <th style={{ padding: '16px 20px', textAlign: 'center', fontSize: '11px', color: 'var(--primary-hover)', textTransform: 'uppercase' }}>Vol. / ha (m³)</th>
+                                <th style={{ padding: '16px 20px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>G / ha (m²)</th>
+                                <th style={{ padding: '16px 20px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Árvores / ha</th>
+                                <th style={{ padding: '16px 20px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Status</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {extrapolationData.processedParcels.map(p => (
+                                <tr key={p.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                                  <td style={{ padding: '16px 20px', fontWeight: 'bold' }}>{p.nome}</td>
+                                  <td style={{ padding: '16px 20px', textAlign: 'center' }}>{p.areaParcela.toFixed(1)}</td>
+                                  <td style={{ padding: '16px 20px', textAlign: 'center', color: 'var(--text-muted)' }}>{p.isProcessed ? p.fatorExpansao.toFixed(2) : '-'}</td>
+                                  <td style={{ padding: '16px 20px', textAlign: 'center' }}>{p.isProcessed ? p.volumeTotalParcela.toFixed(4) : '-'}</td>
+                                  <td style={{ padding: '16px 20px', textAlign: 'center', fontWeight: 'bold', color: '#00e676' }}>{p.isProcessed ? p.volumePorHa.toFixed(2) : '-'}</td>
+                                  <td style={{ padding: '16px 20px', textAlign: 'center' }}>{p.isProcessed ? p.areaBasalPorHa.toFixed(3) : '-'}</td>
+                                  <td style={{ padding: '16px 20px', textAlign: 'center' }}>{p.isProcessed ? p.densidadePorHa.toFixed(1) : '-'}</td>
+                                  <td style={{ padding: '16px 20px', textAlign: 'center' }}>
+                                    {p.isProcessed ? (
+                                      <span style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '11px', background: 'rgba(76, 175, 80, 0.15)', color: '#4caf50', fontWeight: 'bold' }}>Processado</span>
+                                    ) : (
+                                      <span style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '11px', background: 'rgba(244, 67, 54, 0.15)', color: '#f44336', fontWeight: 'bold' }}>Não Processado</span>
+                                    )}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                        {extrapolationData.processedParcels.some(p => !p.isProcessed) && (
+                          <div style={{ padding: '16px 20px', background: 'rgba(244, 67, 54, 0.08)', borderTop: '1px solid rgba(244, 67, 54, 0.15)', color: '#ef5350', fontSize: '13px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                            <span>Esta parcela ainda não foi processada.</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {extraTab === 'talhoes' && (
+                      <div className="glass-card" style={{ padding: 0, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.05)' }}>
+                        <div style={{ overflowX: 'auto' }}>
+                          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                            <thead>
+                              <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', background: 'rgba(0,0,0,0.1)' }}>
+                                <th style={{ padding: '16px 20px', textAlign: 'left', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Talhão</th>
+                                <th style={{ padding: '16px 20px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Área Talhão (ha)</th>
+                                <th style={{ padding: '16px 20px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Parcelas Processadas</th>
+                                <th style={{ padding: '16px 20px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Área Amostrada (m²)</th>
+                                <th style={{ padding: '16px 20px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Vol. Médio / ha (m³)</th>
+                                <th style={{ padding: '16px 20px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>G Médio / ha (m²)</th>
+                                <th style={{ padding: '16px 20px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>DAP Médio (cm)</th>
+                                <th style={{ padding: '16px 20px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Altura Média (m)</th>
+                                <th style={{ padding: '16px 20px', textAlign: 'center', fontSize: '11px', color: 'var(--primary-hover)', textTransform: 'uppercase' }}>Volume Total (m³)</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {extrapolationData.talhoesResults.map(t => (
+                                <tr key={t.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                                  <td style={{ padding: '16px 20px', fontWeight: 'bold' }}>{t.nome}</td>
+                                  <td style={{ padding: '16px 20px', textAlign: 'center' }}>{t.areaTalhaoHa > 0 ? t.areaTalhaoHa.toFixed(2) : 'Não Informado'}</td>
+                                  <td style={{ padding: '16px 20px', textAlign: 'center' }}>{t.numParcelas}</td>
+                                  <td style={{ padding: '16px 20px', textAlign: 'center', color: 'var(--text-muted)' }}>{t.areaAmostradaTotal.toFixed(1)}</td>
+                                  <td style={{ padding: '16px 20px', textAlign: 'center', fontWeight: 'bold' }}>{t.numParcelas > 0 ? t.volumeMedioPorHa.toFixed(2) : '-'}</td>
+                                  <td style={{ padding: '16px 20px', textAlign: 'center' }}>{t.numParcelas > 0 ? t.areaBasalMedioPorHa.toFixed(3) : '-'}</td>
+                                  <td style={{ padding: '16px 20px', textAlign: 'center' }}>{t.numParcelas > 0 ? t.dapMedio.toFixed(2) : '-'}</td>
+                                  <td style={{ padding: '16px 20px', textAlign: 'center' }}>{t.numParcelas > 0 ? t.alturaMedio.toFixed(2) : '-'}</td>
+                                  <td style={{ padding: '16px 20px', textAlign: 'center', fontWeight: 'bold', color: '#00e676', fontSize: '14px' }}>
+                                    {t.numParcelas > 0 && t.areaTalhaoHa > 0 ? t.volumeTotalTalhao.toFixed(2) : '-'}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+
+                    {extraTab === 'estratos' && (
+                      <div className="glass-card" style={{ padding: 0, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.05)' }}>
+                        <div style={{ overflowX: 'auto' }}>
+                          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                            <thead>
+                              <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', background: 'rgba(0,0,0,0.1)' }}>
+                                <th style={{ padding: '16px 20px', textAlign: 'left', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Estrato</th>
+                                <th style={{ padding: '16px 20px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Área Estrato (ha)</th>
+                                <th style={{ padding: '16px 20px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Parcelas Processadas</th>
+                                <th style={{ padding: '16px 20px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Área Amostrada (m²)</th>
+                                <th style={{ padding: '16px 20px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Vol. Médio / ha (m³)</th>
+                                <th style={{ padding: '16px 20px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>G Médio / ha (m²)</th>
+                                <th style={{ padding: '16px 20px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Densidade Média / ha</th>
+                                <th style={{ padding: '16px 20px', textAlign: 'center', fontSize: '11px', color: 'var(--primary-hover)', textTransform: 'uppercase' }}>Volume Total (m³)</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {extrapolationData.strataResults.map(s => (
+                                <tr key={s.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                                  <td style={{ padding: '16px 20px', fontWeight: 'bold' }}>{s.nome}</td>
+                                  <td style={{ padding: '16px 20px', textAlign: 'center' }}>{s.areaEstratoHa > 0 ? s.areaEstratoHa.toFixed(2) : 'Não Informado'}</td>
+                                  <td style={{ padding: '16px 20px', textAlign: 'center' }}>{s.numParcelas}</td>
+                                  <td style={{ padding: '16px 20px', textAlign: 'center', color: 'var(--text-muted)' }}>{s.areaAmostradaTotal.toFixed(1)}</td>
+                                  <td style={{ padding: '16px 20px', textAlign: 'center', fontWeight: 'bold' }}>{s.numParcelas > 0 ? s.volumeMedioPorHa.toFixed(2) : '-'}</td>
+                                  <td style={{ padding: '16px 20px', textAlign: 'center' }}>{s.numParcelas > 0 ? s.areaBasalMedioPorHa.toFixed(3) : '-'}</td>
+                                  <td style={{ padding: '16px 20px', textAlign: 'center' }}>{s.numParcelas > 0 ? s.densidadeMedioPorHa.toFixed(1) : '-'}</td>
+                                  <td style={{ padding: '16px 20px', textAlign: 'center', fontWeight: 'bold', color: '#00e676', fontSize: '14px' }}>
+                                    {s.numParcelas > 0 && s.areaEstratoHa > 0 ? s.volumeTotalEstrato.toFixed(2) : '-'}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+
+                    {extraTab === 'trabalho' && (
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px' }}>
+                        
+                        <div className="glass-card" style={{ padding: '24px', border: '1px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.01)', borderRadius: '16px', marginBottom: 0 }}>
+                          <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Área Total Inventariada</span>
+                          <h3 style={{ fontSize: '24px', fontWeight: '800', margin: '8px 0 0 0', color: '#64b5f6' }}>{extrapolationData.trabalho.areaTotalInventariada.toFixed(2)} ha</h3>
+                          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Soma dos talhões/estratos cadastrados</span>
+                        </div>
+
+                        <div className="glass-card" style={{ padding: '24px', border: '1px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.01)', borderRadius: '16px', marginBottom: 0 }}>
+                          <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Área Total Amostrada</span>
+                          <h3 style={{ fontSize: '24px', fontWeight: '800', margin: '8px 0 0 0', color: '#81c784' }}>{(extrapolationData.trabalho.areaTotalAmostrada / 10000).toFixed(4)} ha</h3>
+                          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{extrapolationData.trabalho.areaTotalAmostrada.toFixed(0)} m² no total</span>
+                        </div>
+
+                        <div className="glass-card" style={{ padding: '24px', border: '1px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.01)', borderRadius: '16px', marginBottom: 0 }}>
+                          <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Parcelas Processadas</span>
+                          <h3 style={{ fontSize: '24px', fontWeight: '800', margin: '8px 0 0 0', color: '#ffb74d' }}>{extrapolationData.trabalho.numTotalParcelas}</h3>
+                          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Parcelas consideradas na amostragem</span>
+                        </div>
+
+                        <div className="glass-card" style={{ padding: '24px', border: '1px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.01)', borderRadius: '16px', marginBottom: 0 }}>
+                          <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Árvores Medidas</span>
+                          <h3 style={{ fontSize: '24px', fontWeight: '800', margin: '8px 0 0 0', color: '#ba68c8' }}>{extrapolationData.trabalho.numTotalArvoresMedidas}</h3>
+                          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Registradas nas parcelas válidas</span>
+                        </div>
+
+                        <div className="glass-card" style={{ padding: '24px', border: '1px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.01)', borderRadius: '16px', marginBottom: 0 }}>
+                          <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Volume Médio / ha</span>
+                          <h3 style={{ fontSize: '24px', fontWeight: '800', margin: '8px 0 0 0', color: '#e57373' }}>{extrapolationData.trabalho.volumeMedioGeralPorHa.toFixed(2)} m³/ha</h3>
+                          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Média aritmética por hectare</span>
+                        </div>
+
+                        <div className="glass-card" style={{ padding: '24px', border: '1px solid rgba(255, 255, 255, 0.1)', background: 'rgba(0, 230, 118, 0.08)', borderRadius: '16px', marginBottom: 0 }}>
+                          <span style={{ fontSize: '10px', color: 'var(--primary-hover)', textTransform: 'uppercase', fontWeight: 'bold' }}>Volume Total Estimado</span>
+                          <h3 style={{ fontSize: '24px', fontWeight: '800', margin: '8px 0 0 0', color: '#00e676' }}>{extrapolationData.trabalho.volumeTotalEstimado.toFixed(2)} m³</h3>
+                          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Extrapolação para a área total</span>
+                        </div>
+
+                        <div className="glass-card" style={{ padding: '24px', border: '1px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.01)', borderRadius: '16px', marginBottom: 0 }}>
+                          <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Área Basal / ha</span>
+                          <h3 style={{ fontSize: '24px', fontWeight: '800', margin: '8px 0 0 0', color: '#a1887f' }}>{extrapolationData.trabalho.areaBasalMediaPorHa.toFixed(3)} m²/ha</h3>
+                          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Média de área transversal acumulada</span>
+                        </div>
+
+                        <div className="glass-card" style={{ padding: '24px', border: '1px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.01)', borderRadius: '16px', marginBottom: 0 }}>
+                          <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Densidade Média / ha</span>
+                          <h3 style={{ fontSize: '24px', fontWeight: '800', margin: '8px 0 0 0', color: '#4db6ac' }}>{extrapolationData.trabalho.densidadeMediaPorHa.toFixed(1)} árv/ha</h3>
+                          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Média de árvores por hectare</span>
+                        </div>
+
+                      </div>
+                    )}
+                  </div>
+                )}
+
               </div>
             ) : null}
 
