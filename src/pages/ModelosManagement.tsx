@@ -445,7 +445,7 @@ export const ModelosManagement: React.FC = () => {
       <div className="app-header">
         <div>
           <h2 style={{ color: 'var(--primary-hover)', fontSize: '22px', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span>📐</span> Biblioteca de Modelos
+            Biblioteca de Modelos
           </h2>
           <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Gerencie equações hipsométricas e volumétricas para cálculo de inventários.</span>
         </div>
@@ -570,7 +570,7 @@ export const ModelosManagement: React.FC = () => {
                     style={{ borderColor: 'var(--primary-color)', color: 'var(--primary-color)', width: 'auto', padding: '10px 24px', background: 'rgba(0, 230, 118, 0.04)' }}
                     onClick={handleLoadDefaults}
                   >
-                    ⚡ Carregar Modelos Padrão (Pinus, Eucalipto)
+                    Carregar Modelos Padrão (Pinus, Eucalipto)
                   </button>
                 </div>
               )}
@@ -588,10 +588,10 @@ export const ModelosManagement: React.FC = () => {
                   
                   <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
                     <span style={{ fontSize: '11px', color: 'var(--primary-hover)', background: 'rgba(46, 125, 50, 0.1)', padding: '2px 6px', borderRadius: '4px', border: '1px solid rgba(46, 125, 50, 0.2)' }}>
-                      🌲 {model.especie}
+                      {model.especie}
                     </span>
                     <span style={{ fontSize: '11px', color: '#64b5f6', background: 'rgba(33, 150, 243, 0.1)', padding: '2px 6px', borderRadius: '4px', border: '1px solid rgba(33, 150, 243, 0.2)' }}>
-                      📍 {model.regiao}
+                      {model.regiao}
                     </span>
                   </div>
 
@@ -655,7 +655,7 @@ export const ModelosManagement: React.FC = () => {
                     style={{ borderColor: 'var(--primary-color)', color: 'var(--primary-color)', width: 'auto', padding: '10px 24px', background: 'rgba(0, 230, 118, 0.04)' }}
                     onClick={handleLoadDefaults}
                   >
-                    ⚡ Carregar Modelos Padrão (Pinus, Eucalipto)
+                    Carregar Modelos Padrão (Pinus, Eucalipto)
                   </button>
                 </div>
               )}
@@ -673,10 +673,10 @@ export const ModelosManagement: React.FC = () => {
                   
                   <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
                     <span style={{ fontSize: '11px', color: 'var(--primary-hover)', background: 'rgba(46, 125, 50, 0.1)', padding: '2px 6px', borderRadius: '4px', border: '1px solid rgba(46, 125, 50, 0.2)' }}>
-                      🌲 {model.especie}
+                      {model.especie}
                     </span>
                     <span style={{ fontSize: '11px', color: '#64b5f6', background: 'rgba(33, 150, 243, 0.1)', padding: '2px 6px', borderRadius: '4px', border: '1px solid rgba(33, 150, 243, 0.2)' }}>
-                      📍 {model.regiao}
+                      {model.regiao}
                     </span>
                   </div>
 

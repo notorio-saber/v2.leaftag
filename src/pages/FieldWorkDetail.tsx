@@ -394,7 +394,7 @@ export const FieldWorkDetail = () => {
             outline: 'none'
           }}
         >
-          📋 Parcelas & Talhões ({parcels.length})
+          Parcelas e Talhões ({parcels.length})
         </button>
         <button 
           onClick={() => setActiveSubTab('cubagem')}
@@ -411,7 +411,7 @@ export const FieldWorkDetail = () => {
             outline: 'none'
           }}
         >
-          🌲 Cubagem Florestal ({cubageSessions.length})
+          Cubagem Florestal ({cubageSessions.length})
         </button>
       </div>
 

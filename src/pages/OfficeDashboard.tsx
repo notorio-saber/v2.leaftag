@@ -684,6 +684,78 @@ export const OfficeDashboard = () => {
     XLSX.writeFile(workbook, `Projeto_${activeFw.nome.replace(/\s+/g, '_')}_Completo.xlsx`);
   };
 
+  // Project-level Processed Excel Export (separate from raw data)
+  const handleExportAllProcessed = () => {
+    if (!activeFw) return;
+    const allData: any[] = [];
+    activeParcels.forEach(inv => {
+      const currentTal = talhoes.find(t => t.id === inv.talhaoId);
+      inv.dados.forEach(ind => {
+        let baseData: any = {
+          'Talhão': currentTal ? currentTal.nome : 'Sem Talhão',
+          'Parcela': inv.nome,
+          'Parcela Coordenadas': inv.coordenadas || '',
+          'Número': ind.numeroIndividuo,
+          'Data / Hora': ind.timestamp,
+        };
+
+        // Adicionar as colunas dinâmicas como referência de DAP/HC/HT
+        inv.colunas.forEach(col => {
+          baseData[col.nome] = ind[col.id] || '';
+        });
+
+        // DAP Equivalente
+        baseData['DAP_Equivalente (cm)'] = ind.cap ? (parseFloat(ind.cap) / Math.PI).toFixed(2) : '0';
+
+        // Área Basal
+        const g = calculateBasalArea(parseFloat(ind.cap || 0));
+        baseData['Area_Basal (m2)'] = g.toFixed(4);
+
+        // Altura Utilizada
+        if (ind.alturaUtilizada !== undefined) {
+          baseData['Altura Utilizada (m)'] = ind.alturaUtilizada;
+          baseData['Altura Medida/Estimada'] = ind.alturaMedidaOuEstimada === 'medida' ? 'Medida' : 'Estimada';
+        } else {
+          baseData['Altura Utilizada (m)'] = parseFloat((ind.ht || 0).toString());
+          baseData['Altura Medida/Estimada'] = 'Medida';
+        }
+
+        // Volume Calculado
+        if (ind.volumeCalculado !== undefined) {
+          baseData['Volume Calculado (m3)'] = ind.volumeCalculado;
+        } else {
+          baseData['Volume Calculado (m3)'] = calculateVolume(g, parseFloat((ind.ht || 0).toString()), 0.7);
+        }
+
+        // Modelo Utilizado
+        if (ind.modeloUtilizado) {
+          baseData['Modelo Utilizado'] = ind.modeloUtilizado;
+        } else {
+          baseData['Modelo Utilizado'] = 'Fator de Forma Comercial (0.7)';
+        }
+
+        // Tratamento para fustes múltiplos / bifurcados
+        if (ind.multipleStems && ind.stems) {
+          ind.stems.forEach((stem: any, i: number) => {
+            baseData[`Fuste_${i+1}_CAP`] = stem.cap || '';
+            baseData[`Fuste_${i+1}_Altura_Calc`] = stem.alturaProcessada !== undefined ? stem.alturaProcessada : (stem.altura || '');
+            baseData[`Fuste_${i+1}_Medida/Estimada`] = stem.alturaMedidaOuEstimada === 'medida' ? 'Medida' : 'Estimada';
+            baseData[`Fuste_${i+1}_Volume`] = stem.volumeProcessado !== undefined ? stem.volumeProcessado : '';
+          });
+        }
+
+        allData.push(baseData);
+      });
+    });
+
+    if (allData.length === 0) return alert("Nenhum dado processado encontrado neste trabalho.");
+    
+    const worksheet = XLSX.utils.json_to_sheet(allData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Dados Processados");
+    XLSX.writeFile(workbook, `Projeto_${activeFw.nome.replace(/\s+/g, '_')}_Processado.xlsx`);
+  };
+
   const handleSyncGoogleSheets = async () => {
     if (!activeFw || !activeFw.googleSheetsUrl) return alert("Por favor, vincule uma planilha do Google nas configurações primeiro.");
 
@@ -957,7 +1029,7 @@ export const OfficeDashboard = () => {
               e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 230, 118, 0.05)';
             }}
           >
-            <span>📐 Biblioteca de Equações</span>
+            <span>Biblioteca de Equações</span>
           </button>
         </div>
 
@@ -986,7 +1058,11 @@ export const OfficeDashboard = () => {
           </span>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {filteredFieldWorks.map(fw => {
-              const count = inventories.filter(i => i.fieldWorkId === fw.id && i.template !== 'cubagem').length;
+              const countTalhoes = talhoes.filter(t => t.fieldWorkId === fw.id).length;
+              const countParcelas = inventories.filter(i => i.fieldWorkId === fw.id && i.template === 'inventario').length;
+              const countArvores = inventories
+                .filter(i => i.fieldWorkId === fw.id)
+                .reduce((acc, curr) => acc + (curr.dados ? curr.dados.length : 0), 0);
               const isActive = fw.id === activeFwId;
               return (
                 <div 
@@ -1007,7 +1083,10 @@ export const OfficeDashboard = () => {
                   )}
                   <h4 style={{ fontSize: '13.5px', margin: 0, fontWeight: '700', color: isActive ? 'var(--primary-hover)' : '#fff' }}>{fw.nome}</h4>
                   <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginTop: '4px' }}>
-                    Local: {fw.local} | {count} parcelas
+                    Local: {fw.local}
+                  </span>
+                  <span style={{ fontSize: '10.5px', color: 'var(--text-muted)', display: 'block', marginTop: '2px', opacity: 0.8 }}>
+                    {countTalhoes} {countTalhoes === 1 ? 'talhão' : 'talhões'} • {countParcelas} {countParcelas === 1 ? 'parcela' : 'parcelas'} • {countArvores} {countArvores === 1 ? 'árvore' : 'árvores'}
                   </span>
                 </div>
               );
@@ -1076,6 +1155,13 @@ export const OfficeDashboard = () => {
                     onClick={handleExportAll}
                   >
                     Exportar Excel Completo
+                  </button>
+                  <button 
+                    className="btn btn-secondary" 
+                    style={{ width: 'auto', padding: '10px 20px', borderColor: '#fbc02d', color: '#ffd54f', background: 'rgba(251, 192, 45, 0.08)' }} 
+                    onClick={handleExportAllProcessed}
+                  >
+                    Exportar Processamento (Excel)
                   </button>
                   <button 
                     type="button" 
@@ -1828,7 +1914,7 @@ export const OfficeDashboard = () => {
                     style={{ width: 'auto', padding: '8px 16px', fontSize: '12px', borderColor: 'var(--primary-color)', color: 'var(--primary-color)' }}
                     onClick={() => handleExportParcelProcessed(auditParcel)}
                   >
-                    📥 Exportar Excel da Parcela
+                    Exportar Excel da Parcela
                   </button>
                 )}
               </div>
@@ -1836,14 +1922,15 @@ export const OfficeDashboard = () => {
               {/* Processamento Profissional (Modelos Florestais) no Escritório */}
               {auditParcel.dados.length > 0 && (
                 <div style={{ 
-                  background: 'rgba(255, 255, 255, 0.02)', 
-                  border: '1px solid rgba(255, 255, 255, 0.06)', 
+                  background: 'rgba(251, 192, 45, 0.03)', 
+                  border: '1px solid rgba(251, 192, 45, 0.25)', 
+                  boxShadow: '0 4px 24px rgba(251, 192, 45, 0.04)',
                   padding: '20px', 
                   borderRadius: '16px', 
                   marginBottom: '20px' 
                 }}>
-                  <h4 style={{ margin: '0 0 12px 0', fontSize: '15px', fontWeight: '800', color: 'var(--primary-hover)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span>⚡</span> Processamento Profissional (Modelos Florestais)
+                  <h4 style={{ margin: '0 0 12px 0', fontSize: '15px', fontWeight: '800', color: '#ffd54f', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    Processamento Profissional (Modelos Florestais)
                   </h4>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '0 0 16px 0', flexWrap: 'wrap', gap: '8px' }}>
                     <p style={{ color: 'var(--text-muted)', fontSize: '12.5px', lineHeight: '1.4', margin: 0, flex: 1 }}>
@@ -1851,10 +1938,10 @@ export const OfficeDashboard = () => {
                     </p>
                     <button 
                       className="btn btn-secondary" 
-                      style={{ fontSize: '12px', padding: '6px 12px', height: 'auto', width: 'auto', borderColor: 'var(--primary-hover)', color: 'var(--primary-hover)', background: 'transparent' }}
+                      style={{ fontSize: '12px', padding: '6px 12px', height: 'auto', width: 'auto', borderColor: '#ffd54f', color: '#ffd54f', background: 'transparent' }}
                       onClick={() => navigate('/modelos')}
                     >
-                      📐 Gerenciar Biblioteca
+                      Gerenciar Biblioteca
                     </button>
                   </div>
 
@@ -1871,7 +1958,7 @@ export const OfficeDashboard = () => {
                         <option value="none">Não utilizar modelo (ignorar estimativa)</option>
                         {heightModels.map(m => (
                           <option key={m.id} value={m.id}>
-                            {m.nome} (🌲 {m.especie} | 📍 {m.regiao})
+                            {m.nome} ({m.especie} | {m.regiao})
                           </option>
                         ))}
                       </select>
@@ -1889,7 +1976,7 @@ export const OfficeDashboard = () => {
                         <option value="legacy">Fator de Forma Comercial (Legacy)</option>
                         {volumeModels.map(m => (
                           <option key={m.id} value={m.id}>
-                            {m.nome} (🌲 {m.especie} | 📍 {m.regiao})
+                            {m.nome} ({m.especie} | {m.regiao})
                           </option>
                         ))}
                       </select>
@@ -1914,17 +2001,27 @@ export const OfficeDashboard = () => {
                   <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                     <button
                       className="btn btn-primary"
-                      style={{ width: 'auto', padding: '8px 20px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                      style={{ 
+                        width: 'auto', 
+                        padding: '10px 24px', 
+                        fontSize: '13px', 
+                        fontWeight: '800',
+                        background: 'linear-gradient(135deg, #ffd54f 0%, #fbc02d 100%)', 
+                        border: 'none',
+                        color: '#000000',
+                        borderRadius: '8px',
+                        boxShadow: '0 4px 14px rgba(251, 192, 45, 0.2)'
+                      }}
                       onClick={() => handleProcessParcelDataInOffice(auditParcel)}
                     >
-                      <span>⚡</span> Executar Processamento e Salvar na Parcela
+                      Executar Processamento e Salvar na Parcela
                     </button>
                   </div>
                 </div>
               )}
 
-              <div style={{ background: 'rgba(0,230,118,0.04)', border: '1px solid rgba(0,230,118,0.2)', padding: '12px 18px', borderRadius: '12px', fontSize: '13px', color: '#a5d6a7', marginBottom: '20px' }}>
-                👉 <strong>Modo Somente Leitura (Audit Panel)</strong>: Este espaço destina-se apenas à verificação e auditoria de consistência das árvores cadastradas em campo. Modificações ou exclusões acidentais estão bloqueadas no ambiente de escritório.
+              <div style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.08)', padding: '12px 18px', borderRadius: '12px', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '20px' }}>
+                <strong>Painel de Auditoria (Modo de Leitura)</strong>: Este espaço destina-se apenas à verificação e auditoria de consistência das árvores cadastradas em campo. Modificações ou exclusões acidentais estão bloqueadas no ambiente de escritório.
               </div>
 
               {/* Data Table */}
@@ -1940,6 +2037,9 @@ export const OfficeDashboard = () => {
                         {auditParcel.colunas.map(col => (
                           <th key={col.id} style={{ padding: '12px 16px', textAlign: 'left', fontSize: '10.5px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>{col.nome}</th>
                         ))}
+                        <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '10.5px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>H. Calc. (m)</th>
+                        <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '10.5px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Vol (m³)</th>
+                        <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '10.5px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Modelo</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1953,6 +2053,15 @@ export const OfficeDashboard = () => {
                               {ind.multipleStems && ['cap', 'hc', 'ht'].includes(col.id) ? ` [Bifurcado: ${ind.stems?.length}]` : ''}
                             </td>
                           ))}
+                          <td style={{ padding: '12px 16px', fontSize: '13px', color: ind.alturaMedidaOuEstimada === 'estimada' ? '#ffd54f' : '#81c784' }}>
+                            {ind.alturaUtilizada !== undefined ? `${ind.alturaUtilizada.toFixed(2)} ${ind.alturaMedidaOuEstimada === 'estimada' ? '(E)' : '(M)'}` : '-'}
+                          </td>
+                          <td style={{ padding: '12px 16px', fontSize: '13px', fontWeight: 'bold', color: '#ffb74d' }}>
+                            {ind.volumeCalculado !== undefined ? ind.volumeCalculado.toFixed(4) : '-'}
+                          </td>
+                          <td style={{ padding: '12px 16px', fontSize: '11px', color: 'var(--text-muted)' }}>
+                            {ind.modeloUtilizado || '-'}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -2269,7 +2378,7 @@ export const OfficeDashboard = () => {
                   background: 'rgba(255, 255, 255, 0.02)'
                 }}
               >
-                {theme === 'dark' ? '☀️ Modo Claro' : '🌙 Modo Escuro'}
+                {theme === 'dark' ? 'Modo Claro' : 'Modo Escuro'}
               </button>
             </div>
 
@@ -2285,7 +2394,7 @@ export const OfficeDashboard = () => {
                     setShowTeamModal(true);
                   }}
                 >
-                  <span>👥 Minha Equipe</span>
+                  <span>Minha Equipe</span>
                   <span style={{ fontSize: '11px', opacity: 0.7 }}>{collaborators.length} membros</span>
                 </button>
               )}
@@ -2300,7 +2409,7 @@ export const OfficeDashboard = () => {
                     navigate('/modelos');
                   }}
                 >
-                  <span>📐 Modelos (Altura / Volume)</span>
+                  <span>Modelos (Altura / Volume)</span>
                   <span style={{ fontSize: '11px', opacity: 0.7 }}>Gerenciar</span>
                 </button>
               )}
@@ -2314,7 +2423,7 @@ export const OfficeDashboard = () => {
                   navigate('/');
                 }}
               >
-                🌲 Ir para Modo Campo
+                Ir para Modo Campo
               </button>
 
               {/* Painel Admin (If Admin) */}

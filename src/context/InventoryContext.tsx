@@ -47,6 +47,116 @@ const cleanObject = (obj: any): any => {
   return obj;
 };
 
+const seedDefaultHeightModels = async (uid: string) => {
+  const defaultHeights: HeightModel[] = [
+    {
+      id: "hm-default-curtis-pinus",
+      nome: "Curtis - Pinus taeda",
+      especie: "Pinus taeda",
+      regiao: "Sul",
+      tipoModelo: "curtis",
+      coeficientes: {
+        beta0: 2.85,
+        beta1: -14.2
+      },
+      fonteBibliografica: "Curtis, R.O. (1967)",
+      observacoes: "Modelo regional para Pinus taeda.",
+      criadoEm: new Date().toISOString()
+    },
+    {
+      id: "hm-default-henriksen-euc",
+      nome: "Henriksen - Eucalyptus grandis",
+      especie: "Eucalyptus grandis",
+      regiao: "Sudeste",
+      tipoModelo: "henriksen",
+      coeficientes: {
+        beta0: 1.25,
+        beta1: 6.82
+      },
+      fonteBibliografica: "Henriksen, H. A. (1950)",
+      observacoes: "Modelo logarítmico padrão para Eucalyptus grandis.",
+      criadoEm: new Date().toISOString()
+    },
+    {
+      id: "hm-default-linear-geral",
+      nome: "Modelo Linear Geral",
+      especie: "Todas",
+      regiao: "Geral",
+      tipoModelo: "linear",
+      coeficientes: {
+        beta0: 4.5,
+        beta1: 0.85
+      },
+      fonteBibliografica: "Geral",
+      observacoes: "Equação linear simples para estimativa de altura.",
+      criadoEm: new Date().toISOString()
+    }
+  ];
+  try {
+    for (const hm of defaultHeights) {
+      const docRef = doc(db, `users/${uid}/heightModels`, hm.id);
+      await setDoc(docRef, hm);
+    }
+  } catch (err) {
+    console.error("Erro ao semear default height models:", err);
+  }
+};
+
+const seedDefaultVolumeModels = async (uid: string) => {
+  const defaultVolumes: VolumeModel[] = [
+    {
+      id: "vm-default-sh-pinus",
+      nome: "Schumacher-Hall - Pinus taeda",
+      especie: "Pinus taeda",
+      regiao: "Sul",
+      tipoModelo: "schumacher_hall",
+      coeficientes: {
+        beta0: 0.000055,
+        beta1: 1.885,
+        beta2: 1.052
+      },
+      fonteBibliografica: "Schumacher & Hall (1933)",
+      observacoes: "Equação clássica de volume comercial para Pinus.",
+      criadoEm: new Date().toISOString()
+    },
+    {
+      id: "vm-default-spurr-euc",
+      nome: "Spurr - Eucalyptus grandis",
+      especie: "Eucalyptus grandis",
+      regiao: "Sudeste",
+      tipoModelo: "spurr",
+      coeficientes: {
+        beta0: 0.0052,
+        beta1: 0.000038
+      },
+      fonteBibliografica: "Spurr, S.H. (1952)",
+      observacoes: "Modelo de Spurr para volume individual de Eucalyptus grandis.",
+      criadoEm: new Date().toISOString()
+    },
+    {
+      id: "vm-default-ff-geral",
+      nome: "Fator de Forma (0.7)",
+      especie: "Todas",
+      regiao: "Geral",
+      tipoModelo: "fator_forma",
+      coeficientes: {
+        beta0: 0.7
+      },
+      fonteBibliografica: "Literatura",
+      observacoes: "Cálculo volumétrico clássico com fator de forma comercial igual a 0.7.",
+      criadoEm: new Date().toISOString()
+    }
+  ];
+  try {
+    for (const vm of defaultVolumes) {
+      const docRef = doc(db, `users/${uid}/volumeModels`, vm.id);
+      await setDoc(docRef, vm);
+    }
+  } catch (err) {
+    console.error("Erro ao semear default volume models:", err);
+  }
+};
+
 const InventoryContext = createContext<InventoryContextType | undefined>(undefined);
 
 export const InventoryProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
@@ -147,6 +257,9 @@ export const InventoryProvider: React.FC<{ children: ReactNode }> = ({ children 
       });
       data.sort((a,b) => b.criadoEm.localeCompare(a.criadoEm));
       setHeightModels(data);
+      if (snapshot.empty && !snapshot.metadata.hasPendingWrites) {
+        seedDefaultHeightModels(uidToUse);
+      }
     }, (error) => {
       console.error("Erro no Sync do HeightModels Firestore:", error);
     });
@@ -160,6 +273,9 @@ export const InventoryProvider: React.FC<{ children: ReactNode }> = ({ children 
       });
       data.sort((a,b) => b.criadoEm.localeCompare(a.criadoEm));
       setVolumeModels(data);
+      if (snapshot.empty && !snapshot.metadata.hasPendingWrites) {
+        seedDefaultVolumeModels(uidToUse);
+      }
     }, (error) => {
       console.error("Erro no Sync do VolumeModels Firestore:", error);
     });

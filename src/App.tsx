@@ -413,17 +413,27 @@ const Home = () => {
             </div>
           ) : (
             <div className="inventory-list">
-              {fieldWorks.map(fw => (
-                <div 
-                  key={fw.id} 
-                  className="inventory-card" 
-                  onClick={() => navigate(`/fieldwork/${fw.id}`)}
-                >
-                  <div className="inventory-card-title">{fw.nome}</div>
-                  <div className="inventory-card-info">Local: {fw.local}</div>
-                  <div className="inventory-card-info">Data: {fw.dataInicio}</div>
-                </div>
-              ))}
+              {fieldWorks.map(fw => {
+                const fwTalhoes = talhoes.filter(t => t.fieldWorkId === fw.id).length;
+                const fwParcelas = inventories.filter(i => i.fieldWorkId === fw.id && i.template === 'inventario').length;
+                const fwArvores = inventories
+                  .filter(i => i.fieldWorkId === fw.id)
+                  .reduce((acc, curr) => acc + (curr.dados ? curr.dados.length : 0), 0);
+                return (
+                  <div 
+                    key={fw.id} 
+                    className="inventory-card" 
+                    onClick={() => navigate(`/fieldwork/${fw.id}`)}
+                  >
+                    <div className="inventory-card-title">{fw.nome}</div>
+                    <div className="inventory-card-info">Local: {fw.local}</div>
+                    <div className="inventory-card-info">Data: {fw.dataInicio}</div>
+                    <div className="inventory-card-info" style={{ marginTop: '4px', fontSize: '11.5px', opacity: 0.7 }}>
+                      {fwTalhoes} {fwTalhoes === 1 ? 'talhão' : 'talhões'} • {fwParcelas} {fwParcelas === 1 ? 'parcela' : 'parcelas'} • {fwArvores} {fwArvores === 1 ? 'árvore' : 'árvores'}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </>
