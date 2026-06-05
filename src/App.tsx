@@ -12,6 +12,7 @@ import { CubagemCollect } from './pages/CubagemCollect';
 import './App.css';
 import { useInventory } from './context/InventoryContext';
 import { useAuth } from './context/AuthContext';
+import * as XLSX from 'xlsx';
 import { doc, getDoc, updateDoc, setDoc, deleteDoc } from 'firebase/firestore';
 import { db } from './lib/firebase';
 import { OfficeDashboard } from './pages/OfficeDashboard';
@@ -44,6 +45,98 @@ const Home = () => {
   const [collaborators, setCollaborators] = useState<string[]>([]);
   const [newEmail, setNewEmail] = useState('');
   const [isTeamLoading, setIsTeamLoading] = useState(false);
+
+  // Estados para o menu de 3 pontinhos e edição de trabalhos
+  const [activeMenuFwId, setActiveMenuFwId] = useState<string | null>(null);
+  const [editingFw, setEditingFw] = useState<any | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editLocal, setEditLocal] = useState('');
+  const [editDate, setEditDate] = useState('');
+
+  const parseDateToYmd = (dateStr: string) => {
+    if (!dateStr) return '';
+    const parts = dateStr.split('/');
+    if (parts.length === 3) {
+      return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+    }
+    return dateStr;
+  };
+
+  const handleEditClick = (fw: any) => {
+    setEditingFw(fw);
+    setEditName(fw.nome);
+    setEditLocal(fw.local || '');
+    setEditDate(parseDateToYmd(fw.dataInicio));
+    setActiveMenuFwId(null);
+  };
+
+  const handleUpdateFw = async () => {
+    if (!editName) return alert('Dê um nome ao trabalho.');
+    const formattedDate = editDate 
+      ? new Date(editDate + 'T12:00:00').toLocaleDateString('pt-BR')
+      : editingFw.dataInicio;
+
+    try {
+      await createFieldWork({
+        ...editingFw,
+        nome: editName,
+        local: editLocal || 'Não especificado',
+        dataInicio: formattedDate
+      });
+      setEditingFw(null);
+    } catch (err: any) {
+      alert("Erro ao atualizar o trabalho: " + err.message);
+    }
+  };
+
+  useEffect(() => {
+    const handleOutsideClick = () => {
+      setActiveMenuFwId(null);
+    };
+    window.addEventListener('click', handleOutsideClick);
+    return () => window.removeEventListener('click', handleOutsideClick);
+  }, []);
+
+  const handleExportFieldWork = (fw: any) => {
+    const fwParcels = inventories.filter(i => i.fieldWorkId === fw.id && i.template !== 'cubagem');
+    const fwTalhoes = talhoes.filter(t => t.fieldWorkId === fw.id);
+    
+    const allData: any[] = [];
+    fwParcels.forEach(inv => {
+      const currentTal = fwTalhoes.find(t => t.id === inv.talhaoId);
+      inv.dados.forEach(ind => {
+        const baseData: any = {
+           'Talhão': currentTal ? currentTal.nome : 'Sem Talhão',
+           'Talhão Observações': currentTal?.observacoes || '',
+           'Parcela': inv.nome,
+           'Parcela Coordenadas': inv.coordenadas || '',
+           'Parcela Observações': inv.observacoes || '',
+           'Número': ind.numeroIndividuo,
+           'Data / Hora': ind.timestamp,
+        };
+        inv.colunas.forEach(col => {
+           baseData[col.nome] = ind[col.id] || '';
+        });
+        if (ind.multipleStems && ind.stems) {
+           ind.stems.forEach((stem: any, i: number) => {
+             baseData[`Fuste_${i+1}_CAP`] = stem.cap;
+             baseData[`Fuste_${i+1}_Altura`] = stem.altura;
+           });
+        }
+        allData.push(baseData);
+      });
+    });
+
+    if (allData.length === 0) {
+      alert("Nenhum dado encontrado nas parcelas deste trabalho.");
+      return;
+    }
+    
+    const worksheet = XLSX.utils.json_to_sheet(allData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Dados Consolidados");
+    XLSX.writeFile(workbook, `Projeto_${fw.nome.replace(/\s+/g, '_')}_Completo.xlsx`);
+  };
 
   useEffect(() => {
     // Se estiver no computador (tela >= 1024px) e não escolheu explicitamente o Modo Campo, vai para o Modo Escritório
@@ -424,37 +517,137 @@ const Home = () => {
                     key={fw.id} 
                     className="inventory-card" 
                     onClick={() => navigate(`/fieldwork/${fw.id}`)}
+                    style={{ overflow: 'visible' }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                       <div className="inventory-card-title">{fw.nome}</div>
-                      <button
-                        type="button"
-                        onClick={async (e) => {
-                          e.stopPropagation();
-                          if (confirm(`Deseja duplicar o trabalho de campo "${fw.nome}"?`)) {
-                            try {
-                              await duplicateFieldWork(fw.id);
-                              alert("Trabalho de campo duplicado com sucesso.");
-                            } catch (err: any) {
-                              alert("Erro ao duplicar: " + err.message);
-                            }
-                          }
-                        }}
-                        style={{
-                          background: 'rgba(255, 255, 255, 0.05)',
-                          border: '1px solid rgba(255, 255, 255, 0.1)',
-                          borderRadius: '8px',
-                          color: 'var(--text-muted)',
-                          fontSize: '10px',
-                          fontWeight: 'bold',
-                          cursor: 'pointer',
-                          padding: '5px 10px',
-                          transition: 'all 0.2s',
-                          zIndex: 2
-                        }}
-                      >
-                        Duplicar
-                      </button>
+                      <div style={{ position: 'relative' }}>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActiveMenuFwId(activeMenuFwId === fw.id ? null : fw.id);
+                          }}
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            color: 'var(--text-muted)',
+                            fontSize: '20px',
+                            cursor: 'pointer',
+                            padding: '0 8px 8px 8px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            transition: 'color 0.2s',
+                            lineHeight: 1
+                          }}
+                          onMouseEnter={(e) => { e.currentTarget.style.color = '#fff'; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; }}
+                        >
+                          •••
+                        </button>
+                        
+                        {activeMenuFwId === fw.id && (
+                          <div 
+                            style={{
+                              position: 'absolute',
+                              top: '28px',
+                              right: '0',
+                              background: '#1a1a1a',
+                              border: '1px solid rgba(255, 255, 255, 0.08)',
+                              borderRadius: '12px',
+                              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)',
+                              zIndex: 10,
+                              minWidth: '130px',
+                              overflow: 'hidden',
+                              backdropFilter: 'blur(16px)',
+                              WebkitBackdropFilter: 'blur(16px)',
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEditClick(fw);
+                              }}
+                              style={{
+                                width: '100%',
+                                padding: '10px 16px',
+                                background: 'transparent',
+                                border: 'none',
+                                color: '#fff',
+                                fontSize: '13px',
+                                textAlign: 'left',
+                                cursor: 'pointer',
+                                transition: 'background-color 0.2s',
+                                borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+                                display: 'block',
+                              }}
+                              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)'; }}
+                              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+                            >
+                              Editar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                setActiveMenuFwId(null);
+                                if (confirm(`Deseja duplicar o trabalho de campo "${fw.nome}"?`)) {
+                                  try {
+                                    await duplicateFieldWork(fw.id);
+                                    alert("Trabalho de campo duplicado com sucesso.");
+                                  } catch (err: any) {
+                                    alert("Erro ao duplicar: " + err.message);
+                                  }
+                                }
+                              }}
+                              style={{
+                                width: '100%',
+                                padding: '10px 16px',
+                                background: 'transparent',
+                                border: 'none',
+                                color: '#fff',
+                                fontSize: '13px',
+                                textAlign: 'left',
+                                cursor: 'pointer',
+                                transition: 'background-color 0.2s',
+                                borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+                                display: 'block',
+                              }}
+                              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)'; }}
+                              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+                            >
+                              Duplicar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setActiveMenuFwId(null);
+                                handleExportFieldWork(fw);
+                              }}
+                              style={{
+                                width: '100%',
+                                padding: '10px 16px',
+                                background: 'transparent',
+                                border: 'none',
+                                color: '#fff',
+                                fontSize: '13px',
+                                textAlign: 'left',
+                                cursor: 'pointer',
+                                transition: 'background-color 0.2s',
+                                display: 'block',
+                              }}
+                              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)'; }}
+                              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+                            >
+                              Exportar
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </div>
                     <div className="inventory-card-info">Local: {fw.local}</div>
                     <div className="inventory-card-info">Data: {fw.dataInicio}</div>
@@ -479,6 +672,21 @@ const Home = () => {
               <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
                 <button className="btn btn-secondary" onClick={() => setShowModal(false)}>Cancelar</button>
                 <button className="btn btn-primary" onClick={handleCreateFw}>Criar</button>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {editingFw && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
+           <div className="glass-card" style={{ width: '100%', maxWidth: '400px', borderRadius: '0px' }}>
+              <h3>Editar Trabalho</h3>
+              <input className="input-field" placeholder="Nome (Ex: Inventário 2026)" value={editName} onChange={e => setEditName(e.target.value)} style={{ marginTop: '16px' }} />
+              <input className="input-field" placeholder="Local / Fazenda" value={editLocal} onChange={e => setEditLocal(e.target.value)} />
+              <input type="date" className="input-field" value={editDate} onChange={e => setEditDate(e.target.value)} />
+              <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
+                <button className="btn btn-secondary" onClick={() => setEditingFw(null)}>Cancelar</button>
+                <button className="btn btn-primary" onClick={handleUpdateFw}>Salvar</button>
               </div>
            </div>
         </div>
