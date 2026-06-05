@@ -13,10 +13,36 @@ import {
   calculateBasalArea, 
   calculateVolume 
 } from '../utils/forestryCalculations';
+import type { 
+  InventoryProcessing, 
+  ModelSnapshot, 
+  ParcelaSnapshot, 
+  TalhaoConsolidation, 
+  StratumConsolidation, 
+  TrabalhoConsolidation 
+} from '../types';
 
 export const OfficeDashboard = () => {
   const navigate = useNavigate();
-  const { fieldWorks, talhoes, inventories, strata, createStratum, deleteStratum, saveInventory, isSynced, createTalhao, deleteTalhao, createFieldWork, heightModels, volumeModels, duplicateFieldWork } = useInventory();
+  const { 
+    fieldWorks, 
+    talhoes, 
+    inventories, 
+    strata, 
+    createStratum, 
+    deleteStratum, 
+    saveInventory, 
+    isSynced, 
+    createTalhao, 
+    deleteTalhao, 
+    createFieldWork, 
+    heightModels, 
+    volumeModels, 
+    duplicateFieldWork,
+    processings,
+    saveProcessing,
+    deleteProcessing
+  } = useInventory();
   const { currentUser, signOut, status, uidToUse, theme, toggleTheme } = useAuth();
 
   const [showSettingsModal, setShowSettingsModal] = useState(false);
@@ -102,7 +128,7 @@ export const OfficeDashboard = () => {
 
   const [activeFwId, setActiveFwId] = useState<string>('');
   const [searchProjectQuery, setSearchProjectQuery] = useState('');
-  const [activeTab, setActiveTab] = useState<'talhoes' | 'parcelas' | 'estratos' | 'cubagem' | 'extrapolacao'>('talhoes');
+  const [activeTab, setActiveTab] = useState<'talhoes' | 'parcelas' | 'estratos' | 'cubagem' | 'extrapolacao' | 'processamentos'>('talhoes');
   const [extraTab, setExtraTab] = useState<'parcelas' | 'talhoes' | 'estratos' | 'trabalho'>('parcelas');
   const [cubageSortOrder, setCubageSortOrder] = useState<'asc' | 'desc' | null>('desc');
   
@@ -147,6 +173,14 @@ export const OfficeDashboard = () => {
   const [batchTalhaoId, setBatchTalhaoId] = useState<string>('');
   const [batchParcelId, setBatchParcelId] = useState<number | null>(null);
   const [isBatchProcessing, setIsBatchProcessing] = useState(false);
+
+  // Estados para novos processamentos oficiais consolidadores
+  const [selectedProcessAId, setSelectedProcessAId] = useState<string>('');
+  const [selectedProcessBId, setSelectedProcessBId] = useState<string>('');
+  const [showNewProcessModal, setShowNewProcessModal] = useState(false);
+  const [newProcessName, setNewProcessName] = useState('');
+  const [newProcessConsolidationMode, setNewProcessConsolidationMode] = useState<'talhao' | 'stratum' | 'auto'>('auto');
+  const [selectedReportProcessing, setSelectedReportProcessing] = useState<InventoryProcessing | null>(null);
 
   // Estados para o menu de 3 pontinhos e edição de trabalhos no escritório
   const [activeMenuFwId, setActiveMenuFwId] = useState<string | null>(null);
@@ -880,6 +914,672 @@ export const OfficeDashboard = () => {
     };
   }, [activeFw, activeParcels, activeTalhoes, activeStrata, inventories, strata, talhoes]);
 
+  const activeProcessings = useMemo(() => {
+    return processings.filter(p => p.fieldWorkId === activeFwId);
+  }, [processings, activeFwId]);
+
+  const handleCreateInventoryProcessing = async (nomeProc: string, consMode: 'talhao' | 'stratum' | 'auto') => {
+    if (!nomeProc.trim()) {
+      alert("Por favor, informe o nome do processamento.");
+      return;
+    }
+
+    const hm = selectedHeightModelId !== 'none' ? heightModels.find(m => m.id === selectedHeightModelId) : null;
+    let vm: any = null;
+    let isLegacyVolume = false;
+    let legacyFf = 0.7;
+
+    if (selectedVolumeModelId === 'legacy') {
+      isLegacyVolume = true;
+      legacyFf = parseFloat(processingFatorForma);
+      if (isNaN(legacyFf) || legacyFf <= 0) {
+        alert('Fator de forma comercial inválido.');
+        return;
+      }
+    } else {
+      vm = volumeModels.find(m => m.id === selectedVolumeModelId);
+      if (!vm) {
+        alert('Modelo volumétrico não encontrado.');
+        return;
+      }
+    }
+
+    // Helpers para obter string de fórmula legível
+    const getHtFormula = (m: any) => {
+      if (!m) return 'Medida Direta';
+      const c = m.coeficientes;
+      switch (m.tipoModelo) {
+        case 'linear': return `H = ${c.beta0} + ${c.beta1} * DAP`;
+        case 'logaritmico': return `H = ${c.beta0} + ${c.beta1} * ln(DAP)`;
+        case 'henriksen': return `H = ${c.beta0} + ${c.beta1} * ln(DAP)`;
+        case 'curtis': return `H = exp(${c.beta0} + ${c.beta1} / DAP)`;
+        case 'trorey': return `H = ${c.beta0} + ${c.beta1} * DAP + ${c.beta2 || 0} * DAP²`;
+        case 'personalizado': return c.expressaoCustom || 'Personalizado';
+        default: return 'Fórmula padrão';
+      }
+    };
+
+    const getVolFormula = (m: any, ff?: number) => {
+      if (!m) {
+        return `V = ((pi * DAP²) / 40000) * H * ${ff || 0.7}`;
+      }
+      const c = m.coeficientes;
+      switch (m.tipoModelo) {
+        case 'fator_forma': return `V = ((pi * DAP²) / 40000) * H * ${c.beta0}`;
+        case 'schumacher_hall': return `V = ${c.beta0} * DAP^(${c.beta1 || 0}) * H^(${c.beta2 || 0})`;
+        case 'spurr': return `V = ${c.beta0} + ${c.beta1 || 0} * DAP² * H`;
+        case 'stoate': return `V = ${c.beta0} + ${c.beta1 || 0} * DAP² + ${c.beta2 || 0} * DAP² * H + ${c.beta3 || 0} * H`;
+        case 'husch': return `V = ${c.beta0} * DAP^(${c.beta1 || 0})`;
+        case 'personalizado': return c.expressaoCustom || 'Personalizado';
+        default: return 'Fórmula padrão';
+      }
+    };
+
+    // Snapshots dos modelos
+    const heightModelSnapshot: ModelSnapshot | null = hm ? {
+      id: hm.id,
+      nome: hm.nome,
+      especie: hm.especie,
+      regiao: hm.regiao,
+      tipoModelo: hm.tipoModelo,
+      coeficientes: hm.coeficientes,
+      fonteBibliografica: hm.fonteBibliografica || 'Não informada',
+      observacoes: hm.observacoes || '',
+      unidadeDap: 'cm',
+      unidadeAltura: 'm',
+      unidadeVolume: 'm³',
+      formula: getHtFormula(hm)
+    } : null;
+
+    const volumeModelSnapshot: ModelSnapshot | null = !isLegacyVolume && vm ? {
+      id: vm.id,
+      nome: vm.nome,
+      especie: vm.especie,
+      regiao: vm.regiao,
+      tipoModelo: vm.tipoModelo,
+      coeficientes: vm.coeficientes,
+      fonteBibliografica: vm.fonteBibliografica || 'Não informada',
+      observacoes: vm.observacoes || '',
+      unidadeDap: 'cm',
+      unidadeAltura: 'm',
+      unidadeVolume: 'm³',
+      formula: getVolFormula(vm)
+    } : {
+      id: 'legacy',
+      nome: `Fator de Forma (${legacyFf})`,
+      especie: 'Geral',
+      regiao: 'Geral',
+      tipoModelo: 'fator_forma',
+      coeficientes: { beta0: legacyFf },
+      fonteBibliografica: 'Literatura convencional',
+      observacoes: 'Fator de forma fixo comercial.',
+      unidadeDap: 'cm',
+      unidadeAltura: 'm',
+      unidadeVolume: 'm³',
+      formula: getVolFormula(null, legacyFf)
+    };
+
+    // Arrays de auditoria
+    const warnings: string[] = [];
+    const parcelasIgnoradas: string[] = [];
+    let arvoresIgnoradas = 0;
+    let arvoresSemDAP = 0;
+    let arvoresSemAltura = 0;
+    let arvoresSemVolume = 0;
+
+    const parcelasSnapshots: ParcelaSnapshot[] = [];
+
+    // Processar todas as parcelas ativas
+    activeParcels.forEach(parcel => {
+      const area = parcel.areaParcela || 0;
+      if (area <= 0) {
+        parcelasIgnoradas.push(parcel.nome);
+        warnings.push(`Parcela "${parcel.nome}": Ignorada porque a área é zero ou negativa.`);
+        return;
+      }
+      if (!parcel.dados || parcel.dados.length === 0) {
+        parcelasIgnoradas.push(parcel.nome);
+        warnings.push(`Parcela "${parcel.nome}": Ignorada porque não contém indivíduos cadastrados.`);
+        return;
+      }
+
+      let validTreesCount = 0;
+      let parcelVolumeTotal = 0;
+      let parcelBasalAreaTotal = 0;
+
+      parcel.dados.forEach(ind => {
+        const treeDap = getDapOfTreeOrStem(ind);
+        if (treeDap <= 0) {
+          arvoresSemDAP++;
+          arvoresIgnoradas++;
+          warnings.push(`Parcela "${parcel.nome}": Indivíduo nº ${ind.numeroIndividuo} ignorado por não possuir diâmetro (CAP/DAP) válido.`);
+          return;
+        }
+
+        validTreesCount++;
+        let treeVol = 0;
+
+        if (ind.multipleStems && ind.stems && ind.stems.length > 0) {
+          let stemsVol = 0;
+          let maxStemHt = 0;
+
+          ind.stems.forEach((stem: any) => {
+            const stemDap = getDapOfTreeOrStem(stem);
+            if (stemDap <= 0) return; // ignora fuste sem dap
+            let stemHt = parseFloat(stem.altura || '0');
+            if (isNaN(stemHt) || stemHt <= 0) {
+              const globalHt = parseFloat(ind.ht || '0');
+              if (!isNaN(globalHt) && globalHt > 0) {
+                stemHt = globalHt;
+              }
+            }
+
+            if ((isNaN(stemHt) || stemHt <= 0) && hm) {
+              stemHt = evaluateHeightModel(hm, stemDap);
+              stemHt = cleanResult(stemHt);
+              arvoresSemAltura++;
+            } else if (isNaN(stemHt) || stemHt <= 0) {
+              stemHt = 0;
+              arvoresSemAltura++;
+            }
+
+            if (stemHt > maxStemHt) {
+              maxStemHt = stemHt;
+            }
+
+            // Volume do fuste
+            let stemVol = 0;
+            if (isLegacyVolume) {
+              const g = (Math.PI * Math.pow(stemDap / 100, 2)) / 4;
+              stemVol = g * stemHt * legacyFf;
+            } else if (vm) {
+              stemVol = evaluateVolumeModel(vm, stemDap, stemHt);
+            }
+            stemVol = cleanResult(stemVol);
+            if (stemVol <= 0) arvoresSemVolume++;
+            stemsVol += stemVol;
+          });
+
+          treeVol = stemsVol;
+        } else {
+          // Tronco único
+          let treeHt = parseFloat(ind.ht || '0');
+          if (isNaN(treeHt) || treeHt <= 0) {
+            if (hm) {
+              treeHt = evaluateHeightModel(hm, treeDap);
+              treeHt = cleanResult(treeHt);
+              arvoresSemAltura++;
+            } else {
+              treeHt = 0;
+              arvoresSemAltura++;
+            }
+          }
+
+          if (isLegacyVolume) {
+            const g = (Math.PI * Math.pow(treeDap / 100, 2)) / 4;
+            treeVol = g * treeHt * legacyFf;
+          } else if (vm) {
+            treeVol = evaluateVolumeModel(vm, treeDap, treeHt);
+          }
+          treeVol = cleanResult(treeVol);
+          if (treeVol <= 0) arvoresSemVolume++;
+        }
+
+        // Basal Area
+        let basalArea = 0;
+        if (ind.multipleStems && ind.stems) {
+          ind.stems.forEach(stem => {
+            basalArea += calculateBasalArea(stem.cap || 0);
+          });
+        } else {
+          basalArea = calculateBasalArea(ind.cap ? parseFloat(ind.cap) : treeDap * Math.PI);
+        }
+
+        parcelVolumeTotal += treeVol;
+        parcelBasalAreaTotal += basalArea;
+      });
+
+      if (validTreesCount === 0) {
+        parcelasIgnoradas.push(parcel.nome);
+        warnings.push(`Parcela "${parcel.nome}": Ignorada porque todos os indivíduos nela cadastrados foram desconsiderados por inconsistência.`);
+        return;
+      }
+
+      const fatorExpansao = 10000 / area;
+      parcelasSnapshots.push({
+        parcelaId: parcel.id,
+        nome: parcel.nome,
+        talhaoId: parcel.talhaoId,
+        stratumId: parcel.stratumId,
+        areaParcela: area,
+        fatorExpansao,
+        volumeTotal: Number(parcelVolumeTotal.toFixed(4)),
+        volumePorHa: Number((parcelVolumeTotal * fatorExpansao).toFixed(2)),
+        areaBasalPorHa: Number((parcelBasalAreaTotal * fatorExpansao).toFixed(3)),
+        densidadePorHa: Number((validTreesCount * fatorExpansao).toFixed(1)),
+        numeroArvores: validTreesCount
+      });
+    });
+
+    if (parcelasSnapshots.length === 0) {
+      alert("Erro no processamento: Nenhuma parcela válida pôde ser calculada. Verifique os dados.");
+      return;
+    }
+
+    // Consolidação por Talhão
+    const talhoesSnapshots: TalhaoConsolidation[] = activeTalhoes.map(t => {
+      const tParcels = parcelasSnapshots.filter(p => p.talhaoId === t.id);
+      const numParcelas = tParcels.length;
+      const areaTalhao = t.area || 0;
+
+      let volumeMedioHa = 0;
+      let areaBasalMediaHa = 0;
+      let densidadeMediaHa = 0;
+      let dapMedio = 0;
+      let alturaMedia = 0;
+      let arvoresUtilizadas = 0;
+
+      if (numParcelas > 0) {
+        volumeMedioHa = tParcels.reduce((acc, curr) => acc + curr.volumePorHa, 0) / numParcelas;
+        areaBasalMediaHa = tParcels.reduce((acc, curr) => acc + curr.areaBasalPorHa, 0) / numParcelas;
+        densidadeMediaHa = tParcels.reduce((acc, curr) => acc + curr.densidadePorHa, 0) / numParcelas;
+        arvoresUtilizadas = tParcels.reduce((acc, curr) => acc + curr.numeroArvores, 0);
+
+        let sumDap = 0;
+        let sumHt = 0;
+        let count = 0;
+
+        tParcels.forEach(pSnap => {
+          const originalParcel = activeParcels.find(ap => ap.id === pSnap.parcelaId);
+          originalParcel?.dados?.forEach(tree => {
+            const treeDap = getDapOfTreeOrStem(tree);
+            if (treeDap > 0) {
+              let treeHt = parseFloat(tree.ht || '0');
+              if (tree.multipleStems && tree.stems) {
+                let maxHt = 0;
+                tree.stems.forEach(stem => {
+                  const sDap = getDapOfTreeOrStem(stem);
+                  if (sDap <= 0) return;
+                  let sHt = stem.altura || 0;
+                  if ((isNaN(sHt) || sHt <= 0) && hm) sHt = cleanResult(evaluateHeightModel(hm, sDap));
+                  if (sHt > maxHt) maxHt = sHt;
+                });
+                treeHt = maxHt;
+              } else {
+                if ((isNaN(treeHt) || treeHt <= 0) && hm) treeHt = cleanResult(evaluateHeightModel(hm, treeDap));
+              }
+
+              sumDap += treeDap;
+              sumHt += treeHt;
+              count++;
+            }
+          });
+        });
+
+        if (count > 0) {
+          dapMedio = sumDap / count;
+          alturaMedia = sumHt / count;
+        }
+      }
+
+      return {
+        talhaoId: t.id,
+        nome: t.nome,
+        areaTalhao,
+        parcelasUtilizadas: numParcelas,
+        arvoresUtilizadas,
+        volumeMedioHa: Number(volumeMedioHa.toFixed(2)),
+        volumeTotalEstimado: Number((volumeMedioHa * areaTalhao).toFixed(2)),
+        areaBasalMediaHa: Number(areaBasalMediaHa.toFixed(3)),
+        densidadeMediaHa: Number(densidadeMediaHa.toFixed(1)),
+        dapMedio: Number(dapMedio.toFixed(2)),
+        alturaMedia: Number(alturaMedia.toFixed(2))
+      };
+    });
+
+    // Consolidação por Estrato
+    const strataSnapshots: StratumConsolidation[] = activeStrata.map(s => {
+      const sParcels = parcelasSnapshots.filter(p => p.stratumId === s.id);
+      const numParcelas = sParcels.length;
+      const areaEstrato = s.area || 0;
+
+      let volumeMedioHa = 0;
+      let areaBasalMediaHa = 0;
+      let densidadeMediaHa = 0;
+      let dapMedio = 0;
+      let alturaMedia = 0;
+      let arvoresUtilizadas = 0;
+
+      if (numParcelas > 0) {
+        volumeMedioHa = sParcels.reduce((acc, curr) => acc + curr.volumePorHa, 0) / numParcelas;
+        areaBasalMediaHa = sParcels.reduce((acc, curr) => acc + curr.areaBasalPorHa, 0) / numParcelas;
+        densidadeMediaHa = sParcels.reduce((acc, curr) => acc + curr.densidadePorHa, 0) / numParcelas;
+        arvoresUtilizadas = sParcels.reduce((acc, curr) => acc + curr.numeroArvores, 0);
+
+        let sumDap = 0;
+        let sumHt = 0;
+        let count = 0;
+
+        sParcels.forEach(pSnap => {
+          const originalParcel = activeParcels.find(ap => ap.id === pSnap.parcelaId);
+          originalParcel?.dados?.forEach(tree => {
+            const treeDap = getDapOfTreeOrStem(tree);
+            if (treeDap > 0) {
+              let treeHt = parseFloat(tree.ht || '0');
+              if (tree.multipleStems && tree.stems) {
+                let maxHt = 0;
+                tree.stems.forEach(stem => {
+                  const sDap = getDapOfTreeOrStem(stem);
+                  if (sDap <= 0) return;
+                  let sHt = stem.altura || 0;
+                  if ((isNaN(sHt) || sHt <= 0) && hm) sHt = cleanResult(evaluateHeightModel(hm, sDap));
+                  if (sHt > maxHt) maxHt = sHt;
+                });
+                treeHt = maxHt;
+              } else {
+                if ((isNaN(treeHt) || treeHt <= 0) && hm) treeHt = cleanResult(evaluateHeightModel(hm, treeDap));
+              }
+
+              sumDap += treeDap;
+              sumHt += treeHt;
+              count++;
+            }
+          });
+        });
+
+        if (count > 0) {
+          dapMedio = sumDap / count;
+          alturaMedia = sumHt / count;
+        }
+      }
+
+      return {
+        stratumId: s.id,
+        nome: s.nome,
+        areaEstrato,
+        parcelasUtilizadas: numParcelas,
+        arvoresUtilizadas,
+        volumeMedioHa: Number(volumeMedioHa.toFixed(2)),
+        volumeTotalEstimado: Number((volumeMedioHa * areaEstrato).toFixed(2)),
+        areaBasalMediaHa: Number(areaBasalMediaHa.toFixed(3)),
+        densidadeMediaHa: Number(densidadeMediaHa.toFixed(1)),
+        dapMedio: Number(dapMedio.toFixed(2)),
+        alturaMedia: Number(alturaMedia.toFixed(2))
+      };
+    });
+
+    // Consolidação Geral do Trabalho
+    const totalParcelsCount = parcelasSnapshots.length;
+    const totalSampledArea = parcelasSnapshots.reduce((acc, curr) => acc + curr.areaParcela, 0);
+    const totalTreesCount = parcelasSnapshots.reduce((acc, curr) => acc + curr.numeroArvores, 0);
+
+    const avgVolHa = totalParcelsCount > 0 ? parcelasSnapshots.reduce((acc, curr) => acc + curr.volumePorHa, 0) / totalParcelsCount : 0;
+    const avgBasalHa = totalParcelsCount > 0 ? parcelasSnapshots.reduce((acc, curr) => acc + curr.areaBasalPorHa, 0) / totalParcelsCount : 0;
+    const avgDensityHa = totalParcelsCount > 0 ? parcelasSnapshots.reduce((acc, curr) => acc + curr.densidadePorHa, 0) / totalParcelsCount : 0;
+
+    let overallDap = 0;
+    let overallHt = 0;
+    let overallTreesCount = 0;
+
+    parcelasSnapshots.forEach(pSnap => {
+      const originalParcel = activeParcels.find(ap => ap.id === pSnap.parcelaId);
+      originalParcel?.dados?.forEach(tree => {
+        const treeDap = getDapOfTreeOrStem(tree);
+        if (treeDap > 0) {
+          let treeHt = parseFloat(tree.ht || '0');
+          if (tree.multipleStems && tree.stems) {
+            let maxHt = 0;
+            tree.stems.forEach(stem => {
+              const sDap = getDapOfTreeOrStem(stem);
+              if (sDap <= 0) return;
+              let sHt = stem.altura || 0;
+              if ((isNaN(sHt) || sHt <= 0) && hm) sHt = cleanResult(evaluateHeightModel(hm, sDap));
+              if (sHt > maxHt) maxHt = sHt;
+            });
+            treeHt = maxHt;
+          } else {
+            if ((isNaN(treeHt) || treeHt <= 0) && hm) treeHt = cleanResult(evaluateHeightModel(hm, treeDap));
+          }
+
+          overallDap += treeDap;
+          overallHt += treeHt;
+          overallTreesCount++;
+        }
+      });
+    });
+
+    const dapMedioGeral = overallTreesCount > 0 ? overallDap / overallTreesCount : 0;
+    const alturaMediaGeral = overallTreesCount > 0 ? overallHt / overallTreesCount : 0;
+
+    // Determinar modo de amostragem efetivo
+    let effectiveConsMode: 'talhao' | 'stratum';
+    if (consMode === 'auto') {
+      const hasStrataWithArea = activeStrata.some(s => (s.area || 0) > 0) && strataSnapshots.some(s => s.parcelasUtilizadas > 0);
+      effectiveConsMode = hasStrataWithArea ? 'stratum' : 'talhao';
+    } else {
+      effectiveConsMode = consMode;
+    }
+
+    let areaTotal = 0;
+    let volumeTotalEstimado = 0;
+
+    if (effectiveConsMode === 'stratum' && strataSnapshots.length > 0) {
+      areaTotal = strataSnapshots.reduce((acc, curr) => acc + curr.areaEstrato, 0);
+      volumeTotalEstimado = strataSnapshots.reduce((acc, curr) => acc + curr.volumeTotalEstimado, 0);
+    } else if (effectiveConsMode === 'talhao' && talhoesSnapshots.length > 0) {
+      areaTotal = talhoesSnapshots.reduce((acc, curr) => acc + curr.areaTalhao, 0);
+      volumeTotalEstimado = talhoesSnapshots.reduce((acc, curr) => acc + curr.volumeTotalEstimado, 0);
+    } else {
+      const totalAreaConfig = activeTalhoes.reduce((acc, curr) => acc + (curr.area || 0), 0);
+      areaTotal = totalAreaConfig > 0 ? totalAreaConfig : (totalSampledArea / 10000);
+      volumeTotalEstimado = avgVolHa * areaTotal;
+    }
+
+    const trabalhoConsolidation: TrabalhoConsolidation = {
+      areaTotal: Number(areaTotal.toFixed(2)),
+      areaAmostrada: Number((totalSampledArea / 10000).toFixed(4)),
+      numeroTalhoes: activeTalhoes.length,
+      numeroEstratos: activeStrata.length,
+      numeroParcelas: totalParcelsCount,
+      numeroArvores: totalTreesCount,
+      volumeMedioHa: Number(avgVolHa.toFixed(2)),
+      volumeTotalEstimado: Number(volumeTotalEstimado.toFixed(2)),
+      areaBasalMediaHa: Number(avgBasalHa.toFixed(3)),
+      densidadeMedia: Number(avgDensityHa.toFixed(1)),
+      dapMedio: Number(dapMedioGeral.toFixed(2)),
+      alturaMedia: Number(alturaMediaGeral.toFixed(2))
+    };
+
+    const newProcessing: InventoryProcessing = {
+      id: `proc_${Date.now()}`,
+      fieldWorkId: activeFwId,
+      nomeProcessamento: nomeProc,
+      dataProcessamento: new Date().toLocaleDateString('pt-BR'),
+      heightModelSnapshot,
+      volumeModelSnapshot,
+      consolidationMode: consMode,
+      effectiveConsolidationMode: effectiveConsMode,
+      numeroParcelas: totalParcelsCount,
+      areaAmostrada: totalSampledArea,
+      volumeTotalEstimado: trabalhoConsolidation.volumeTotalEstimado,
+      volumeMedioHa: trabalhoConsolidation.volumeMedioHa,
+      areaBasalMediaHa: trabalhoConsolidation.areaBasalMediaHa,
+      dapMedio: trabalhoConsolidation.dapMedio,
+      alturaMedia: trabalhoConsolidation.alturaMedia,
+      warnings,
+      parcelasIgnoradas,
+      arvoresIgnoradas,
+      arvoresSemDAP,
+      arvoresSemAltura,
+      arvoresSemVolume,
+      status: 'Oficial',
+      createdAt: new Date().toISOString(),
+      createdBy: currentUser?.displayName || currentUser?.email || 'Usuário',
+      parcelas: parcelasSnapshots,
+      talhoes: talhoesSnapshots,
+      strata: strataSnapshots,
+      trabalho: trabalhoConsolidation
+    };
+
+    try {
+      await saveProcessing(newProcessing);
+      alert("Processamento e consolidação executados com sucesso!");
+    } catch (e: any) {
+      console.error(e);
+      alert("Erro ao gravar snapshot de processamento: " + e.message);
+    }
+  };
+
+  const handleDuplicarConfiguracao = (proc: InventoryProcessing) => {
+    if (proc.heightModelSnapshot) {
+      setSelectedHeightModelId(proc.heightModelSnapshot.id);
+    } else {
+      setSelectedHeightModelId('none');
+    }
+    
+    if (proc.volumeModelSnapshot) {
+      if (proc.volumeModelSnapshot.id === 'legacy') {
+        setSelectedVolumeModelId('legacy');
+        setProcessingFatorForma(proc.volumeModelSnapshot.coeficientes.beta0.toString());
+      } else {
+        setSelectedVolumeModelId(proc.volumeModelSnapshot.id);
+      }
+    } else {
+      setSelectedVolumeModelId('legacy');
+      setProcessingFatorForma('0.7');
+    }
+
+    setNewProcessConsolidationMode(proc.consolidationMode);
+    setNewProcessName(`${proc.nomeProcessamento} (Nova Execução)`);
+    setShowNewProcessModal(true);
+  };
+
+  const handleExportAdvancedXLSX = (proc: InventoryProcessing) => {
+    const wb = XLSX.utils.book_new();
+
+    const resumoData = [
+      { Métrica: "Nome do Trabalho", Valor: activeFw?.nome || "" },
+      { Métrica: "Nome do Processamento", Valor: proc.nomeProcessamento },
+      { Métrica: "Data do Processamento", Valor: proc.dataProcessamento },
+      { Métrica: "Responsável", Valor: proc.createdBy },
+      { Métrica: "Configuração de Consolidação", Valor: proc.consolidationMode === "stratum" ? "Estrato" : proc.consolidationMode === "talhao" ? "Talhão" : "Automático" },
+      { Métrica: "Modo de Consolidação Efetivo", Valor: proc.effectiveConsolidationMode === "stratum" ? "Estrato" : "Talhão" },
+      { Métrica: "Área Total Inventariada (ha)", Valor: proc.trabalho.areaTotal },
+      { Métrica: "Área Total Amostrada (ha)", Valor: proc.trabalho.areaAmostrada },
+      { Métrica: "Volume Total Estimado (m³)", Valor: proc.trabalho.volumeTotalEstimado },
+      { Métrica: "Volume Médio Geral (m³/ha)", Valor: proc.trabalho.volumeMedioHa },
+      { Métrica: "Área Basal Média Geral (m²/ha)", Valor: proc.trabalho.areaBasalMediaHa },
+      { Métrica: "Densidade Média Geral (árv/ha)", Valor: proc.trabalho.densidadeMedia },
+      { Métrica: "DAP Médio Geral (cm)", Valor: proc.trabalho.dapMedio },
+      { Métrica: "Altura Média Geral (m)", Valor: proc.trabalho.alturaMedia },
+      { Métrica: "Nº de Talhões", Valor: proc.trabalho.numeroTalhoes },
+      { Métrica: "Nº de Estratos", Valor: proc.trabalho.numeroEstratos },
+      { Métrica: "Nº de Parcelas", Valor: proc.trabalho.numeroParcelas },
+      { Métrica: "Nº de Árvores", Valor: proc.trabalho.numeroArvores }
+    ];
+    const wsResumo = XLSX.utils.json_to_sheet(resumoData);
+
+    const talhoesData = proc.talhoes.map(t => ({
+      "Talhão": t.nome,
+      "Área (ha)": t.areaTalhao,
+      "Parcelas Utilizadas": t.parcelasUtilizadas,
+      "Árvores Utilizadas": t.arvoresUtilizadas,
+      "Volume Médio / ha (m³)": t.volumeMedioHa,
+      "Volume Total Estimado (m³)": t.volumeTotalEstimado,
+      "Área Basal / ha (m²)": t.areaBasalMediaHa,
+      "Densidade / ha (árv)": t.densidadeMediaHa,
+      "DAP Médio (cm)": t.dapMedio,
+      "Altura Média (m)": t.alturaMedia
+    }));
+    const wsTalhoes = XLSX.utils.json_to_sheet(talhoesData);
+
+    const estratosData = proc.strata.map(s => ({
+      "Estrato": s.nome,
+      "Área (ha)": s.areaEstrato,
+      "Parcelas Utilizadas": s.parcelasUtilizadas,
+      "Árvores Utilizadas": s.arvoresUtilizadas,
+      "Volume Médio / ha (m³)": s.volumeMedioHa,
+      "Volume Total Estimado (m³)": s.volumeTotalEstimado,
+      "Área Basal / ha (m²)": s.areaBasalMediaHa,
+      "Densidade / ha (árv)": s.densidadeMediaHa,
+      "DAP Médio (cm)": s.dapMedio,
+      "Altura Média (m)": s.alturaMedia
+    }));
+    const wsEstratos = XLSX.utils.json_to_sheet(estratosData);
+
+    const parcelasData = proc.parcelas.map(p => ({
+      "Parcela": p.nome,
+      "Área (m²)": p.areaParcela,
+      "Fator de Expansão": p.fatorExpansao,
+      "Volume Total (m³)": p.volumeTotal,
+      "Volume / ha (m³)": p.volumePorHa,
+      "Área Basal / ha (m²)": p.areaBasalPorHa,
+      "Densidade / ha (árv)": p.densidadePorHa,
+      "Número de Árvores": p.numeroArvores
+    }));
+    const wsParcelas = XLSX.utils.json_to_sheet(parcelasData);
+
+    const modelosData = [];
+    if (proc.heightModelSnapshot) {
+      modelosData.push({
+        Módulo: "Hipsometria (Altura)",
+        Nome: proc.heightModelSnapshot.nome,
+        Tipo: proc.heightModelSnapshot.tipoModelo,
+        Equação: proc.heightModelSnapshot.formula,
+        "Beta 0": proc.heightModelSnapshot.coeficientes.beta0,
+        "Beta 1": proc.heightModelSnapshot.coeficientes.beta1 || 0,
+        "Beta 2": proc.heightModelSnapshot.coeficientes.beta2 || 0,
+        "Beta 3": proc.heightModelSnapshot.coeficientes.beta3 || 0,
+        Unidades: `DAP: ${proc.heightModelSnapshot.unidadeDap} | Altura: ${proc.heightModelSnapshot.unidadeAltura}`,
+        Bibliografia: proc.heightModelSnapshot.fonteBibliografica || "",
+        Observações: proc.heightModelSnapshot.observacoes || ""
+      });
+    } else {
+      modelosData.push({ Módulo: "Hipsometria (Altura)", Nome: "Altura Medida ou Estimada Geral", Tipo: "Nenhum", Equação: "-", "Beta 0": "-", "Beta 1": "-", "Beta 2": "-", "Beta 3": "-", Unidades: "-", Bibliografia: "-", Observações: "-" });
+    }
+
+    if (proc.volumeModelSnapshot) {
+      modelosData.push({
+        Módulo: "Volumetria (Volume)",
+        Nome: proc.volumeModelSnapshot.nome,
+        Tipo: proc.volumeModelSnapshot.tipoModelo,
+        Equação: proc.volumeModelSnapshot.formula,
+        "Beta 0": proc.volumeModelSnapshot.coeficientes.beta0,
+        "Beta 1": proc.volumeModelSnapshot.coeficientes.beta1 || 0,
+        "Beta 2": proc.volumeModelSnapshot.coeficientes.beta2 || 0,
+        "Beta 3": proc.volumeModelSnapshot.coeficientes.beta3 || 0,
+        Unidades: `DAP: ${proc.volumeModelSnapshot.unidadeDap} | Volume: ${proc.volumeModelSnapshot.unidadeVolume}`,
+        Bibliografia: proc.volumeModelSnapshot.fonteBibliografica || "",
+        Observações: proc.volumeModelSnapshot.observacoes || ""
+      });
+    }
+    const wsModelos = XLSX.utils.json_to_sheet(modelosData);
+
+    const metadadosData = [
+      { Campo: "ID do Processamento", Valor: proc.id },
+      { Campo: "Data/Hora Criação", Valor: proc.createdAt },
+      { Campo: "Criado Por", Valor: proc.createdBy },
+      { Campo: "Status", Valor: proc.status },
+      { Campo: "Total Parcelas Ignoradas", Valor: proc.parcelasIgnoradas.length },
+      { Campo: "Nomes Parcelas Ignoradas", Valor: proc.parcelasIgnoradas.join(", ") || "Nenhuma" },
+      { Campo: "Total Árvores Ignoradas (Sem DAP)", Valor: proc.arvoresIgnoradas },
+      { Campo: "Total Árvores Sem DAP", Valor: proc.arvoresSemDAP },
+      { Campo: "Total Árvores Sem Altura", Valor: proc.arvoresSemAltura },
+      { Campo: "Total Árvores Sem Volume", Valor: proc.arvoresSemVolume },
+      { Campo: "Avisos de Inconsistência", Valor: proc.warnings.join(" | ") || "Nenhum aviso" }
+    ];
+    const wsMetadados = XLSX.utils.json_to_sheet(metadadosData);
+
+    XLSX.utils.book_append_sheet(wb, wsResumo, "Resumo Executivo");
+    XLSX.utils.book_append_sheet(wb, wsTalhoes, "Talhões");
+    XLSX.utils.book_append_sheet(wb, wsEstratos, "Estratos");
+    XLSX.utils.book_append_sheet(wb, wsParcelas, "Parcelas");
+    XLSX.utils.book_append_sheet(wb, wsModelos, "Modelos Utilizados");
+    XLSX.utils.book_append_sheet(wb, wsMetadados, "Metadados e Auditoria");
+
+    XLSX.writeFile(wb, `Consolidacao_${activeFw?.nome.replace(/\s+/g, '_')}_${proc.nomeProcessamento.replace(/\s+/g, '_')}.xlsx`);
+  };
+
   const activeCubageSessions = useMemo(() => {
     return inventories.filter(i => i.fieldWorkId === activeFwId && i.template === 'cubagem');
   }, [inventories, activeFwId]);
@@ -1418,10 +2118,10 @@ export const OfficeDashboard = () => {
   }, [auditParcel]);
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg-color)', color: 'var(--text-main)', fontFamily: "'Plus Jakarta Sans', sans-serif", overflowX: 'hidden' }}>
+    <div className="office-dashboard-layout" style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg-color)', color: 'var(--text-main)', fontFamily: "'Plus Jakarta Sans', sans-serif", overflowX: 'hidden' }}>
       
       {/* Sidebar (List of projects) */}
-      <div style={{ width: '320px', background: 'rgba(5, 13, 8, 0.4)', backdropFilter: 'blur(30px)', borderRight: '1px solid rgba(255, 255, 255, 0.05)', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
+      <div className="office-sidebar" style={{ width: '320px', background: 'rgba(5, 13, 8, 0.4)', backdropFilter: 'blur(30px)', borderRight: '1px solid rgba(255, 255, 255, 0.05)', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
         
         {/* Brand Header */}
         <div style={{ padding: '24px 24px 16px', display: 'flex', flexDirection: 'column', gap: '12px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
@@ -1758,7 +2458,7 @@ export const OfficeDashboard = () => {
       </div>
 
       {/* Main Content Area */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100vh', overflowY: 'auto' }}>
+      <div className="office-content" style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100vh', overflowY: 'auto' }}>
         {activeFw ? (
           <div style={{ padding: '32px', boxSizing: 'border-box', width: '100%' }}>
             
@@ -1976,6 +2676,21 @@ export const OfficeDashboard = () => {
                 }}
               >
                 Extrapolação
+              </button>
+              <button 
+                onClick={() => setActiveTab('processamentos')}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  borderBottom: activeTab === 'processamentos' ? '2px solid var(--primary-color)' : '2px solid transparent',
+                  color: activeTab === 'processamentos' ? 'var(--primary-hover)' : 'var(--text-muted)',
+                  padding: '12px 20px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold',
+                  fontSize: '14.5px'
+                }}
+              >
+                Processamentos ({activeProcessings.length})
               </button>
             </div>
 
@@ -2759,9 +3474,601 @@ export const OfficeDashboard = () => {
                     )}
                   </div>
                 )}
+              </div>
+            ) : activeTab === 'processamentos' ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                
+                {/* TOOLBAR */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+                  <div>
+                    <h2 style={{ fontSize: '20px', fontWeight: '800', margin: 0 }}>Consolidação & Processamentos</h2>
+                    <p style={{ color: 'var(--text-muted)', fontSize: '13px', margin: '4px 0 0 0' }}>
+                      Gere snapshots oficiais e consolidados para amostragem florestal técnica.
+                    </p>
+                  </div>
+                  <button 
+                    className="btn btn-primary" 
+                    style={{ width: 'auto', padding: '12px 24px' }}
+                    onClick={() => {
+                      setNewProcessName(`Processamento Oficial - ${new Date().toLocaleDateString('pt-BR')} ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`);
+                      setNewProcessConsolidationMode('auto');
+                      setShowNewProcessModal(true);
+                    }}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '8px' }}>
+                      <line x1="12" y1="5" x2="12" y2="19"></line>
+                      <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
+                    Processar Novo Inventário
+                  </button>
+                </div>
 
+                {/* HISTÓRICO TABLE */}
+                <div className="glass-card" style={{ padding: 0, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.05)' }}>
+                  <div style={{ padding: '20px 24px', borderBottom: '1px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.01)' }}>
+                    <h3 style={{ fontSize: '13px', fontWeight: '800', textTransform: 'uppercase', color: 'var(--primary-hover)', margin: 0, letterSpacing: '0.5px' }}>
+                      Histórico de Versões
+                    </h3>
+                  </div>
+
+                  {activeProcessings.length === 0 ? (
+                    <div style={{ padding: '60px 24px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="1.5" style={{ marginBottom: '12px' }}>
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                        <line x1="16" y1="2" x2="16" y2="6"></line>
+                        <line x1="8" y1="2" x2="8" y2="6"></line>
+                        <line x1="3" y1="10" x2="21" y2="10"></line>
+                      </svg>
+                      <h4 style={{ color: '#fff', fontSize: '15px', fontWeight: '700' }}>Sem processamentos oficiais</h4>
+                      <p style={{ fontSize: '13px', marginTop: '4px' }}>
+                        Clique no botão acima para processar as parcelas e congelar a primeira versão oficial.
+                      </p>
+                    </div>
+                  ) : (
+                    <div style={{ overflowX: 'auto' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                        <thead>
+                          <tr style={{ background: 'rgba(0,0,0,0.1)' }}>
+                            <th style={{ padding: '16px 20px', fontSize: '11px', color: 'var(--text-muted)' }}>Nome do Processamento</th>
+                            <th style={{ padding: '16px 20px', fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center' }}>Data</th>
+                            <th style={{ padding: '16px 20px', fontSize: '11px', color: 'var(--text-muted)' }}>Responsável</th>
+                            <th style={{ padding: '16px 20px', fontSize: '11px', color: 'var(--text-muted)' }}>Equações H / V</th>
+                            <th style={{ padding: '16px 20px', fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center' }}>Modo</th>
+                            <th style={{ padding: '16px 20px', fontSize: '11px', color: 'var(--text-muted)', textAlign: 'right' }}>Vol. Total (m³)</th>
+                            <th style={{ padding: '16px 20px', fontSize: '11px', color: 'var(--text-muted)', textAlign: 'right' }}>Média (m³/ha)</th>
+                            <th style={{ padding: '16px 20px', fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center' }}>Ações</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {activeProcessings.map(proc => (
+                            <tr key={proc.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                              <td style={{ padding: '16px 20px', fontWeight: 'bold', fontSize: '14.5px', color: '#fff' }}>{proc.nomeProcessamento}</td>
+                              <td style={{ padding: '16px 20px', textAlign: 'center', fontSize: '13px', color: 'var(--text-muted)' }}>{proc.dataProcessamento}</td>
+                              <td style={{ padding: '16px 20px', fontSize: '13px' }}>{proc.createdBy}</td>
+                              <td style={{ padding: '16px 20px', fontSize: '12px', color: 'var(--text-muted)', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                H: {proc.heightModelSnapshot ? proc.heightModelSnapshot.nome : 'Medida'} <br />
+                                V: {proc.volumeModelSnapshot ? proc.volumeModelSnapshot.nome : '-'}
+                              </td>
+                              <td style={{ padding: '16px 20px', textAlign: 'center', fontSize: '12px' }}>
+                                <span style={{ padding: '3px 8px', borderRadius: '6px', background: 'rgba(255,255,255,0.04)', color: 'var(--text-muted)' }}>
+                                  {proc.effectiveConsolidationMode === 'stratum' ? 'Estrato' : 'Talhão'}{proc.consolidationMode === 'auto' ? ' (Auto)' : ''}
+                                </span>
+                              </td>
+                              <td style={{ padding: '16px 20px', textAlign: 'right', fontWeight: 'bold', color: '#81c784' }}>{proc.volumeTotalEstimado.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                              <td style={{ padding: '16px 20px', textAlign: 'right', color: 'var(--text-muted)' }}>{proc.volumeMedioHa.toFixed(2)}</td>
+                              <td style={{ padding: '16px 20px', textAlign: 'center' }}>
+                                <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
+                                  <button 
+                                    className="btn btn-secondary" 
+                                    style={{ width: 'auto', padding: '6px 10px', height: '28px', fontSize: '10px' }}
+                                    onClick={() => setSelectedReportProcessing(proc)}
+                                    title="Visualizar Relatório Executivo"
+                                  >
+                                    📄 Relatório
+                                  </button>
+                                  <button 
+                                    className="btn btn-secondary" 
+                                    style={{ width: 'auto', padding: '6px 10px', height: '28px', fontSize: '10px' }}
+                                    onClick={() => handleDuplicarConfiguracao(proc)}
+                                    title="Duplicar Configurações no Painel"
+                                  >
+                                    ⚙️ Duplicar Configuração
+                                  </button>
+                                  <button 
+                                    className="btn btn-danger" 
+                                    style={{ width: 'auto', padding: '6px 10px', height: '28px', fontSize: '10px' }}
+                                    onClick={async () => {
+                                      if (confirm(`Deseja realmente deletar permanentemente o processamento "${proc.nomeProcessamento}"?`)) {
+                                        await deleteProcessing(proc.id);
+                                      }
+                                    }}
+                                  >
+                                    🗑️ Excluir
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+
+                {/* COMPARADOR DE CENÁRIOS */}
+                {activeProcessings.length >= 2 && (
+                  <div className="glass-card" style={{ border: '1px solid rgba(255,255,255,0.06)' }}>
+                    <h3 style={{ fontSize: '15px', fontWeight: '800', color: 'var(--primary-hover)', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      Comparação de Cenários (Auditoria Metodológica)
+                    </h3>
+                    <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginBottom: '20px' }}>
+                      Selecione dois processamentos oficiais do histórico para comparar o impacto estatístico da troca de modelos e consolidação.
+                    </p>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
+                      <div>
+                        <label className="input-label">Cenário A (Base)</label>
+                        <select 
+                          className="input-field" 
+                          style={{ marginBottom: 0 }}
+                          value={selectedProcessAId}
+                          onChange={e => setSelectedProcessAId(e.target.value)}
+                        >
+                          <option value="">Selecione...</option>
+                          {activeProcessings.map(p => (
+                            <option key={p.id} value={p.id}>{p.nomeProcessamento} ({p.dataProcessamento})</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="input-label">Cenário B (Simulação)</label>
+                        <select 
+                          className="input-field" 
+                          style={{ marginBottom: 0 }}
+                          value={selectedProcessBId}
+                          onChange={e => setSelectedProcessBId(e.target.value)}
+                        >
+                          <option value="">Selecione...</option>
+                          {activeProcessings.map(p => (
+                            <option key={p.id} value={p.id}>{p.nomeProcessamento} ({p.dataProcessamento})</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* COMPARISON RESULTS */}
+                    {(() => {
+                      const procA = activeProcessings.find(p => p.id === selectedProcessAId);
+                      const procB = activeProcessings.find(p => p.id === selectedProcessBId);
+
+                      if (!procA || !procB) {
+                        return (
+                          <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', background: 'rgba(255,255,255,0.01)', border: '1px dashed rgba(255,255,255,0.05)', borderRadius: '12px' }}>
+                            Escolha os cenários A e B acima para ver a comparação de variação técnica.
+                          </div>
+                        );
+                      }
+
+                      const renderDiffRow = (label: string, valA: number, valB: number, digits = 2, unit = "") => {
+                        const diffAbs = valB - valA;
+                        const diffPct = valA > 0 ? (diffAbs / valA) * 100 : 0;
+                        const isPos = diffAbs > 0;
+                        const isZero = Math.abs(diffAbs) < 0.0001;
+
+                        const diffColor = isZero ? 'var(--text-muted)' : (isPos ? '#00e676' : '#ff5252');
+                        const diffSign = isZero ? '' : (isPos ? '+' : '');
+
+                        return (
+                          <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                            <td style={{ padding: '14px 20px', fontWeight: 'bold' }}>{label}</td>
+                            <td style={{ padding: '14px 20px', textAlign: 'right' }}>{valA.toLocaleString('pt-BR', { minimumFractionDigits: digits, maximumFractionDigits: digits })} {unit}</td>
+                            <td style={{ padding: '14px 20px', textAlign: 'right' }}>{valB.toLocaleString('pt-BR', { minimumFractionDigits: digits, maximumFractionDigits: digits })} {unit}</td>
+                            <td style={{ padding: '14px 20px', textAlign: 'right', fontWeight: 'bold', color: diffColor }}>
+                              {diffSign}{diffAbs.toLocaleString('pt-BR', { minimumFractionDigits: digits, maximumFractionDigits: digits })} {unit}
+                            </td>
+                            <td style={{ padding: '14px 20px', textAlign: 'right', fontWeight: 'bold', color: diffColor }}>
+                              {isZero ? '0.00%' : `${diffSign}${diffPct.toFixed(2)}%`}
+                            </td>
+                          </tr>
+                        );
+                      };
+
+                      return (
+                        <div style={{ overflowX: 'auto', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px', background: 'rgba(0,0,0,0.1)' }}>
+                          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                            <thead>
+                              <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', background: 'rgba(0,0,0,0.2)' }}>
+                                <th style={{ padding: '14px 20px', fontSize: '11px', color: 'var(--text-muted)' }}>Parâmetro Florestal</th>
+                                <th style={{ padding: '14px 20px', fontSize: '11px', color: 'var(--text-muted)', textAlign: 'right' }}>Cenário A (Base)</th>
+                                <th style={{ padding: '14px 20px', fontSize: '11px', color: 'var(--text-muted)', textAlign: 'right' }}>Cenário B (Simulação)</th>
+                                <th style={{ padding: '14px 20px', fontSize: '11px', color: 'var(--text-muted)', textAlign: 'right' }}>Diferença Absoluta</th>
+                                <th style={{ padding: '14px 20px', fontSize: '11px', color: 'var(--text-muted)', textAlign: 'right' }}>Variação (%)</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {renderDiffRow("Volume Total Estimado", procA.trabalho.volumeTotalEstimado, procB.trabalho.volumeTotalEstimado, 2, "m³")}
+                              {renderDiffRow("Volume Médio por Hectare", procA.trabalho.volumeMedioHa, procB.trabalho.volumeMedioHa, 2, "m³/ha")}
+                              {renderDiffRow("Área Basal Média por Hectare", procA.trabalho.areaBasalMediaHa, procB.trabalho.areaBasalMediaHa, 3, "m²/ha")}
+                              {renderDiffRow("Densidade Média por Hectare", procA.trabalho.densidadeMedia, procB.trabalho.densidadeMedia, 1, "árv/ha")}
+                              {renderDiffRow("DAP Médio", procA.trabalho.dapMedio, procB.trabalho.dapMedio, 2, "cm")}
+                              {renderDiffRow("Altura Média", procA.trabalho.alturaMedia, procB.trabalho.alturaMedia, 2, "m")}
+                            </tbody>
+                          </table>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
               </div>
             ) : null}
+
+            {/* Modal de Novo Processamento */}
+            {showNewProcessModal && (
+              <div style={{ 
+                position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
+                background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', 
+                zIndex: 10000, padding: '20px', backdropFilter: 'blur(8px)'
+              }}>
+                <div className="glass-card" style={{ width: '100%', maxWidth: '480px', padding: '24px', marginBottom: 0 }}>
+                  <h3 style={{ fontSize: '18px', fontWeight: '800', color: 'var(--primary-hover)', margin: 0 }}>
+                    Novo Processamento Oficial
+                  </h3>
+                  <p style={{ color: 'var(--text-muted)', fontSize: '13px', margin: '8px 0 20px 0', lineHeight: '1.4' }}>
+                    Isso calculará todas as parcelas e árvores usando os modelos ativos no painel e salvará um snapshot consolidado permanente.
+                  </p>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '24px' }}>
+                    <div>
+                      <label className="input-label">Nome do Processamento</label>
+                      <input 
+                        type="text" 
+                        className="input-field" 
+                        style={{ marginBottom: 0 }}
+                        placeholder="Ex: Processamento Consolidação Junho"
+                        value={newProcessName}
+                        onChange={e => setNewProcessName(e.target.value)}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="input-label">Modo de Consolidação de Área</label>
+                      <select 
+                        className="input-field" 
+                        style={{ marginBottom: 0 }}
+                        value={newProcessConsolidationMode}
+                        onChange={e => setNewProcessConsolidationMode(e.target.value as any)}
+                      >
+                        <option value="auto">Automático (Prioriza Estrato se houver area)</option>
+                        <option value="talhao">Por Talhões</option>
+                        <option value="stratum">Por Estratos</option>
+                      </select>
+                    </div>
+
+                    <div style={{ background: 'rgba(255,255,255,0.02)', padding: '12px 16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                      <span style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold', display: 'block', marginBottom: '6px' }}>
+                        Modelos Selecionados
+                      </span>
+                      <span style={{ fontSize: '13px', display: 'block', color: '#fff' }}>
+                        <strong>Hipsometria:</strong> {selectedHeightModelId !== 'none' ? heightModels.find(m => m.id === selectedHeightModelId)?.nome : 'Medida / Sem Modelo'}
+                      </span>
+                      <span style={{ fontSize: '13px', display: 'block', color: '#fff', marginTop: '4px' }}>
+                        <strong>Volume:</strong> {selectedVolumeModelId === 'legacy' ? `Fator de Forma (${processingFatorForma})` : volumeModels.find(m => m.id === selectedVolumeModelId)?.nome}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '12px' }}>
+                    <button 
+                      className="btn btn-secondary" 
+                      onClick={() => setShowNewProcessModal(false)}
+                    >
+                      Cancelar
+                    </button>
+                    <button 
+                      className="btn btn-primary"
+                      onClick={async () => {
+                        await handleCreateInventoryProcessing(newProcessName, newProcessConsolidationMode);
+                        setShowNewProcessModal(false);
+                      }}
+                    >
+                      Processar e Salvar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Relatório Executivo Printável */}
+            {selectedReportProcessing && (
+              <div style={{ 
+                position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
+                background: 'rgba(0,0,0,0.9)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', 
+                zIndex: 10000, padding: '20px', overflowY: 'auto', backdropFilter: 'blur(8px)'
+              }} className="report-modal-backdrop">
+                <div className="glass-card printable-report" style={{ width: '100%', maxWidth: '900px', marginTop: '30px', marginBottom: '30px', padding: '32px' }}>
+                  
+                  {/* Header com botões - Ocultado na Impressão via CSS */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: '16px' }} className="no-print">
+                    <div>
+                      <span style={{ fontSize: '10px', color: 'var(--primary-hover)', textTransform: 'uppercase', fontWeight: 'bold' }}>Relatório Oficial Consolidado</span>
+                      <h3 style={{ fontSize: '20px', fontWeight: '800', color: '#fff', margin: '2px 0 0 0' }}>{selectedReportProcessing.nomeProcessamento}</h3>
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button 
+                        className="btn btn-primary" 
+                        style={{ width: 'auto', padding: '8px 16px', fontSize: '11px', height: '36px' }}
+                        onClick={() => window.print()}
+                      >
+                        🖨️ Imprimir / PDF
+                      </button>
+                      <button 
+                        className="btn btn-secondary" 
+                        style={{ width: 'auto', padding: '8px 16px', fontSize: '11px', height: '36px', borderColor: '#4caf50', color: '#4caf50' }}
+                        onClick={() => handleExportAdvancedXLSX(selectedReportProcessing)}
+                      >
+                        📥 Planilha XLSX
+                      </button>
+                      <button 
+                        className="btn btn-secondary" 
+                        style={{ width: 'auto', padding: '8px 16px', fontSize: '11px', height: '36px' }}
+                        onClick={() => setSelectedReportProcessing(null)}
+                      >
+                        Fechar
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* CONTEÚDO DO RELATÓRIO */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
+                    
+                    {/* CABEÇALHO DA PÁGINA (Aparece na impressão) */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <div>
+                        <h1 style={{ fontSize: '24px', fontWeight: '800', color: 'var(--primary-hover)' }}>LeafTag - Relatório de Inventário</h1>
+                        <p style={{ color: 'var(--text-muted)', fontSize: '13px', margin: '4px 0 0 0' }}>
+                          Projeto de Campo: <strong>{activeFw?.nome}</strong> ({activeFw?.local || 'Local não especificado'})
+                        </p>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <span style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block' }}>Data Processamento: <strong>{selectedReportProcessing.dataProcessamento}</strong></span>
+                        <span style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block' }}>Responsável: <strong>{selectedReportProcessing.createdBy}</strong></span>
+                        <span style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block' }}>Modo Consolidação: <strong>{selectedReportProcessing.effectiveConsolidationMode === 'stratum' ? 'Estrato' : 'Talhão'}{selectedReportProcessing.consolidationMode === 'auto' ? ' (Automático)' : ''}</strong></span>
+                      </div>
+                    </div>
+
+                    <div style={{ height: '1px', background: 'rgba(255,255,255,0.06)' }}></div>
+
+                    {/* 1. RESUMO EXECUTIVO DO TRABALHO */}
+                    <div>
+                      <h3 style={{ fontSize: '14px', fontWeight: '800', color: 'var(--primary-hover)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px' }}>
+                        1. Resumo Executivo
+                      </h3>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px' }}>
+                        <div style={{ padding: '14px', background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: '12px' }}>
+                          <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Volume Total Estimado</span>
+                          <h4 style={{ fontSize: '20px', fontWeight: '800', color: '#00e676', marginTop: '4px' }}>{selectedReportProcessing.trabalho.volumeTotalEstimado.toLocaleString('pt-BR')} m³</h4>
+                        </div>
+                        <div style={{ padding: '14px', background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: '12px' }}>
+                          <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Volume Médio por Hectare</span>
+                          <h4 style={{ fontSize: '20px', fontWeight: '800', color: '#fff', marginTop: '4px' }}>{selectedReportProcessing.trabalho.volumeMedioHa.toFixed(2)} m³/ha</h4>
+                        </div>
+                        <div style={{ padding: '14px', background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: '12px' }}>
+                          <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Área Total Inventariada</span>
+                          <h4 style={{ fontSize: '20px', fontWeight: '800', color: '#64b5f6', marginTop: '4px' }}>{selectedReportProcessing.trabalho.areaTotal} ha</h4>
+                        </div>
+                        <div style={{ padding: '14px', background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: '12px' }}>
+                          <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Área Total Amostrada</span>
+                          <h4 style={{ fontSize: '20px', fontWeight: '800', color: '#ffb74d', marginTop: '4px' }}>{selectedReportProcessing.trabalho.areaAmostrada} ha</h4>
+                        </div>
+                        <div style={{ padding: '14px', background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: '12px' }}>
+                          <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Área Basal Média</span>
+                          <h4 style={{ fontSize: '20px', fontWeight: '800', color: '#fff', marginTop: '4px' }}>{selectedReportProcessing.trabalho.areaBasalMediaHa.toFixed(3)} m²/ha</h4>
+                        </div>
+                        <div style={{ padding: '14px', background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: '12px' }}>
+                          <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>DAP / Altura Média</span>
+                          <h4 style={{ fontSize: '20px', fontWeight: '800', color: '#fff', marginTop: '4px' }}>{selectedReportProcessing.trabalho.dapMedio.toFixed(1)} cm / {selectedReportProcessing.trabalho.alturaMedia.toFixed(1)} m</h4>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 2. METODOLOGIA E MODELOS MATEMÁTICOS */}
+                    <div>
+                      <h3 style={{ fontSize: '14px', fontWeight: '800', color: 'var(--primary-hover)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px' }}>
+                        2. Metodologia e Modelos Matemáticos
+                      </h3>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                        {/* Hipsometria */}
+                        <div style={{ padding: '16px', background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px' }}>
+                          <span style={{ fontSize: '11px', color: 'var(--primary-hover)', textTransform: 'uppercase', fontWeight: 'bold' }}>Relação Hipsométrica (Altura)</span>
+                          <h4 style={{ fontSize: '15px', fontWeight: '700', color: '#fff', marginTop: '8px' }}>
+                            {selectedReportProcessing.heightModelSnapshot ? selectedReportProcessing.heightModelSnapshot.nome : 'Alturas Medidas em Campo'}
+                          </h4>
+                          {selectedReportProcessing.heightModelSnapshot && (
+                            <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                              <span>Tipo: <strong>{selectedReportProcessing.heightModelSnapshot.tipoModelo}</strong></span>
+                              <span>Fórmula: <code>{selectedReportProcessing.heightModelSnapshot.formula}</code></span>
+                              <span>Coeficientes: <br />
+                                <code>B0: {selectedReportProcessing.heightModelSnapshot.coeficientes.beta0} | B1: {selectedReportProcessing.heightModelSnapshot.coeficientes.beta1}</code>
+                              </span>
+                              {selectedReportProcessing.heightModelSnapshot.fonteBibliografica && (
+                                <span>Fonte: {selectedReportProcessing.heightModelSnapshot.fonteBibliografica}</span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Volumetria */}
+                        <div style={{ padding: '16px', background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px' }}>
+                          <span style={{ fontSize: '11px', color: 'var(--primary-hover)', textTransform: 'uppercase', fontWeight: 'bold' }}>Cálculo Volumétrico (Volume)</span>
+                          <h4 style={{ fontSize: '15px', fontWeight: '700', color: '#fff', marginTop: '8px' }}>
+                            {selectedReportProcessing.volumeModelSnapshot ? selectedReportProcessing.volumeModelSnapshot.nome : '-'}
+                          </h4>
+                          {selectedReportProcessing.volumeModelSnapshot && (
+                            <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                              <span>Tipo: <strong>{selectedReportProcessing.volumeModelSnapshot.tipoModelo}</strong></span>
+                              <span>Fórmula: <code>{selectedReportProcessing.volumeModelSnapshot.formula}</code></span>
+                              <span>Coeficientes: <br />
+                                <code>B0: {selectedReportProcessing.volumeModelSnapshot.coeficientes.beta0}
+                                  {selectedReportProcessing.volumeModelSnapshot.coeficientes.beta1 !== undefined && ` | B1: ${selectedReportProcessing.volumeModelSnapshot.coeficientes.beta1}`}
+                                  {selectedReportProcessing.volumeModelSnapshot.coeficientes.beta2 !== undefined && ` | B2: ${selectedReportProcessing.volumeModelSnapshot.coeficientes.beta2}`}
+                                </code>
+                              </span>
+                              {selectedReportProcessing.volumeModelSnapshot.fonteBibliografica && (
+                                <span>Fonte: {selectedReportProcessing.volumeModelSnapshot.fonteBibliografica}</span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 3. AUDITORIA E CONSISTÊNCIA DE DADOS */}
+                    <div>
+                      <h3 style={{ fontSize: '14px', fontWeight: '800', color: 'var(--primary-hover)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px' }}>
+                        3. Auditoria e Validação Técnica
+                      </h3>
+                      <div style={{ padding: '16px', background: 'rgba(239, 35, 60, 0.02)', border: '1px solid rgba(239, 35, 60, 0.15)', borderRadius: '12px' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '12px', marginBottom: '14px' }}>
+                          <span style={{ fontSize: '13px' }}>Parcelas Ignoradas: <strong>{selectedReportProcessing.parcelasIgnoradas.length}</strong></span>
+                          <span style={{ fontSize: '13px' }}>Árvores Ignoradas: <strong>{selectedReportProcessing.arvoresIgnoradas}</strong></span>
+                          <span style={{ fontSize: '13px' }}>Árvores sem DAP: <strong>{selectedReportProcessing.arvoresSemDAP}</strong></span>
+                          <span style={{ fontSize: '13px' }}>Árvores sem Altura: <strong>{selectedReportProcessing.arvoresSemAltura}</strong></span>
+                          <span style={{ fontSize: '13px' }}>Árvores sem Volume: <strong>{selectedReportProcessing.arvoresSemVolume}</strong></span>
+                        </div>
+
+                        {selectedReportProcessing.warnings.length > 0 && (
+                          <div>
+                            <span style={{ fontSize: '11px', color: '#ff5252', fontWeight: 'bold', display: 'block', marginBottom: '6px', textTransform: 'uppercase' }}>
+                              Inconsistências encontradas ({selectedReportProcessing.warnings.length})
+                            </span>
+                            <div style={{ maxHeight: '120px', overflowY: 'auto', background: 'rgba(0,0,0,0.2)', padding: '10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.03)' }}>
+                              {selectedReportProcessing.warnings.map((warn, i) => (
+                                <div key={i} style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px', display: 'flex', gap: '6px' }}>
+                                  <span>•</span> <span>{warn}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* 4. RESULTADOS POR TALHÃO */}
+                    <div>
+                      <h3 style={{ fontSize: '14px', fontWeight: '800', color: 'var(--primary-hover)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px' }}>
+                        4. Resultados Consolidados por Talhão
+                      </h3>
+                      <div style={{ overflowX: 'auto', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                          <thead>
+                            <tr style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+                              <th style={{ padding: '12px 16px', fontSize: '10px' }}>Talhão</th>
+                              <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'center' }}>Área (ha)</th>
+                              <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'center' }}>Parc. Usadas</th>
+                              <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'center' }}>Árv. Usadas</th>
+                              <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'right' }}>Volume / ha (m³)</th>
+                              <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'right' }}>Área Basal / ha (m²)</th>
+                              <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'right' }}>Densidade / ha</th>
+                              <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'right' }}>Volume Total (m³)</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {selectedReportProcessing.talhoes.map(t => (
+                              <tr key={t.talhaoId} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                                <td style={{ padding: '12px 16px', fontWeight: 'bold' }}>{t.nome}</td>
+                                <td style={{ padding: '12px 16px', textAlign: 'center' }}>{t.areaTalhao.toFixed(2)}</td>
+                                <td style={{ padding: '12px 16px', textAlign: 'center' }}>{t.parcelasUtilizadas}</td>
+                                <td style={{ padding: '12px 16px', textAlign: 'center' }}>{t.arvoresUtilizadas}</td>
+                                <td style={{ padding: '12px 16px', textAlign: 'right' }}>{t.volumeMedioHa.toFixed(2)}</td>
+                                <td style={{ padding: '12px 16px', textAlign: 'right' }}>{t.areaBasalMediaHa.toFixed(3)}</td>
+                                <td style={{ padding: '12px 16px', textAlign: 'right' }}>{t.densidadeMediaHa.toFixed(0)}</td>
+                                <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 'bold', color: '#81c784' }}>{t.volumeTotalEstimado.toLocaleString('pt-BR')}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    {/* 5. RESULTADOS POR ESTRATO */}
+                    {selectedReportProcessing.strata.length > 0 && (
+                      <div>
+                        <h3 style={{ fontSize: '14px', fontWeight: '800', color: 'var(--primary-hover)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px' }}>
+                          5. Resultados Consolidados por Estrato
+                        </h3>
+                        <div style={{ overflowX: 'auto', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px' }}>
+                          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                            <thead>
+                              <tr style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+                                <th style={{ padding: '12px 16px', fontSize: '10px' }}>Estrato</th>
+                                <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'center' }}>Área (ha)</th>
+                                <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'center' }}>Parc. Usadas</th>
+                                <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'center' }}>Árv. Usadas</th>
+                                <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'right' }}>Volume / ha (m³)</th>
+                                <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'right' }}>Área Basal / ha (m²)</th>
+                                <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'right' }}>Densidade / ha</th>
+                                <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'right' }}>Volume Total (m³)</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {selectedReportProcessing.strata.map(s => (
+                                <tr key={s.stratumId} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                                  <td style={{ padding: '12px 16px', fontWeight: 'bold' }}>{s.nome}</td>
+                                  <td style={{ padding: '12px 16px', textAlign: 'center' }}>{s.areaEstrato.toFixed(2)}</td>
+                                  <td style={{ padding: '12px 16px', textAlign: 'center' }}>{s.parcelasUtilizadas}</td>
+                                  <td style={{ padding: '12px 16px', textAlign: 'center' }}>{s.arvoresUtilizadas}</td>
+                                  <td style={{ padding: '12px 16px', textAlign: 'right' }}>{s.volumeMedioHa.toFixed(2)}</td>
+                                  <td style={{ padding: '12px 16px', textAlign: 'right' }}>{s.areaBasalMediaHa.toFixed(3)}</td>
+                                  <td style={{ padding: '12px 16px', textAlign: 'right' }}>{s.densidadeMediaHa.toFixed(0)}</td>
+                                  <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 'bold', color: '#81c784' }}>{s.volumeTotalEstimado.toLocaleString('pt-BR')}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 6. RESULTADOS DETALHADOS POR PARCELA */}
+                    <div>
+                      <h3 style={{ fontSize: '14px', fontWeight: '800', color: 'var(--primary-hover)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px' }}>
+                        {selectedReportProcessing.strata.length > 0 ? '6. Detalhamento das Unidades Amostrais' : '5. Detalhamento das Unidades Amostrais'}
+                      </h3>
+                      <div style={{ overflowX: 'auto', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                          <thead>
+                            <tr style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+                              <th style={{ padding: '12px 16px', fontSize: '10px' }}>Parcela</th>
+                              <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'center' }}>Área (m²)</th>
+                              <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'center' }}>Fator Expansão</th>
+                              <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'center' }}>Árvores Medidas</th>
+                              <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'right' }}>Volume Parcela (m³)</th>
+                              <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'right' }}>Volume / ha (m³)</th>
+                              <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'right' }}>Área Basal / ha (m²)</th>
+                              <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'right' }}>Densidade / ha (árv)</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {selectedReportProcessing.parcelas.map(p => (
+                              <tr key={p.parcelaId} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                                <td style={{ padding: '12px 16px', fontWeight: 'bold' }}>{p.nome}</td>
+                                <td style={{ padding: '12px 16px', textAlign: 'center' }}>{p.areaParcela}</td>
+                                <td style={{ padding: '12px 16px', textAlign: 'center' }}>{p.fatorExpansao.toFixed(2)}</td>
+                                <td style={{ padding: '12px 16px', textAlign: 'center' }}>{p.numeroArvores}</td>
+                                <td style={{ padding: '12px 16px', textAlign: 'right' }}>{p.volumeTotal.toFixed(4)}</td>
+                                <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 'bold' }}>{p.volumePorHa.toFixed(2)}</td>
+                                <td style={{ padding: '12px 16px', textAlign: 'right' }}>{p.areaBasalPorHa.toFixed(3)}</td>
+                                <td style={{ padding: '12px 16px', textAlign: 'right' }}>{p.densidadePorHa.toFixed(0)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
           </div>
         ) : (

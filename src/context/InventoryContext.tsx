@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
-import type { Inventory, FieldWork, Talhao, Stratum, HeightModel, VolumeModel } from '../types';
+import type { Inventory, FieldWork, Talhao, Stratum, HeightModel, VolumeModel, InventoryProcessing } from '../types';
 import { db } from '../lib/firebase';
 import { collection, doc, onSnapshot, setDoc, deleteDoc } from 'firebase/firestore';
 import { useAuth } from './AuthContext';
@@ -27,6 +27,9 @@ interface InventoryContextType {
   deleteHeightModel: (id: string) => Promise<void>;
   createVolumeModel: (vm: VolumeModel) => Promise<void>;
   deleteVolumeModel: (id: string) => Promise<void>;
+  processings: InventoryProcessing[];
+  saveProcessing: (proc: InventoryProcessing) => Promise<void>;
+  deleteProcessing: (id: string) => Promise<void>;
   isSynced: boolean;
 }
 
@@ -169,6 +172,7 @@ export const InventoryProvider: React.FC<{ children: ReactNode }> = ({ children 
   const [heightModels, setHeightModels] = useState<HeightModel[]>([]);
   const [volumeModels, setVolumeModels] = useState<VolumeModel[]>([]);
   const [currentInventory, setCurrentInventory] = useState<Inventory | null>(null);
+  const [processings, setProcessings] = useState<InventoryProcessing[]>([]);
 
   const [fwPending, setFwPending] = useState(false);
   const [talPending, setTalPending] = useState(false);
@@ -176,8 +180,9 @@ export const InventoryProvider: React.FC<{ children: ReactNode }> = ({ children 
   const [strataPending, setStrataPending] = useState(false);
   const [hmPending, setHmPending] = useState(false);
   const [vmPending, setVmPending] = useState(false);
+  const [processPending, setProcessPending] = useState(false);
 
-  const isSynced = !fwPending && !talPending && !invPending && !strataPending && !hmPending && !vmPending;
+  const isSynced = !fwPending && !talPending && !invPending && !strataPending && !hmPending && !vmPending && !processPending;
 
   // Firestore Snapshot (Realtime + Offline IndexedDB)
   useEffect(() => {
@@ -281,6 +286,19 @@ export const InventoryProvider: React.FC<{ children: ReactNode }> = ({ children 
       console.error("Erro no Sync do VolumeModels Firestore:", error);
     });
 
+    const processRef = collection(db, `users/${uidToUse}/processings`);
+    const unsubscribeProcess = onSnapshot(processRef, { includeMetadataChanges: true }, (snapshot) => {
+      setProcessPending(snapshot.metadata.hasPendingWrites);
+      const data: InventoryProcessing[] = [];
+      snapshot.forEach(doc => {
+        data.push(doc.data() as InventoryProcessing);
+      });
+      data.sort((a,b) => b.createdAt.localeCompare(a.createdAt));
+      setProcessings(data);
+    }, (error) => {
+      console.error("Erro no Sync do Processings Firestore:", error);
+    });
+
     return () => {
       unsubscribeFw();
       unsubscribeTal();
@@ -288,6 +306,7 @@ export const InventoryProvider: React.FC<{ children: ReactNode }> = ({ children 
       unsubscribeStrata();
       unsubscribeHm();
       unsubscribeVm();
+      unsubscribeProcess();
     };
   }, [currentUser, uidToUse]);
 
@@ -415,6 +434,18 @@ export const InventoryProvider: React.FC<{ children: ReactNode }> = ({ children 
     await deleteDoc(docRef);
   };
 
+  const saveProcessing = async (newProc: InventoryProcessing) => {
+    if (!currentUser || !uidToUse) return;
+    const docRef = doc(db, `users/${uidToUse}/processings`, newProc.id);
+    await setDoc(docRef, cleanObject(newProc));
+  };
+
+  const deleteProcessing = async (id: string) => {
+    if (!currentUser || !uidToUse) return;
+    const docRef = doc(db, `users/${uidToUse}/processings`, id);
+    await deleteDoc(docRef);
+  };
+
   const duplicateFieldWork = async (originalId: string) => {
     if (!currentUser || !uidToUse) return;
 
@@ -500,6 +531,9 @@ export const InventoryProvider: React.FC<{ children: ReactNode }> = ({ children 
         deleteHeightModel,
         createVolumeModel,
         deleteVolumeModel,
+        processings,
+        saveProcessing,
+        deleteProcessing,
         isSynced
       }}
     >

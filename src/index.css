@@ -487,4 +487,65 @@ body.light-theme .btn-danger:hover {
   }
 }
 
+/* Print Styles for Executive Report */
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+  
+  /* Hide dashboard navigation and contents */
+  .office-sidebar,
+  .office-content,
+  .no-print,
+  button,
+  .btn {
+    display: none !important;
+  }
+
+  /* Reset report modal wrapper */
+  .report-modal-backdrop {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    background: #ffffff !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    padding: 0 !important;
+    z-index: 99999 !important;
+    display: block !important;
+    overflow: visible !important;
+  }
+
+  /* Make sure the printable report card covers the print area */
+  .printable-report {
+    display: block !important;
+    position: relative !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+
+  .printable-report * {
+    color: #000000 !important;
+    background: transparent !important;
+    border-color: #cbd5e1 !important;
+  }
+
+  .printable-report code {
+    background: #f1f5f9 !important;
+    padding: 2px 4px !important;
+    border-radius: 4px !important;
+    color: #000000 !important;
+  }
+}
+
+
 

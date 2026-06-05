@@ -117,3 +117,119 @@ export interface Inventory {
   modoColeta?: 'relativa' | 'seccional';
   metodoCalculo?: 'smalian' | 'huber' | 'newton';
 }
+
+export interface ModelSnapshot {
+  id: string;
+  nome: string;
+  especie: string;
+  regiao: string;
+  tipoModelo: string;
+  coeficientes: {
+    beta0: number;
+    beta1?: number;
+    beta2?: number;
+    beta3?: number;
+    expressaoCustom?: string;
+  };
+  fonteBibliografica?: string;
+  observacoes?: string;
+  unidadeDap: string;
+  unidadeAltura: string;
+  unidadeVolume: string;
+  formula: string;
+}
+
+export interface ParcelaSnapshot {
+  parcelaId: number;
+  nome: string;
+  talhaoId?: string;
+  stratumId?: string;
+  areaParcela: number;
+  fatorExpansao: number;
+  volumeTotal: number;
+  volumePorHa: number;
+  areaBasalPorHa: number;
+  densidadePorHa: number;
+  numeroArvores: number;
+}
+
+export interface TalhaoConsolidation {
+  talhaoId: string;
+  nome: string;
+  areaTalhao: number;
+  parcelasUtilizadas: number;
+  arvoresUtilizadas: number;
+  volumeMedioHa: number;
+  volumeTotalEstimado: number;
+  areaBasalMediaHa: number;
+  densidadeMediaHa: number;
+  dapMedio: number;
+  alturaMedia: number;
+}
+
+export interface StratumConsolidation {
+  stratumId: string;
+  nome: string;
+  areaEstrato: number;
+  parcelasUtilizadas: number;
+  arvoresUtilizadas: number;
+  volumeMedioHa: number;
+  volumeTotalEstimado: number;
+  areaBasalMediaHa: number;
+  densidadeMediaHa: number;
+  dapMedio: number;
+  alturaMedia: number;
+}
+
+export interface TrabalhoConsolidation {
+  areaTotal: number;
+  areaAmostrada: number;
+  numeroTalhoes: number;
+  numeroEstratos: number;
+  numeroParcelas: number;
+  numeroArvores: number;
+  volumeMedioHa: number;
+  volumeTotalEstimado: number;
+  areaBasalMediaHa: number;
+  densidadeMedia: number;
+  dapMedio: number;
+  alturaMedia: number;
+}
+
+export interface InventoryProcessing {
+  id: string;
+  fieldWorkId: string;
+  nomeProcessamento: string;
+  dataProcessamento: string;
+  
+  heightModelSnapshot?: ModelSnapshot | null;
+  volumeModelSnapshot?: ModelSnapshot | null;
+  
+  consolidationMode: 'talhao' | 'stratum' | 'auto';
+  effectiveConsolidationMode: 'talhao' | 'stratum';
+  
+  numeroParcelas: number;
+  areaAmostrada: number;
+  volumeTotalEstimado: number;
+  volumeMedioHa: number;
+  areaBasalMediaHa: number;
+  dapMedio: number;
+  alturaMedia: number;
+  
+  warnings: string[];
+  parcelasIgnoradas: string[];
+  arvoresIgnoradas: number;
+  arvoresSemDAP: number;
+  arvoresSemAltura: number;
+  arvoresSemVolume: number;
+  
+  status: string;
+  createdAt: string;
+  createdBy: string;
+  
+  parcelas: ParcelaSnapshot[];
+  talhoes: TalhaoConsolidation[];
+  strata: StratumConsolidation[];
+  trabalho: TrabalhoConsolidation;
+}
+
