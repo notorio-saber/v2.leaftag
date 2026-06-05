@@ -5,13 +5,15 @@ interface NumericKeyboardModalProps {
   onChange: (val: string) => void;
   onConfirm: () => void;
   onClose: () => void;
+  label?: string;
 }
 
 export const NumericKeyboardModal: React.FC<NumericKeyboardModalProps> = ({
   value,
   onChange,
   onConfirm,
-  onClose
+  onClose,
+  label
 }) => {
   const handleKeyPress = (key: string) => {
     if (key === '.' || key === ',') {
@@ -65,6 +67,36 @@ export const NumericKeyboardModal: React.FC<NumericKeyboardModalProps> = ({
       gap: '4px',
       boxSizing: 'border-box'
     }}>
+      {label && (
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '6px',
+          padding: '8px 16px 16px 16px',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+          marginBottom: '12px',
+          width: '100%',
+          boxSizing: 'border-box'
+        }}>
+          <span style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '0.8px' }}>
+            {label}
+          </span>
+          <div style={{
+            fontSize: '36px',
+            fontWeight: '800',
+            color: '#00e676',
+            minHeight: '44px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            letterSpacing: '1px'
+          }}>
+            {value || '0'}
+            <span className="blink-cursor" style={{ color: 'var(--primary-color)', marginLeft: '4px' }}>|</span>
+          </div>
+        </div>
+      )}
       {/* Grid Keypad */}
       <div style={{ 
         display: 'grid', 

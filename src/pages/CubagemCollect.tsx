@@ -487,6 +487,20 @@ export const CubagemCollect = () => {
     await persistSession(updated);
   };
 
+  const getFieldLabel = () => {
+    if (!activeField) return '';
+    if (activeField.type === 'height') return 'Altura Total (m)';
+    if (activeField.type === 'spec_height') return 'Altura da Árvore (m)';
+    if (activeField.type === 'relative') return `Diâmetro Ponto ${activeField.point} (cm)`;
+    if (activeField.type === 'sectional') {
+      if (activeField.field === 'comprimento') return 'Comprimento da Seção (m)';
+      if (activeField.field === 'dInicial') return 'Diâmetro Inicial (cm)';
+      if (activeField.field === 'dMedio') return 'Diâmetro Médio (cm)';
+      if (activeField.field === 'dFinal') return 'Diâmetro Final (cm)';
+    }
+    return '';
+  };
+
   // Teclado Numérico - Trata digitação
   const getKeyboardValue = () => {
     if (!activeField) return '';
@@ -1191,14 +1205,88 @@ export const CubagemCollect = () => {
                 </div>
               )}
 
-              {/* Teclado Numérico Integrado */}
+              {/* Teclado Numérico Integrado em Bottom Sheet */}
               {activeField && (
-                <div className="glass-card" style={{ padding: '8px', borderRadius: '20px', marginBottom: 0, border: '1px solid rgba(0, 230, 118, 0.15)' }}>
+                <div 
+                  style={{ 
+                    position: 'fixed', 
+                    bottom: 0, 
+                    left: 0, 
+                    right: 0, 
+                    background: 'rgba(18, 24, 21, 0.98)', 
+                    backdropFilter: 'blur(20px)',
+                    WebkitBackdropFilter: 'blur(20px)',
+                    borderTop: '1px solid rgba(255, 255, 255, 0.12)',
+                    borderTopLeftRadius: '24px',
+                    borderTopRightRadius: '24px',
+                    boxShadow: '0 -8px 32px rgba(0, 0, 0, 0.6)',
+                    zIndex: 1000, 
+                    padding: '16px 20px 24px 20px',
+                    animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+                    boxSizing: 'border-box'
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <style>{`
+                    @keyframes slideUp {
+                      from { transform: translateY(100%); }
+                      to { transform: translateY(0); }
+                    }
+                    @keyframes blink {
+                      50% { opacity: 0; }
+                    }
+                    .blink-cursor {
+                      animation: blink 1s step-end infinite;
+                    }
+                  `}</style>
+                  
+                  {/* Bottom Sheet Header Bar (premium drag handle) */}
+                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '12px' }}>
+                    <div style={{ width: '36px', height: '4px', background: 'rgba(255,255,255,0.15)', borderRadius: '2px' }} />
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <button 
+                      type="button" 
+                      onClick={() => setActiveField(null)} 
+                      style={{ 
+                        background: 'rgba(255,255,255,0.04)', 
+                        border: '1px solid rgba(255,255,255,0.08)', 
+                        color: 'var(--text-muted)', 
+                        padding: '6px 12px', 
+                        borderRadius: '8px', 
+                        fontSize: '12.5px',
+                        fontWeight: 'bold',
+                        cursor: 'pointer' 
+                      }}
+                    >
+                      Fechar
+                    </button>
+                    
+                    <button 
+                      type="button" 
+                      onClick={handleKeyboardConfirm} 
+                      style={{ 
+                        background: 'var(--primary-color)', 
+                        border: 'none', 
+                        color: '#fff', 
+                        padding: '6px 18px', 
+                        borderRadius: '8px', 
+                        fontSize: '12.5px',
+                        fontWeight: 'bold',
+                        cursor: 'pointer' 
+                      }}
+                    >
+                      Confirmar
+                    </button>
+                  </div>
+
                   <NumericKeyboardModal
                     value={getKeyboardValue()}
                     onChange={handleKeyboardChange}
                     onConfirm={handleKeyboardConfirm}
                     onClose={() => setActiveField(null)}
+                    label={getFieldLabel()}
                   />
                 </div>
               )}
