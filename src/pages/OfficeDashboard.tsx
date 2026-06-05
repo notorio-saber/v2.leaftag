@@ -180,6 +180,7 @@ export const OfficeDashboard = () => {
   const [showNewProcessModal, setShowNewProcessModal] = useState(false);
   const [newProcessName, setNewProcessName] = useState('');
   const [newProcessConsolidationMode, setNewProcessConsolidationMode] = useState<'talhao' | 'stratum' | 'auto'>('auto');
+  const [newProcessFatorCasca, setNewProcessFatorCasca] = useState('0.90');
   const [selectedReportProcessing, setSelectedReportProcessing] = useState<InventoryProcessing | null>(null);
 
   // Estados para o menu de 3 pontinhos e edição de trabalhos no escritório
@@ -924,6 +925,12 @@ export const OfficeDashboard = () => {
       return;
     }
 
+    const k = parseFloat(newProcessFatorCasca);
+    if (isNaN(k) || k < 0.5 || k > 1.0) {
+      alert("Por favor, informe um Fator de Casca válido entre 0.5 e 1.0.");
+      return;
+    }
+
     const hm = selectedHeightModelId !== 'none' ? heightModels.find(m => m.id === selectedHeightModelId) : null;
     let vm: any = null;
     let isLegacyVolume = false;
@@ -1045,6 +1052,7 @@ export const OfficeDashboard = () => {
 
       let validTreesCount = 0;
       let parcelVolumeTotal = 0;
+      let parcelVolumeTotalSemCasca = 0;
       let parcelBasalAreaTotal = 0;
 
       parcel.dados.forEach(ind => {
@@ -1058,14 +1066,19 @@ export const OfficeDashboard = () => {
 
         validTreesCount++;
         let treeVol = 0;
+        let treeVolSemCasca = 0;
 
         if (ind.multipleStems && ind.stems && ind.stems.length > 0) {
           let stemsVol = 0;
+          let stemsVolSemCasca = 0;
           let maxStemHt = 0;
+          let maxStemHtSemCasca = 0;
 
           ind.stems.forEach((stem: any) => {
             const stemDap = getDapOfTreeOrStem(stem);
             if (stemDap <= 0) return; // ignora fuste sem dap
+            const stemDapSemCasca = stemDap * k;
+
             let stemHt = parseFloat(stem.altura || '0');
             if (isNaN(stemHt) || stemHt <= 0) {
               const globalHt = parseFloat(ind.ht || '0');
@@ -1073,6 +1086,8 @@ export const OfficeDashboard = () => {
                 stemHt = globalHt;
               }
             }
+
+            let stemHtSemCasca = stemHt;
 
             if ((isNaN(stemHt) || stemHt <= 0) && hm) {
               stemHt = evaluateHeightModel(hm, stemDap);
@@ -1083,11 +1098,21 @@ export const OfficeDashboard = () => {
               arvoresSemAltura++;
             }
 
+            if ((isNaN(stemHtSemCasca) || stemHtSemCasca <= 0) && hm) {
+              stemHtSemCasca = evaluateHeightModel(hm, stemDapSemCasca);
+              stemHtSemCasca = cleanResult(stemHtSemCasca);
+            } else if (isNaN(stemHtSemCasca) || stemHtSemCasca <= 0) {
+              stemHtSemCasca = 0;
+            }
+
             if (stemHt > maxStemHt) {
               maxStemHt = stemHt;
             }
+            if (stemHtSemCasca > maxStemHtSemCasca) {
+              maxStemHtSemCasca = stemHtSemCasca;
+            }
 
-            // Volume do fuste
+            // Volume do fuste com casca
             let stemVol = 0;
             if (isLegacyVolume) {
               const g = (Math.PI * Math.pow(stemDap / 100, 2)) / 4;
@@ -1096,14 +1121,29 @@ export const OfficeDashboard = () => {
               stemVol = evaluateVolumeModel(vm, stemDap, stemHt);
             }
             stemVol = cleanResult(stemVol);
+
+            // Volume do fuste sem casca
+            let stemVolSemCasca = 0;
+            if (isLegacyVolume) {
+              const gSemCasca = (Math.PI * Math.pow(stemDapSemCasca / 100, 2)) / 4;
+              stemVolSemCasca = gSemCasca * stemHtSemCasca * legacyFf;
+            } else if (vm) {
+              stemVolSemCasca = evaluateVolumeModel(vm, stemDapSemCasca, stemHtSemCasca);
+            }
+            stemVolSemCasca = cleanResult(stemVolSemCasca);
+
             if (stemVol <= 0) arvoresSemVolume++;
             stemsVol += stemVol;
+            stemsVolSemCasca += stemVolSemCasca;
           });
 
           treeVol = stemsVol;
+          treeVolSemCasca = stemsVolSemCasca;
         } else {
           // Tronco único
           let treeHt = parseFloat(ind.ht || '0');
+          let treeHtSemCasca = treeHt;
+
           if (isNaN(treeHt) || treeHt <= 0) {
             if (hm) {
               treeHt = evaluateHeightModel(hm, treeDap);
@@ -1115,6 +1155,15 @@ export const OfficeDashboard = () => {
             }
           }
 
+          if (isNaN(treeHtSemCasca) || treeHtSemCasca <= 0) {
+            if (hm) {
+              treeHtSemCasca = evaluateHeightModel(hm, treeDap * k);
+              treeHtSemCasca = cleanResult(treeHtSemCasca);
+            } else {
+              treeHtSemCasca = 0;
+            }
+          }
+
           if (isLegacyVolume) {
             const g = (Math.PI * Math.pow(treeDap / 100, 2)) / 4;
             treeVol = g * treeHt * legacyFf;
@@ -1122,6 +1171,15 @@ export const OfficeDashboard = () => {
             treeVol = evaluateVolumeModel(vm, treeDap, treeHt);
           }
           treeVol = cleanResult(treeVol);
+
+          if (isLegacyVolume) {
+            const gSemCasca = (Math.PI * Math.pow((treeDap * k) / 100, 2)) / 4;
+            treeVolSemCasca = gSemCasca * treeHtSemCasca * legacyFf;
+          } else if (vm) {
+            treeVolSemCasca = evaluateVolumeModel(vm, treeDap * k, treeHtSemCasca);
+          }
+          treeVolSemCasca = cleanResult(treeVolSemCasca);
+
           if (treeVol <= 0) arvoresSemVolume++;
         }
 
@@ -1136,6 +1194,7 @@ export const OfficeDashboard = () => {
         }
 
         parcelVolumeTotal += treeVol;
+        parcelVolumeTotalSemCasca += treeVolSemCasca;
         parcelBasalAreaTotal += basalArea;
       });
 
@@ -1154,7 +1213,9 @@ export const OfficeDashboard = () => {
         areaParcela: area,
         fatorExpansao,
         volumeTotal: Number(parcelVolumeTotal.toFixed(4)),
+        volumeTotalSemCasca: Number(parcelVolumeTotalSemCasca.toFixed(4)),
         volumePorHa: Number((parcelVolumeTotal * fatorExpansao).toFixed(2)),
+        volumePorHaSemCasca: Number((parcelVolumeTotalSemCasca * fatorExpansao).toFixed(2)),
         areaBasalPorHa: Number((parcelBasalAreaTotal * fatorExpansao).toFixed(3)),
         densidadePorHa: Number((validTreesCount * fatorExpansao).toFixed(1)),
         numeroArvores: validTreesCount
@@ -1173,6 +1234,7 @@ export const OfficeDashboard = () => {
       const areaTalhao = t.area || 0;
 
       let volumeMedioHa = 0;
+      let volumeMedioHaSemCasca = 0;
       let areaBasalMediaHa = 0;
       let densidadeMediaHa = 0;
       let dapMedio = 0;
@@ -1181,6 +1243,7 @@ export const OfficeDashboard = () => {
 
       if (numParcelas > 0) {
         volumeMedioHa = tParcels.reduce((acc, curr) => acc + curr.volumePorHa, 0) / numParcelas;
+        volumeMedioHaSemCasca = tParcels.reduce((acc, curr) => acc + (curr.volumePorHaSemCasca || 0), 0) / numParcelas;
         areaBasalMediaHa = tParcels.reduce((acc, curr) => acc + curr.areaBasalPorHa, 0) / numParcelas;
         densidadeMediaHa = tParcels.reduce((acc, curr) => acc + curr.densidadePorHa, 0) / numParcelas;
         arvoresUtilizadas = tParcels.reduce((acc, curr) => acc + curr.numeroArvores, 0);
@@ -1229,7 +1292,9 @@ export const OfficeDashboard = () => {
         parcelasUtilizadas: numParcelas,
         arvoresUtilizadas,
         volumeMedioHa: Number(volumeMedioHa.toFixed(2)),
+        volumeMedioHaSemCasca: Number(volumeMedioHaSemCasca.toFixed(2)),
         volumeTotalEstimado: Number((volumeMedioHa * areaTalhao).toFixed(2)),
+        volumeTotalEstimadoSemCasca: Number((volumeMedioHaSemCasca * areaTalhao).toFixed(2)),
         areaBasalMediaHa: Number(areaBasalMediaHa.toFixed(3)),
         densidadeMediaHa: Number(densidadeMediaHa.toFixed(1)),
         dapMedio: Number(dapMedio.toFixed(2)),
@@ -1244,6 +1309,7 @@ export const OfficeDashboard = () => {
       const areaEstrato = s.area || 0;
 
       let volumeMedioHa = 0;
+      let volumeMedioHaSemCasca = 0;
       let areaBasalMediaHa = 0;
       let densidadeMediaHa = 0;
       let dapMedio = 0;
@@ -1252,6 +1318,7 @@ export const OfficeDashboard = () => {
 
       if (numParcelas > 0) {
         volumeMedioHa = sParcels.reduce((acc, curr) => acc + curr.volumePorHa, 0) / numParcelas;
+        volumeMedioHaSemCasca = sParcels.reduce((acc, curr) => acc + (curr.volumePorHaSemCasca || 0), 0) / numParcelas;
         areaBasalMediaHa = sParcels.reduce((acc, curr) => acc + curr.areaBasalPorHa, 0) / numParcelas;
         densidadeMediaHa = sParcels.reduce((acc, curr) => acc + curr.densidadePorHa, 0) / numParcelas;
         arvoresUtilizadas = sParcels.reduce((acc, curr) => acc + curr.numeroArvores, 0);
@@ -1300,7 +1367,9 @@ export const OfficeDashboard = () => {
         parcelasUtilizadas: numParcelas,
         arvoresUtilizadas,
         volumeMedioHa: Number(volumeMedioHa.toFixed(2)),
+        volumeMedioHaSemCasca: Number(volumeMedioHaSemCasca.toFixed(2)),
         volumeTotalEstimado: Number((volumeMedioHa * areaEstrato).toFixed(2)),
+        volumeTotalEstimadoSemCasca: Number((volumeMedioHaSemCasca * areaEstrato).toFixed(2)),
         areaBasalMediaHa: Number(areaBasalMediaHa.toFixed(3)),
         densidadeMediaHa: Number(densidadeMediaHa.toFixed(1)),
         dapMedio: Number(dapMedio.toFixed(2)),
@@ -1314,6 +1383,7 @@ export const OfficeDashboard = () => {
     const totalTreesCount = parcelasSnapshots.reduce((acc, curr) => acc + curr.numeroArvores, 0);
 
     const avgVolHa = totalParcelsCount > 0 ? parcelasSnapshots.reduce((acc, curr) => acc + curr.volumePorHa, 0) / totalParcelsCount : 0;
+    const avgVolHaSemCasca = totalParcelsCount > 0 ? parcelasSnapshots.reduce((acc, curr) => acc + (curr.volumePorHaSemCasca || 0), 0) / totalParcelsCount : 0;
     const avgBasalHa = totalParcelsCount > 0 ? parcelasSnapshots.reduce((acc, curr) => acc + curr.areaBasalPorHa, 0) / totalParcelsCount : 0;
     const avgDensityHa = totalParcelsCount > 0 ? parcelasSnapshots.reduce((acc, curr) => acc + curr.densidadePorHa, 0) / totalParcelsCount : 0;
 
@@ -1362,17 +1432,21 @@ export const OfficeDashboard = () => {
 
     let areaTotal = 0;
     let volumeTotalEstimado = 0;
+    let volumeTotalEstimadoSemCasca = 0;
 
     if (effectiveConsMode === 'stratum' && strataSnapshots.length > 0) {
       areaTotal = strataSnapshots.reduce((acc, curr) => acc + curr.areaEstrato, 0);
       volumeTotalEstimado = strataSnapshots.reduce((acc, curr) => acc + curr.volumeTotalEstimado, 0);
+      volumeTotalEstimadoSemCasca = strataSnapshots.reduce((acc, curr) => acc + (curr.volumeTotalEstimadoSemCasca || 0), 0);
     } else if (effectiveConsMode === 'talhao' && talhoesSnapshots.length > 0) {
       areaTotal = talhoesSnapshots.reduce((acc, curr) => acc + curr.areaTalhao, 0);
       volumeTotalEstimado = talhoesSnapshots.reduce((acc, curr) => acc + curr.volumeTotalEstimado, 0);
+      volumeTotalEstimadoSemCasca = talhoesSnapshots.reduce((acc, curr) => acc + (curr.volumeTotalEstimadoSemCasca || 0), 0);
     } else {
       const totalAreaConfig = activeTalhoes.reduce((acc, curr) => acc + (curr.area || 0), 0);
       areaTotal = totalAreaConfig > 0 ? totalAreaConfig : (totalSampledArea / 10000);
       volumeTotalEstimado = avgVolHa * areaTotal;
+      volumeTotalEstimadoSemCasca = avgVolHaSemCasca * areaTotal;
     }
 
     const trabalhoConsolidation: TrabalhoConsolidation = {
@@ -1383,7 +1457,9 @@ export const OfficeDashboard = () => {
       numeroParcelas: totalParcelsCount,
       numeroArvores: totalTreesCount,
       volumeMedioHa: Number(avgVolHa.toFixed(2)),
+      volumeMedioHaSemCasca: Number(avgVolHaSemCasca.toFixed(2)),
       volumeTotalEstimado: Number(volumeTotalEstimado.toFixed(2)),
+      volumeTotalEstimadoSemCasca: Number(volumeTotalEstimadoSemCasca.toFixed(2)),
       areaBasalMediaHa: Number(avgBasalHa.toFixed(3)),
       densidadeMedia: Number(avgDensityHa.toFixed(1)),
       dapMedio: Number(dapMedioGeral.toFixed(2)),
@@ -1402,7 +1478,10 @@ export const OfficeDashboard = () => {
       numeroParcelas: totalParcelsCount,
       areaAmostrada: totalSampledArea,
       volumeTotalEstimado: trabalhoConsolidation.volumeTotalEstimado,
+      volumeTotalEstimadoSemCasca: trabalhoConsolidation.volumeTotalEstimadoSemCasca,
       volumeMedioHa: trabalhoConsolidation.volumeMedioHa,
+      volumeMedioHaSemCasca: trabalhoConsolidation.volumeMedioHaSemCasca,
+      fatorCasca: k,
       areaBasalMediaHa: trabalhoConsolidation.areaBasalMediaHa,
       dapMedio: trabalhoConsolidation.dapMedio,
       alturaMedia: trabalhoConsolidation.alturaMedia,
@@ -1450,6 +1529,7 @@ export const OfficeDashboard = () => {
     }
 
     setNewProcessConsolidationMode(proc.consolidationMode);
+    setNewProcessFatorCasca(proc.fatorCasca !== undefined ? proc.fatorCasca.toString() : '0.90');
     setNewProcessName(`${proc.nomeProcessamento} (Nova Execução)`);
     setShowNewProcessModal(true);
   };
@@ -1464,10 +1544,13 @@ export const OfficeDashboard = () => {
       { Métrica: "Responsável", Valor: proc.createdBy },
       { Métrica: "Configuração de Consolidação", Valor: proc.consolidationMode === "stratum" ? "Estrato" : proc.consolidationMode === "talhao" ? "Talhão" : "Automático" },
       { Métrica: "Modo de Consolidação Efetivo", Valor: proc.effectiveConsolidationMode === "stratum" ? "Estrato" : "Talhão" },
+      { Métrica: "Fator de Casca (k)", Valor: proc.fatorCasca !== undefined ? proc.fatorCasca : 1.0 },
       { Métrica: "Área Total Inventariada (ha)", Valor: proc.trabalho.areaTotal },
       { Métrica: "Área Total Amostrada (ha)", Valor: proc.trabalho.areaAmostrada },
-      { Métrica: "Volume Total Estimado (m³)", Valor: proc.trabalho.volumeTotalEstimado },
-      { Métrica: "Volume Médio Geral (m³/ha)", Valor: proc.trabalho.volumeMedioHa },
+      { Métrica: "Volume Total CC Estimado (m³)", Valor: proc.trabalho.volumeTotalEstimado },
+      { Métrica: "Volume Total SC Estimado (m³)", Valor: proc.trabalho.volumeTotalEstimadoSemCasca || 0 },
+      { Métrica: "Volume Médio CC Geral (m³/ha)", Valor: proc.trabalho.volumeMedioHa },
+      { Métrica: "Volume Médio SC Geral (m³/ha)", Valor: proc.trabalho.volumeMedioHaSemCasca || 0 },
       { Métrica: "Área Basal Média Geral (m²/ha)", Valor: proc.trabalho.areaBasalMediaHa },
       { Métrica: "Densidade Média Geral (árv/ha)", Valor: proc.trabalho.densidadeMedia },
       { Métrica: "DAP Médio Geral (cm)", Valor: proc.trabalho.dapMedio },
@@ -1484,8 +1567,10 @@ export const OfficeDashboard = () => {
       "Área (ha)": t.areaTalhao,
       "Parcelas Utilizadas": t.parcelasUtilizadas,
       "Árvores Utilizadas": t.arvoresUtilizadas,
-      "Volume Médio / ha (m³)": t.volumeMedioHa,
-      "Volume Total Estimado (m³)": t.volumeTotalEstimado,
+      "Volume Médio CC / ha (m³)": t.volumeMedioHa,
+      "Volume Médio SC / ha (m³)": t.volumeMedioHaSemCasca || 0,
+      "Volume Total CC Estimado (m³)": t.volumeTotalEstimado,
+      "Volume Total SC Estimado (m³)": t.volumeTotalEstimadoSemCasca || 0,
       "Área Basal / ha (m²)": t.areaBasalMediaHa,
       "Densidade / ha (árv)": t.densidadeMediaHa,
       "DAP Médio (cm)": t.dapMedio,
@@ -1498,8 +1583,10 @@ export const OfficeDashboard = () => {
       "Área (ha)": s.areaEstrato,
       "Parcelas Utilizadas": s.parcelasUtilizadas,
       "Árvores Utilizadas": s.arvoresUtilizadas,
-      "Volume Médio / ha (m³)": s.volumeMedioHa,
-      "Volume Total Estimado (m³)": s.volumeTotalEstimado,
+      "Volume Médio CC / ha (m³)": s.volumeMedioHa,
+      "Volume Médio SC / ha (m³)": s.volumeMedioHaSemCasca || 0,
+      "Volume Total CC Estimado (m³)": s.volumeTotalEstimado,
+      "Volume Total SC Estimado (m³)": s.volumeTotalEstimadoSemCasca || 0,
       "Área Basal / ha (m²)": s.areaBasalMediaHa,
       "Densidade / ha (árv)": s.densidadeMediaHa,
       "DAP Médio (cm)": s.dapMedio,
@@ -1511,8 +1598,10 @@ export const OfficeDashboard = () => {
       "Parcela": p.nome,
       "Área (m²)": p.areaParcela,
       "Fator de Expansão": p.fatorExpansao,
-      "Volume Total (m³)": p.volumeTotal,
-      "Volume / ha (m³)": p.volumePorHa,
+      "Volume Total CC (m³)": p.volumeTotal,
+      "Volume Total SC (m³)": p.volumeTotalSemCasca || 0,
+      "Volume CC / ha (m³)": p.volumePorHa,
+      "Volume SC / ha (m³)": p.volumePorHaSemCasca || 0,
       "Área Basal / ha (m²)": p.areaBasalPorHa,
       "Densidade / ha (árv)": p.densidadePorHa,
       "Número de Árvores": p.numeroArvores
@@ -3534,8 +3623,8 @@ export const OfficeDashboard = () => {
                             <th style={{ padding: '16px 20px', fontSize: '11px', color: 'var(--text-muted)' }}>Responsável</th>
                             <th style={{ padding: '16px 20px', fontSize: '11px', color: 'var(--text-muted)' }}>Equações H / V</th>
                             <th style={{ padding: '16px 20px', fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center' }}>Modo</th>
-                            <th style={{ padding: '16px 20px', fontSize: '11px', color: 'var(--text-muted)', textAlign: 'right' }}>Vol. Total (m³)</th>
-                            <th style={{ padding: '16px 20px', fontSize: '11px', color: 'var(--text-muted)', textAlign: 'right' }}>Média (m³/ha)</th>
+                            <th style={{ padding: '16px 20px', fontSize: '11px', color: 'var(--text-muted)', textAlign: 'right' }}>Vol. Total CC / SC (m³)</th>
+                            <th style={{ padding: '16px 20px', fontSize: '11px', color: 'var(--text-muted)', textAlign: 'right' }}>Média CC / SC (m³/ha)</th>
                             <th style={{ padding: '16px 20px', fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center' }}>Ações</th>
                           </tr>
                         </thead>
@@ -3554,8 +3643,22 @@ export const OfficeDashboard = () => {
                                   {proc.effectiveConsolidationMode === 'stratum' ? 'Estrato' : 'Talhão'}{proc.consolidationMode === 'auto' ? ' (Auto)' : ''}
                                 </span>
                               </td>
-                              <td style={{ padding: '16px 20px', textAlign: 'right', fontWeight: 'bold', color: '#81c784' }}>{proc.volumeTotalEstimado.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                              <td style={{ padding: '16px 20px', textAlign: 'right', color: 'var(--text-muted)' }}>{proc.volumeMedioHa.toFixed(2)}</td>
+                              <td style={{ padding: '16px 20px', textAlign: 'right', fontSize: '13px' }}>
+                                <div style={{ fontWeight: 'bold', color: '#81c784' }} title="Com Casca">
+                                  {proc.volumeTotalEstimado.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} CC
+                                </div>
+                                <div style={{ fontSize: '12px', color: '#00b0ff' }} title="Sem Casca">
+                                  {(proc.volumeTotalEstimadoSemCasca || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} SC
+                                </div>
+                              </td>
+                              <td style={{ padding: '16px 20px', textAlign: 'right', fontSize: '13px' }}>
+                                <div style={{ color: 'var(--text-muted)' }} title="Com Casca">
+                                  {proc.volumeMedioHa.toFixed(2)} CC
+                                </div>
+                                <div style={{ fontSize: '12px', color: '#00b0ff' }} title="Sem Casca">
+                                  {(proc.volumeMedioHaSemCasca || 0).toFixed(2)} SC
+                                </div>
+                              </td>
                               <td style={{ padding: '16px 20px', textAlign: 'center' }}>
                                 <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
                                   <button 
@@ -3686,8 +3789,11 @@ export const OfficeDashboard = () => {
                               </tr>
                             </thead>
                             <tbody>
-                              {renderDiffRow("Volume Total Estimado", procA.trabalho.volumeTotalEstimado, procB.trabalho.volumeTotalEstimado, 2, "m³")}
-                              {renderDiffRow("Volume Médio por Hectare", procA.trabalho.volumeMedioHa, procB.trabalho.volumeMedioHa, 2, "m³/ha")}
+                              {renderDiffRow("Volume Total CC Estimado", procA.trabalho.volumeTotalEstimado, procB.trabalho.volumeTotalEstimado, 2, "m³")}
+                              {renderDiffRow("Volume Total SC Estimado", procA.volumeTotalEstimadoSemCasca || procA.trabalho.volumeTotalEstimadoSemCasca || 0, procB.volumeTotalEstimadoSemCasca || procB.trabalho.volumeTotalEstimadoSemCasca || 0, 2, "m³")}
+                              {renderDiffRow("Volume Médio CC por Hectare", procA.trabalho.volumeMedioHa, procB.trabalho.volumeMedioHa, 2, "m³/ha")}
+                              {renderDiffRow("Volume Médio SC por Hectare", procA.volumeMedioHaSemCasca || procA.trabalho.volumeMedioHaSemCasca || 0, procB.volumeMedioHaSemCasca || procB.trabalho.volumeMedioHaSemCasca || 0, 2, "m³/ha")}
+                              {renderDiffRow("Fator de Casca (k)", procA.fatorCasca !== undefined ? procA.fatorCasca : 1.0, procB.fatorCasca !== undefined ? procB.fatorCasca : 1.0, 2, "")}
                               {renderDiffRow("Área Basal Média por Hectare", procA.trabalho.areaBasalMediaHa, procB.trabalho.areaBasalMediaHa, 3, "m²/ha")}
                               {renderDiffRow("Densidade Média por Hectare", procA.trabalho.densidadeMedia, procB.trabalho.densidadeMedia, 1, "árv/ha")}
                               {renderDiffRow("DAP Médio", procA.trabalho.dapMedio, procB.trabalho.dapMedio, 2, "cm")}
@@ -3742,6 +3848,24 @@ export const OfficeDashboard = () => {
                         <option value="talhao">Por Talhões</option>
                         <option value="stratum">Por Estratos</option>
                       </select>
+                    </div>
+
+                    <div>
+                      <label className="input-label">Fator de Casca (k)</label>
+                      <input 
+                        type="number" 
+                        step="0.01"
+                        min="0.5"
+                        max="1.0"
+                        className="input-field" 
+                        style={{ marginBottom: 0 }}
+                        placeholder="Ex: 0.90"
+                        value={newProcessFatorCasca}
+                        onChange={e => setNewProcessFatorCasca(e.target.value)}
+                      />
+                      <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
+                        Utilizado para deduzir o diâmetro sem casca: DAPsc = DAPcc * k
+                      </span>
                     </div>
 
                     <div style={{ background: 'rgba(255,255,255,0.02)', padding: '12px 16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.06)' }}>
@@ -3832,6 +3956,7 @@ export const OfficeDashboard = () => {
                       <div style={{ textAlign: 'right' }}>
                         <span style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block' }}>Data Processamento: <strong>{selectedReportProcessing.dataProcessamento}</strong></span>
                         <span style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block' }}>Responsável: <strong>{selectedReportProcessing.createdBy}</strong></span>
+                        <span style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block' }}>Fator de Casca (k): <strong>{selectedReportProcessing.fatorCasca !== undefined ? selectedReportProcessing.fatorCasca.toFixed(2) : '1,00'}</strong></span>
                         <span style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block' }}>Modo Consolidação: <strong>{selectedReportProcessing.effectiveConsolidationMode === 'stratum' ? 'Estrato' : 'Talhão'}{selectedReportProcessing.consolidationMode === 'auto' ? ' (Automático)' : ''}</strong></span>
                       </div>
                     </div>
@@ -3846,11 +3971,13 @@ export const OfficeDashboard = () => {
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px' }}>
                         <div style={{ padding: '14px', background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: '12px' }}>
                           <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Volume Total Estimado</span>
-                          <h4 style={{ fontSize: '20px', fontWeight: '800', color: '#00e676', marginTop: '4px' }}>{selectedReportProcessing.trabalho.volumeTotalEstimado.toLocaleString('pt-BR')} m³</h4>
+                          <h4 style={{ fontSize: '18px', fontWeight: '800', color: '#00e676', marginTop: '4px' }}>{selectedReportProcessing.trabalho.volumeTotalEstimado.toLocaleString('pt-BR')} m³ <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 'normal' }}>CC</span></h4>
+                          <h4 style={{ fontSize: '16px', fontWeight: '800', color: '#00b0ff', marginTop: '2px' }}>{(selectedReportProcessing.volumeTotalEstimadoSemCasca || selectedReportProcessing.trabalho.volumeTotalEstimadoSemCasca || 0).toLocaleString('pt-BR')} m³ <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 'normal' }}>SC</span></h4>
                         </div>
                         <div style={{ padding: '14px', background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: '12px' }}>
                           <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Volume Médio por Hectare</span>
-                          <h4 style={{ fontSize: '20px', fontWeight: '800', color: '#fff', marginTop: '4px' }}>{selectedReportProcessing.trabalho.volumeMedioHa.toFixed(2)} m³/ha</h4>
+                          <h4 style={{ fontSize: '18px', fontWeight: '800', color: '#fff', marginTop: '4px' }}>{selectedReportProcessing.trabalho.volumeMedioHa.toFixed(2)} m³/ha <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 'normal' }}>CC</span></h4>
+                          <h4 style={{ fontSize: '16px', fontWeight: '800', color: '#00b0ff', marginTop: '2px' }}>{(selectedReportProcessing.volumeMedioHaSemCasca || selectedReportProcessing.trabalho.volumeMedioHaSemCasca || 0).toFixed(2)} m³/ha <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 'normal' }}>SC</span></h4>
                         </div>
                         <div style={{ padding: '14px', background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: '12px' }}>
                           <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Área Total Inventariada</span>
@@ -3966,10 +4093,12 @@ export const OfficeDashboard = () => {
                               <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'center' }}>Área (ha)</th>
                               <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'center' }}>Parc. Usadas</th>
                               <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'center' }}>Árv. Usadas</th>
-                              <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'right' }}>Volume / ha (m³)</th>
+                              <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'right' }}>Vol CC / ha (m³)</th>
+                              <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'right' }}>Vol SC / ha (m³)</th>
                               <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'right' }}>Área Basal / ha (m²)</th>
                               <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'right' }}>Densidade / ha</th>
-                              <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'right' }}>Volume Total (m³)</th>
+                              <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'right' }}>Vol Total CC (m³)</th>
+                              <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'right' }}>Vol Total SC (m³)</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -3980,9 +4109,11 @@ export const OfficeDashboard = () => {
                                 <td style={{ padding: '12px 16px', textAlign: 'center' }}>{t.parcelasUtilizadas}</td>
                                 <td style={{ padding: '12px 16px', textAlign: 'center' }}>{t.arvoresUtilizadas}</td>
                                 <td style={{ padding: '12px 16px', textAlign: 'right' }}>{t.volumeMedioHa.toFixed(2)}</td>
+                                <td style={{ padding: '12px 16px', textAlign: 'right' }}>{(t.volumeMedioHaSemCasca || 0).toFixed(2)}</td>
                                 <td style={{ padding: '12px 16px', textAlign: 'right' }}>{t.areaBasalMediaHa.toFixed(3)}</td>
                                 <td style={{ padding: '12px 16px', textAlign: 'right' }}>{t.densidadeMediaHa.toFixed(0)}</td>
                                 <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 'bold', color: '#81c784' }}>{t.volumeTotalEstimado.toLocaleString('pt-BR')}</td>
+                                <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 'bold', color: '#29b6f6' }}>{(t.volumeTotalEstimadoSemCasca || 0).toLocaleString('pt-BR')}</td>
                               </tr>
                             ))}
                           </tbody>
@@ -4004,10 +4135,12 @@ export const OfficeDashboard = () => {
                                 <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'center' }}>Área (ha)</th>
                                 <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'center' }}>Parc. Usadas</th>
                                 <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'center' }}>Árv. Usadas</th>
-                                <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'right' }}>Volume / ha (m³)</th>
+                                <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'right' }}>Vol CC / ha (m³)</th>
+                                <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'right' }}>Vol SC / ha (m³)</th>
                                 <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'right' }}>Área Basal / ha (m²)</th>
                                 <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'right' }}>Densidade / ha</th>
-                                <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'right' }}>Volume Total (m³)</th>
+                                <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'right' }}>Vol Total CC (m³)</th>
+                                <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'right' }}>Vol Total SC (m³)</th>
                               </tr>
                             </thead>
                             <tbody>
@@ -4018,9 +4151,11 @@ export const OfficeDashboard = () => {
                                   <td style={{ padding: '12px 16px', textAlign: 'center' }}>{s.parcelasUtilizadas}</td>
                                   <td style={{ padding: '12px 16px', textAlign: 'center' }}>{s.arvoresUtilizadas}</td>
                                   <td style={{ padding: '12px 16px', textAlign: 'right' }}>{s.volumeMedioHa.toFixed(2)}</td>
+                                  <td style={{ padding: '12px 16px', textAlign: 'right' }}>{(s.volumeMedioHaSemCasca || 0).toFixed(2)}</td>
                                   <td style={{ padding: '12px 16px', textAlign: 'right' }}>{s.areaBasalMediaHa.toFixed(3)}</td>
                                   <td style={{ padding: '12px 16px', textAlign: 'right' }}>{s.densidadeMediaHa.toFixed(0)}</td>
                                   <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 'bold', color: '#81c784' }}>{s.volumeTotalEstimado.toLocaleString('pt-BR')}</td>
+                                  <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 'bold', color: '#29b6f6' }}>{(s.volumeTotalEstimadoSemCasca || 0).toLocaleString('pt-BR')}</td>
                                 </tr>
                               ))}
                             </tbody>
@@ -4042,8 +4177,10 @@ export const OfficeDashboard = () => {
                               <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'center' }}>Área (m²)</th>
                               <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'center' }}>Fator Expansão</th>
                               <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'center' }}>Árvores Medidas</th>
-                              <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'right' }}>Volume Parcela (m³)</th>
-                              <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'right' }}>Volume / ha (m³)</th>
+                              <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'right' }}>Vol CC Parcela (m³)</th>
+                              <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'right' }}>Vol SC Parcela (m³)</th>
+                              <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'right' }}>Vol CC / ha (m³)</th>
+                              <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'right' }}>Vol SC / ha (m³)</th>
                               <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'right' }}>Área Basal / ha (m²)</th>
                               <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'right' }}>Densidade / ha (árv)</th>
                             </tr>
@@ -4056,7 +4193,9 @@ export const OfficeDashboard = () => {
                                 <td style={{ padding: '12px 16px', textAlign: 'center' }}>{p.fatorExpansao.toFixed(2)}</td>
                                 <td style={{ padding: '12px 16px', textAlign: 'center' }}>{p.numeroArvores}</td>
                                 <td style={{ padding: '12px 16px', textAlign: 'right' }}>{p.volumeTotal.toFixed(4)}</td>
+                                <td style={{ padding: '12px 16px', textAlign: 'right' }}>{(p.volumeTotalSemCasca || 0).toFixed(4)}</td>
                                 <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 'bold' }}>{p.volumePorHa.toFixed(2)}</td>
+                                <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 'bold' }}>{(p.volumePorHaSemCasca || 0).toFixed(2)}</td>
                                 <td style={{ padding: '12px 16px', textAlign: 'right' }}>{p.areaBasalPorHa.toFixed(3)}</td>
                                 <td style={{ padding: '12px 16px', textAlign: 'right' }}>{p.densidadePorHa.toFixed(0)}</td>
                               </tr>

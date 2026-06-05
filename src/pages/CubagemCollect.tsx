@@ -17,6 +17,9 @@ interface CubageTree {
   dadosRelativos: {
     [ponto: string]: string; // diâmetro em string para digitação
   };
+  cascaRelativos?: {
+    [ponto: string]: string; // espessura em mm
+  };
 
   // Modo Seccional
   secoes: {
@@ -25,10 +28,16 @@ interface CubageTree {
     dInicial?: string;
     dMedio?: string;
     dFinal?: string;
+    eInicial?: string;
+    eMedio?: string;
+    eFinal?: string;
     volume: number;
+    volumeSemCasca: number;
   }[];
   volumeTotal: number;
+  volumeTotalSemCasca: number;
   volumePorSecao?: { secao: number; volume: number }[];
+  volumePorSecaoSemCasca?: { secao: number; volume: number }[];
   dataCalculo?: string;
 }
 
@@ -63,14 +72,16 @@ export const CubagemCollect = () => {
   const [secDInicial, setSecDInicial] = useState('');
   const [secDMedio, setSecDMedio] = useState('');
   const [secDFinal, setSecDFinal] = useState('');
+  const [secEInicial, setSecEInicial] = useState('');
+  const [secEMedio, setSecEMedio] = useState('');
+  const [secEFinal, setSecEFinal] = useState('');
   const [activeSecId, setActiveSecId] = useState<string | null>(null);
 
   // Campo ativo para o teclado numérico
-  // Ex: { type: 'relative', point: '10%' } ou { type: 'sectional', field: 'dInicial' } ou { type: 'height' }
   const [activeField, setActiveField] = useState<{
-    type: 'relative' | 'sectional' | 'height' | 'spec_height';
+    type: 'relative' | 'relative_bark' | 'sectional' | 'height' | 'spec_height';
     point?: string;
-    field?: 'comprimento' | 'dInicial' | 'dMedio' | 'dFinal';
+    field?: 'comprimento' | 'dInicial' | 'dMedio' | 'dFinal' | 'eInicial' | 'eMedio' | 'eFinal';
   } | null>(null);
 
   const [tab, setTab] = useState<'coleta' | 'tabela' | 'afilamento'>('coleta');
@@ -89,9 +100,12 @@ export const CubagemCollect = () => {
         timestamp: tree.timestamp,
         metodoCalculo: tree.metodoCalculo || 'smalian',
         dadosRelativos: tree.dadosRelativos || {},
+        cascaRelativos: tree.cascaRelativos || {},
         secoes: tree.secoes || [],
         volumeTotal: tree.volumeTotal || 0,
+        volumeTotalSemCasca: tree.volumeTotalSemCasca || 0,
         volumePorSecao: tree.volumePorSecao || [],
+        volumePorSecaoSemCasca: tree.volumePorSecaoSemCasca || [],
         dataCalculo: tree.dataCalculo || '',
       }));
       setTrees(loadedTrees);
@@ -123,6 +137,9 @@ export const CubagemCollect = () => {
         setSecDInicial('');
         setSecDMedio('');
         setSecDFinal('');
+        setSecEInicial('');
+        setSecEMedio('');
+        setSecEFinal('');
         setActiveSecId(null);
       }
     }
@@ -143,9 +160,15 @@ export const CubagemCollect = () => {
   const persistSession = async (updatedTrees: CubageTree[]) => {
     const updatedDados = updatedTrees.map(t => {
       let vol = t.volumeTotal || 0;
+      let volSemCasca = t.volumeTotalSemCasca || 0;
+      let volPorSec = t.volumePorSecao || [];
+      let volPorSecSemCasca = t.volumePorSecaoSemCasca || [];
       if (t.status !== 'Concluído') {
-        const { volumeTotal } = computeDetailedVolume(t);
-        vol = volumeTotal;
+        const res = computeDetailedVolume(t);
+        vol = res.volumeTotal;
+        volSemCasca = res.volumeTotalSemCasca;
+        volPorSec = res.volumePorSecao;
+        volPorSecSemCasca = res.volumePorSecaoSemCasca;
       }
 
       return {
@@ -158,9 +181,12 @@ export const CubagemCollect = () => {
         timestamp: t.timestamp,
         metodoCalculo: t.metodoCalculo,
         dadosRelativos: t.dadosRelativos,
+        cascaRelativos: t.cascaRelativos || {},
         secoes: t.secoes,
         volumeTotal: vol,
-        volumePorSecao: t.volumePorSecao || [],
+        volumeTotalSemCasca: volSemCasca,
+        volumePorSecao: volPorSec,
+        volumePorSecaoSemCasca: volPorSecSemCasca,
         dataCalculo: t.dataCalculo || '',
         multipleStems: false
       };
@@ -183,26 +209,52 @@ export const CubagemCollect = () => {
     L: number,
     dIni: number,
     dMed: number,
-    dFin: number
-  ): number => {
-    if (L <= 0) return 0;
+    dFin: number,
+    eIni: number = 0,
+    eMed: number = 0,
+    eFin: number = 0
+  ): { volumeComCasca: number; volumeSemCasca: number } => {
+    if (L <= 0) return { volumeComCasca: 0, volumeSemCasca: 0 };
 
     const area = (d: number) => (Math.PI * Math.pow(d, 2)) / 40000;
+    const getDsc = (dCc: number, eMm: number) => Math.max(0, dCc - 2 * (eMm / 10));
+
+    const dIniSc = getDsc(dIni, eIni);
+    const dMedSc = getDsc(dMed, eMed);
+    const dFinSc = getDsc(dFin, eFin);
+
+    let volCc = 0;
+    let volSc = 0;
 
     if (method === 'smalian') {
-      return ((area(dIni) + area(dFin)) / 2) * L;
+      volCc = ((area(dIni) + area(dFin)) / 2) * L;
+      volSc = ((area(dIniSc) + area(dFinSc)) / 2) * L;
     } else if (method === 'huber') {
-      return area(dMed) * L;
+      volCc = area(dMed) * L;
+      volSc = area(dMedSc) * L;
     } else if (method === 'newton') {
-      return ((area(dIni) + 4 * area(dMed) + area(dFin)) / 6) * L;
+      volCc = ((area(dIni) + 4 * area(dMed) + area(dFin)) / 6) * L;
+      volSc = ((area(dIniSc) + 4 * area(dMedSc) + area(dFinSc)) / 6) * L;
     }
-    return 0;
+
+    return {
+      volumeComCasca: volCc,
+      volumeSemCasca: volSc
+    };
   };
 
-  const computeDetailedVolume = (tree: CubageTree): { volumeTotal: number; volumePorSecao: { secao: number; volume: number }[] } => {
+  const computeDetailedVolume = (tree: CubageTree): { 
+    volumeTotal: number; 
+    volumeTotalSemCasca: number;
+    volumePorSecao: { secao: number; volume: number }[];
+    volumePorSecaoSemCasca: { secao: number; volume: number }[];
+  } => {
     const volumePorSecao: { secao: number; volume: number }[] = [];
+    const volumePorSecaoSemCasca: { secao: number; volume: number }[] = [];
     let volumeTotal = 0;
+    let volumeTotalSemCasca = 0;
     const method = tree.metodoCalculo || 'smalian';
+    const cascaRel = tree.cascaRelativos || {};
 
     if (tree.modo === 'relativo') {
       const h = tree.alturaTotal || 0;
@@ -213,17 +265,27 @@ export const CubagemCollect = () => {
         const p2 = PONTOS_RELATIVOS[i + 1];
         const d1 = parseFloat(tree.dadosRelativos[p1] || '0');
         const d2 = parseFloat(tree.dadosRelativos[p2] || '0');
+        const e1 = parseFloat(cascaRel[p1] || '0');
+        const e2 = parseFloat(cascaRel[p2] || '0');
         
-        let vol = 0;
+        let volCc = 0;
+        let volSc = 0;
         if (d1 > 0 && d2 > 0) {
-          vol = calculateSectionVolume(method, L, d1, (d1 + d2) / 2, d2);
+          const res = calculateSectionVolume(method, L, d1, (d1 + d2) / 2, d2, e1, (e1 + e2) / 2, e2);
+          volCc = res.volumeComCasca;
+          volSc = res.volumeSemCasca;
         }
         
         volumePorSecao.push({
           secao: i + 1,
-          volume: parseFloat(vol.toFixed(6))
+          volume: parseFloat(volCc.toFixed(6))
         });
-        volumeTotal += vol;
+        volumePorSecaoSemCasca.push({
+          secao: i + 1,
+          volume: parseFloat(volSc.toFixed(6))
+        });
+        volumeTotal += volCc;
+        volumeTotalSemCasca += volSc;
       }
     } else {
       // Modo Seccional
@@ -232,19 +294,29 @@ export const CubagemCollect = () => {
         const dIni = parseFloat(sec.dInicial || '0');
         const dMed = parseFloat(sec.dMedio || '0');
         const dFin = parseFloat(sec.dFinal || '0');
+        const eIni = parseFloat(sec.eInicial || '0');
+        const eMed = parseFloat(sec.eMedio || '0');
+        const eFin = parseFloat(sec.eFinal || '0');
         
-        const vol = calculateSectionVolume(method, L, dIni, dMed, dFin);
+        const res = calculateSectionVolume(method, L, dIni, dMed, dFin, eIni, eMed, eFin);
         volumePorSecao.push({
           secao: idx + 1,
-          volume: parseFloat(vol.toFixed(6))
+          volume: parseFloat(res.volumeComCasca.toFixed(6))
         });
-        volumeTotal += vol;
+        volumePorSecaoSemCasca.push({
+          secao: idx + 1,
+          volume: parseFloat(res.volumeSemCasca.toFixed(6))
+        });
+        volumeTotal += res.volumeComCasca;
+        volumeTotalSemCasca += res.volumeSemCasca;
       });
     }
     
     return {
       volumeTotal: parseFloat(volumeTotal.toFixed(6)),
-      volumePorSecao
+      volumeTotalSemCasca: parseFloat(volumeTotalSemCasca.toFixed(6)),
+      volumePorSecao,
+      volumePorSecaoSemCasca
     };
   };
 
@@ -309,7 +381,9 @@ export const CubagemCollect = () => {
       dadosRelativos: {},
       secoes: [],
       volumeTotal: 0,
+      volumeTotalSemCasca: 0,
       volumePorSecao: [],
+      volumePorSecaoSemCasca: [],
       dataCalculo: ''
     };
 
@@ -346,7 +420,7 @@ export const CubagemCollect = () => {
       return;
     }
     
-    const { volumeTotal, volumePorSecao } = computeDetailedVolume(activeTree);
+    const { volumeTotal, volumeTotalSemCasca, volumePorSecao, volumePorSecaoSemCasca } = computeDetailedVolume(activeTree);
     const dataCalculo = new Date().toLocaleDateString('pt-BR');
     
     const updated = trees.map(t => {
@@ -355,7 +429,9 @@ export const CubagemCollect = () => {
           ...t,
           status: 'Concluído' as const,
           volumeTotal,
+          volumeTotalSemCasca,
           volumePorSecao,
+          volumePorSecaoSemCasca,
           dataCalculo
         };
       }
@@ -386,6 +462,25 @@ export const CubagemCollect = () => {
     await persistSession(updated);
   };
 
+  // Modo Relativo: Inserção de espessura de casca
+  const handleRelativeBarkValueChange = async (val: string) => {
+    if (!activeTree) return;
+
+    const updated = trees.map(t => {
+      if (t.id === activeTree.id) {
+        const nextBark = { ...(t.cascaRelativos || {}), [selectedPonto]: val };
+        return {
+          ...t,
+          cascaRelativos: nextBark
+        };
+      }
+      return t;
+    });
+
+    setTrees(updated);
+    await persistSession(updated);
+  };
+
   // Modo Seccional: Gerenciamento de Seções
   const handleSaveSection = async () => {
     if (!activeTree) return;
@@ -394,6 +489,9 @@ export const CubagemCollect = () => {
     const dIni = parseFloat(secDInicial || '0');
     const dMed = parseFloat(secDMedio || '0');
     const dFin = parseFloat(secDFinal || '0');
+    const eIni = parseFloat(secEInicial || '0');
+    const eMed = parseFloat(secEMedio || '0');
+    const eFin = parseFloat(secEFinal || '0');
 
     if (isNaN(L) || L <= 0) {
       alert('Por favor, insira um comprimento válido.');
@@ -413,7 +511,7 @@ export const CubagemCollect = () => {
       return;
     }
 
-    const vol = calculateSectionVolume(metodoCalculo, L, dIni, dMed, dFin);
+    const res = calculateSectionVolume(metodoCalculo, L, dIni, dMed, dFin, eIni, eMed, eFin);
 
     const updated = trees.map(t => {
       if (t.id === activeTree.id) {
@@ -428,7 +526,11 @@ export const CubagemCollect = () => {
                 dInicial: secDInicial || undefined,
                 dMedio: secDMedio || undefined,
                 dFinal: secDFinal || undefined,
-                volume: vol
+                eInicial: secEInicial || undefined,
+                eMedio: secEMedio || undefined,
+                eFinal: secEFinal || undefined,
+                volume: res.volumeComCasca,
+                volumeSemCasca: res.volumeSemCasca
               };
             }
             return s;
@@ -441,7 +543,11 @@ export const CubagemCollect = () => {
             dInicial: secDInicial || undefined,
             dMedio: secDMedio || undefined,
             dFinal: secDFinal || undefined,
-            volume: vol
+            eInicial: secEInicial || undefined,
+            eMedio: secEMedio || undefined,
+            eFinal: secEFinal || undefined,
+            volume: res.volumeComCasca,
+            volumeSemCasca: res.volumeSemCasca
           });
         }
         return { ...t, secoes: nextSecoes };
@@ -455,6 +561,9 @@ export const CubagemCollect = () => {
     setSecDInicial('');
     setSecDMedio('');
     setSecDFinal('');
+    setSecEInicial('');
+    setSecEMedio('');
+    setSecEFinal('');
     setActiveSecId(null);
     setActiveField(null);
     await persistSession(updated);
@@ -466,6 +575,9 @@ export const CubagemCollect = () => {
     setSecDInicial(sec.dInicial || '');
     setSecDMedio(sec.dMedio || '');
     setSecDFinal(sec.dFinal || '');
+    setSecEInicial(sec.eInicial || '');
+    setSecEMedio(sec.eMedio || '');
+    setSecEFinal(sec.eFinal || '');
     setActiveField({ type: 'sectional', field: 'comprimento' });
   };
 
@@ -492,11 +604,15 @@ export const CubagemCollect = () => {
     if (activeField.type === 'height') return 'Altura Total (m)';
     if (activeField.type === 'spec_height') return 'Altura da Árvore (m)';
     if (activeField.type === 'relative') return `Diâmetro Ponto ${activeField.point} (cm)`;
+    if (activeField.type === 'relative_bark') return `Esp. Casca Ponto ${activeField.point} (mm)`;
     if (activeField.type === 'sectional') {
       if (activeField.field === 'comprimento') return 'Comprimento da Seção (m)';
       if (activeField.field === 'dInicial') return 'Diâmetro Inicial (cm)';
       if (activeField.field === 'dMedio') return 'Diâmetro Médio (cm)';
       if (activeField.field === 'dFinal') return 'Diâmetro Final (cm)';
+      if (activeField.field === 'eInicial') return 'Esp. Casca Inicial (mm)';
+      if (activeField.field === 'eMedio') return 'Esp. Casca Média (mm)';
+      if (activeField.field === 'eFinal') return 'Esp. Casca Final (mm)';
     }
     return '';
   };
@@ -506,11 +622,16 @@ export const CubagemCollect = () => {
     if (!activeField) return '';
     if (activeField.type === 'relative') {
       return activeTree?.dadosRelativos[activeField.point || ''] || '';
+    } else if (activeField.type === 'relative_bark') {
+      return activeTree?.cascaRelativos?.[activeField.point || ''] || '';
     } else if (activeField.type === 'sectional') {
       if (activeField.field === 'comprimento') return secComprimento;
       if (activeField.field === 'dInicial') return secDInicial;
       if (activeField.field === 'dMedio') return secDMedio;
       if (activeField.field === 'dFinal') return secDFinal;
+      if (activeField.field === 'eInicial') return secEInicial;
+      if (activeField.field === 'eMedio') return secEMedio;
+      if (activeField.field === 'eFinal') return secEFinal;
     } else if (activeField.type === 'height') {
       return alturaTotal;
     } else if (activeField.type === 'spec_height') {
@@ -523,11 +644,16 @@ export const CubagemCollect = () => {
     if (!activeField) return;
     if (activeField.type === 'relative') {
       handleRelativeValueChange(val);
+    } else if (activeField.type === 'relative_bark') {
+      handleRelativeBarkValueChange(val);
     } else if (activeField.type === 'sectional') {
       if (activeField.field === 'comprimento') setSecComprimento(val);
       if (activeField.field === 'dInicial') setSecDInicial(val);
       if (activeField.field === 'dMedio') setSecDMedio(val);
       if (activeField.field === 'dFinal') setSecDFinal(val);
+      if (activeField.field === 'eInicial') setSecEInicial(val);
+      if (activeField.field === 'eMedio') setSecEMedio(val);
+      if (activeField.field === 'eFinal') setSecEFinal(val);
     } else if (activeField.type === 'height' || activeField.type === 'spec_height') {
       setAlturaTotal(val);
       handleUpdateTreeMeta('alturaTotal', parseFloat(val) || undefined);
@@ -538,6 +664,8 @@ export const CubagemCollect = () => {
     if (!activeField) return;
     
     if (activeField.type === 'relative') {
+      setActiveField({ type: 'relative_bark', point: selectedPonto });
+    } else if (activeField.type === 'relative_bark') {
       // Avança para o próximo ponto automático
       const idx = PONTOS_RELATIVOS.indexOf(selectedPonto);
       if (idx < PONTOS_RELATIVOS.length - 1) {
@@ -548,7 +676,7 @@ export const CubagemCollect = () => {
         setActiveField(null);
       }
     } else if (activeField.type === 'sectional') {
-      // Avança para os campos seguintes da seção dependendo do método
+      // Avança para os campos seguintes da seção dependendo do método e da casca
       if (activeField.field === 'comprimento') {
         if (metodoCalculo === 'huber') {
           setActiveField({ type: 'sectional', field: 'dMedio' });
@@ -565,10 +693,23 @@ export const CubagemCollect = () => {
         if (metodoCalculo === 'newton') {
           setActiveField({ type: 'sectional', field: 'dFinal' });
         } else {
-          setActiveField(null);
+          setActiveField({ type: 'sectional', field: 'eMedio' });
         }
       } else if (activeField.field === 'dFinal') {
-        // Último campo, fecha ou salva
+        setActiveField({ type: 'sectional', field: 'eInicial' });
+      } else if (activeField.field === 'eInicial') {
+        if (metodoCalculo === 'newton') {
+          setActiveField({ type: 'sectional', field: 'eMedio' });
+        } else {
+          setActiveField({ type: 'sectional', field: 'eFinal' });
+        }
+      } else if (activeField.field === 'eMedio') {
+        if (metodoCalculo === 'newton') {
+          setActiveField({ type: 'sectional', field: 'eFinal' });
+        } else {
+          setActiveField(null);
+        }
+      } else if (activeField.field === 'eFinal') {
         setActiveField(null);
       }
     } else {
@@ -998,7 +1139,7 @@ export const CubagemCollect = () => {
               />
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
-              <span>Volume Estimado: <strong style={{ color: '#00e676' }}>{activeTree.volumeTotal.toFixed(4)} m³</strong></span>
+              <span>Vol. CC: <strong style={{ color: '#00e676' }}>{activeTree.volumeTotal.toFixed(4)} m³</strong> | SC: <strong style={{ color: '#00b0ff' }}>{(activeTree.volumeTotalSemCasca || 0).toFixed(4)} m³</strong></span>
               <span>Status: <strong style={{ color: activeTree.status === 'Concluído' ? '#00e676' : '#ff9800' }}>{activeTree.status}</strong></span>
             </div>
           </div>
@@ -1066,21 +1207,40 @@ export const CubagemCollect = () => {
                     })}
                   </div>
 
-                  {/* Campo de Entrada de Diâmetro */}
-                  <div style={{ background: 'rgba(0,0,0,0.2)', padding: '12px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.04)' }}>
-                    <span style={{ fontSize: '10.5px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Diâmetro do ponto: {selectedPonto}</span>
-                    <div 
-                      onClick={() => setActiveField({ type: 'relative', point: selectedPonto })}
-                      style={{
-                        fontSize: '28px', fontWeight: 'bold', color: activeTree.dadosRelativos[selectedPonto] ? 'var(--primary-hover)' : 'var(--text-muted)',
-                        textAlign: 'center', padding: '8px 0', cursor: 'pointer', borderBottom: '2px solid rgba(255,255,255,0.1)', minHeight: '48px',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center'
-                      }}
-                    >
-                      {activeTree.dadosRelativos[selectedPonto] ? `${activeTree.dadosRelativos[selectedPonto].replace('.', ',')} cm` : 'Toque para digitar'}
-                      {activeField?.type === 'relative' && activeField.point === selectedPonto && (
-                        <span className="blinking-cursor" style={{ height: '24px', width: '2px', background: 'var(--primary-hover)', marginLeft: '6px' }} />
-                      )}
+                  {/* Campos de Entrada de Diâmetro e Casca */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                    <div style={{ background: 'rgba(0,0,0,0.2)', padding: '10px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.04)', cursor: 'pointer' }}
+                         onClick={() => setActiveField({ type: 'relative', point: selectedPonto })}>
+                      <span style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Diâmetro (cm)</span>
+                      <div 
+                        style={{
+                          fontSize: '20px', fontWeight: 'bold', color: activeTree.dadosRelativos[selectedPonto] ? 'var(--primary-hover)' : 'var(--text-muted)',
+                          textAlign: 'center', padding: '6px 0', minHeight: '34px',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center'
+                        }}
+                      >
+                        {activeTree.dadosRelativos[selectedPonto] ? `${activeTree.dadosRelativos[selectedPonto].replace('.', ',')} cm` : 'Digitar...'}
+                        {activeField?.type === 'relative' && activeField.point === selectedPonto && (
+                          <span className="blinking-cursor" style={{ height: '18px', width: '2px', background: 'var(--primary-hover)', marginLeft: '4px' }} />
+                        )}
+                      </div>
+                    </div>
+
+                    <div style={{ background: 'rgba(0,0,0,0.2)', padding: '10px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.04)', cursor: 'pointer' }}
+                         onClick={() => setActiveField({ type: 'relative_bark', point: selectedPonto })}>
+                      <span style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Esp. Casca (mm)</span>
+                      <div 
+                        style={{
+                          fontSize: '20px', fontWeight: 'bold', color: activeTree.cascaRelativos?.[selectedPonto] ? 'var(--primary-hover)' : 'var(--text-muted)',
+                          textAlign: 'center', padding: '6px 0', minHeight: '34px',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center'
+                        }}
+                      >
+                        {activeTree.cascaRelativos?.[selectedPonto] ? `${activeTree.cascaRelativos[selectedPonto].replace('.', ',')} mm` : '0 mm'}
+                        {activeField?.type === 'relative_bark' && activeField.point === selectedPonto && (
+                          <span className="blinking-cursor" style={{ height: '18px', width: '2px', background: 'var(--primary-hover)', marginLeft: '4px' }} />
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1109,7 +1269,7 @@ export const CubagemCollect = () => {
                     </span>
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     {/* Comprimento */}
                     <div 
                       onClick={() => setActiveField({ type: 'sectional', field: 'comprimento' })}
@@ -1119,59 +1279,104 @@ export const CubagemCollect = () => {
                         border: activeField?.field === 'comprimento' ? '1px solid var(--primary-hover)' : '1px solid rgba(255,255,255,0.05)'
                       }}
                     >
-                      <span style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Comprimento (m)</span>
+                      <span style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Comprimento da Seção (m)</span>
                       <div style={{ fontSize: '16px', fontWeight: 'bold', marginTop: '4px', minHeight: '22px' }}>
                         {secComprimento || <span style={{ color: 'rgba(255,255,255,0.15)' }}>Ex: 2.0</span>}
                       </div>
                     </div>
 
-                    {/* D.Inicial (Opcional por Huber) */}
+                    {/* D.Inicial & E.Inicial */}
                     {(metodoCalculo === 'smalian' || metodoCalculo === 'newton') && (
-                      <div 
-                        onClick={() => setActiveField({ type: 'sectional', field: 'dInicial' })}
-                        style={{
-                          padding: '8px 10px', borderRadius: '10px', cursor: 'pointer',
-                          background: activeField?.field === 'dInicial' ? 'rgba(46, 125, 50, 0.05)' : 'rgba(0,0,0,0.2)',
-                          border: activeField?.field === 'dInicial' ? '1px solid var(--primary-hover)' : '1px solid rgba(255,255,255,0.05)'
-                        }}
-                      >
-                        <span style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>D. Inicial (cm)</span>
-                        <div style={{ fontSize: '16px', fontWeight: 'bold', marginTop: '4px', minHeight: '22px' }}>
-                          {secDInicial || <span style={{ color: 'rgba(255,255,255,0.15)' }}>Ex: 30.0</span>}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                        <div 
+                          onClick={() => setActiveField({ type: 'sectional', field: 'dInicial' })}
+                          style={{
+                            padding: '8px 10px', borderRadius: '10px', cursor: 'pointer',
+                            background: activeField?.field === 'dInicial' ? 'rgba(46, 125, 50, 0.05)' : 'rgba(0,0,0,0.2)',
+                            border: activeField?.field === 'dInicial' ? '1px solid var(--primary-hover)' : '1px solid rgba(255,255,255,0.05)'
+                          }}
+                        >
+                          <span style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>D. Inicial (cm)</span>
+                          <div style={{ fontSize: '16px', fontWeight: 'bold', marginTop: '4px', minHeight: '22px' }}>
+                            {secDInicial || <span style={{ color: 'rgba(255,255,255,0.15)' }}>Ex: 30.0</span>}
+                          </div>
+                        </div>
+                        <div 
+                          onClick={() => setActiveField({ type: 'sectional', field: 'eInicial' })}
+                          style={{
+                            padding: '8px 10px', borderRadius: '10px', cursor: 'pointer',
+                            background: activeField?.field === 'eInicial' ? 'rgba(46, 125, 50, 0.05)' : 'rgba(0,0,0,0.2)',
+                            border: activeField?.field === 'eInicial' ? '1px solid var(--primary-hover)' : '1px solid rgba(255,255,255,0.05)'
+                          }}
+                        >
+                          <span style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Esp. Casca Ini. (mm)</span>
+                          <div style={{ fontSize: '16px', fontWeight: 'bold', marginTop: '4px', minHeight: '22px' }}>
+                            {secEInicial || <span style={{ color: 'rgba(255,255,255,0.15)' }}>0</span>}
+                          </div>
                         </div>
                       </div>
                     )}
 
-                    {/* D.Medio (Para Huber e Newton) */}
+                    {/* D.Medio & E.Medio */}
                     {(metodoCalculo === 'huber' || metodoCalculo === 'newton') && (
-                      <div 
-                        onClick={() => setActiveField({ type: 'sectional', field: 'dMedio' })}
-                        style={{
-                          padding: '8px 10px', borderRadius: '10px', cursor: 'pointer',
-                          background: activeField?.field === 'dMedio' ? 'rgba(46, 125, 50, 0.05)' : 'rgba(0,0,0,0.2)',
-                          border: activeField?.field === 'dMedio' ? '1px solid var(--primary-hover)' : '1px solid rgba(255,255,255,0.05)'
-                        }}
-                      >
-                        <span style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>D. Médio (cm)</span>
-                        <div style={{ fontSize: '16px', fontWeight: 'bold', marginTop: '4px', minHeight: '22px' }}>
-                          {secDMedio || <span style={{ color: 'rgba(255,255,255,0.15)' }}>Ex: 28.0</span>}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                        <div 
+                          onClick={() => setActiveField({ type: 'sectional', field: 'dMedio' })}
+                          style={{
+                            padding: '8px 10px', borderRadius: '10px', cursor: 'pointer',
+                            background: activeField?.field === 'dMedio' ? 'rgba(46, 125, 50, 0.05)' : 'rgba(0,0,0,0.2)',
+                            border: activeField?.field === 'dMedio' ? '1px solid var(--primary-hover)' : '1px solid rgba(255,255,255,0.05)'
+                          }}
+                        >
+                          <span style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>D. Médio (cm)</span>
+                          <div style={{ fontSize: '16px', fontWeight: 'bold', marginTop: '4px', minHeight: '22px' }}>
+                            {secDMedio || <span style={{ color: 'rgba(255,255,255,0.15)' }}>Ex: 28.0</span>}
+                          </div>
+                        </div>
+                        <div 
+                          onClick={() => setActiveField({ type: 'sectional', field: 'eMedio' })}
+                          style={{
+                            padding: '8px 10px', borderRadius: '10px', cursor: 'pointer',
+                            background: activeField?.field === 'eMedio' ? 'rgba(46, 125, 50, 0.05)' : 'rgba(0,0,0,0.2)',
+                            border: activeField?.field === 'eMedio' ? '1px solid var(--primary-hover)' : '1px solid rgba(255,255,255,0.05)'
+                          }}
+                        >
+                          <span style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Esp. Casca Méd. (mm)</span>
+                          <div style={{ fontSize: '16px', fontWeight: 'bold', marginTop: '4px', minHeight: '22px' }}>
+                            {secEMedio || <span style={{ color: 'rgba(255,255,255,0.15)' }}>0</span>}
+                          </div>
                         </div>
                       </div>
                     )}
 
-                    {/* D.Final (Opcional por Huber) */}
+                    {/* D.Final & E.Final */}
                     {(metodoCalculo === 'smalian' || metodoCalculo === 'newton') && (
-                      <div 
-                        onClick={() => setActiveField({ type: 'sectional', field: 'dFinal' })}
-                        style={{
-                          padding: '8px 10px', borderRadius: '10px', cursor: 'pointer',
-                          background: activeField?.field === 'dFinal' ? 'rgba(46, 125, 50, 0.05)' : 'rgba(0,0,0,0.2)',
-                          border: activeField?.field === 'dFinal' ? '1px solid var(--primary-hover)' : '1px solid rgba(255,255,255,0.05)'
-                        }}
-                      >
-                        <span style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>D. Final (cm)</span>
-                        <div style={{ fontSize: '16px', fontWeight: 'bold', marginTop: '4px', minHeight: '22px' }}>
-                          {secDFinal || <span style={{ color: 'rgba(255,255,255,0.15)' }}>Ex: 26.0</span>}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                        <div 
+                          onClick={() => setActiveField({ type: 'sectional', field: 'dFinal' })}
+                          style={{
+                            padding: '8px 10px', borderRadius: '10px', cursor: 'pointer',
+                            background: activeField?.field === 'dFinal' ? 'rgba(46, 125, 50, 0.05)' : 'rgba(0,0,0,0.2)',
+                            border: activeField?.field === 'dFinal' ? '1px solid var(--primary-hover)' : '1px solid rgba(255,255,255,0.05)'
+                          }}
+                        >
+                          <span style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>D. Final (cm)</span>
+                          <div style={{ fontSize: '16px', fontWeight: 'bold', marginTop: '4px', minHeight: '22px' }}>
+                            {secDFinal || <span style={{ color: 'rgba(255,255,255,0.15)' }}>Ex: 26.0</span>}
+                          </div>
+                        </div>
+                        <div 
+                          onClick={() => setActiveField({ type: 'sectional', field: 'eFinal' })}
+                          style={{
+                            padding: '8px 10px', borderRadius: '10px', cursor: 'pointer',
+                            background: activeField?.field === 'eFinal' ? 'rgba(46, 125, 50, 0.05)' : 'rgba(0,0,0,0.2)',
+                            border: activeField?.field === 'eFinal' ? '1px solid var(--primary-hover)' : '1px solid rgba(255,255,255,0.05)'
+                          }}
+                        >
+                          <span style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Esp. Casca Fin. (mm)</span>
+                          <div style={{ fontSize: '16px', fontWeight: 'bold', marginTop: '4px', minHeight: '22px' }}>
+                            {secEFinal || <span style={{ color: 'rgba(255,255,255,0.15)' }}>0</span>}
+                          </div>
                         </div>
                       </div>
                     )}
@@ -1465,9 +1670,16 @@ export const CubagemCollect = () => {
                   <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block' }}>Método</span>
                   <span style={{ fontSize: '16px', fontWeight: 'bold', color: '#fff', textTransform: 'capitalize' }}>{sumTree.metodoCalculo}</span>
                 </div>
-                <div style={{ background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)', gridColumn: 'span 2', textAlign: 'center' }}>
-                  <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block' }}>Volume Total</span>
-                  <span style={{ fontSize: '26px', fontWeight: '800', color: '#00e676' }}>{sumTree.volumeTotal.toFixed(3).replace('.', ',')} m³</span>
+                <div style={{ background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)', gridColumn: 'span 2', display: 'flex', gap: '10px', justifyContent: 'space-around', alignItems: 'center' }}>
+                  <div style={{ textAlign: 'center', flex: 1 }}>
+                    <span style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block' }}>Vol. Com Casca</span>
+                    <span style={{ fontSize: '20px', fontWeight: '800', color: '#00e676' }}>{sumTree.volumeTotal.toFixed(4).replace('.', ',')} m³</span>
+                  </div>
+                  <div style={{ width: '1px', alignSelf: 'stretch', background: 'rgba(255,255,255,0.08)' }}></div>
+                  <div style={{ textAlign: 'center', flex: 1 }}>
+                    <span style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block' }}>Vol. Sem Casca</span>
+                    <span style={{ fontSize: '20px', fontWeight: '800', color: '#00b0ff' }}>{(sumTree.volumeTotalSemCasca || 0).toFixed(4).replace('.', ',')} m³</span>
+                  </div>
                 </div>
                 <div style={{ background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)', gridColumn: 'span 2' }}>
                   <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block' }}>Número de Seções</span>
@@ -1480,18 +1692,25 @@ export const CubagemCollect = () => {
                   <thead>
                     <tr style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                       <th style={{ padding: '8px 12px', fontSize: '10px', color: 'var(--text-muted)', textAlign: 'left', textTransform: 'uppercase' }}>Seção</th>
-                      <th style={{ padding: '8px 12px', fontSize: '10px', color: 'var(--text-muted)', textAlign: 'right', textTransform: 'uppercase' }}>Volume (m³)</th>
+                      <th style={{ padding: '8px 12px', fontSize: '10px', color: 'var(--text-muted)', textAlign: 'right', textTransform: 'uppercase' }}>Vol CC (m³)</th>
+                      <th style={{ padding: '8px 12px', fontSize: '10px', color: 'var(--text-muted)', textAlign: 'right', textTransform: 'uppercase' }}>Vol SC (m³)</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {sumTree.volumePorSecao?.map(sec => (
-                      <tr key={sec.secao} style={{ borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
-                        <td style={{ padding: '8px 12px', fontSize: '12px', color: 'var(--text-muted)' }}>Seção {sec.secao}</td>
-                        <td style={{ padding: '8px 12px', fontSize: '12px', color: '#00e676', textAlign: 'right', fontWeight: 'bold' }}>
-                          {sec.volume.toFixed(4).replace('.', ',')}
-                        </td>
-                      </tr>
-                    ))}
+                    {sumTree.volumePorSecao?.map((sec, idx) => {
+                      const secSc = sumTree.volumePorSecaoSemCasca?.[idx];
+                      return (
+                        <tr key={sec.secao} style={{ borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
+                          <td style={{ padding: '8px 12px', fontSize: '12px', color: 'var(--text-muted)' }}>Seção {sec.secao}</td>
+                          <td style={{ padding: '8px 12px', fontSize: '12px', color: '#00e676', textAlign: 'right', fontWeight: 'bold' }}>
+                            {sec.volume.toFixed(4).replace('.', ',')}
+                          </td>
+                          <td style={{ padding: '8px 12px', fontSize: '12px', color: '#00b0ff', textAlign: 'right', fontWeight: 'bold' }}>
+                            {secSc ? secSc.volume.toFixed(4).replace('.', ',') : (0).toFixed(4).replace('.', ',')}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

@@ -14,6 +14,7 @@ export interface StemData {
   alturaProcessada?: number;
   alturaMedidaOuEstimada?: 'medida' | 'estimada';
   volumeProcessado?: number;
+  volumeProcessadoSemCasca?: number;
 }
 
 export interface IndividualData {
@@ -26,6 +27,7 @@ export interface IndividualData {
   alturaUtilizada?: number;
   alturaMedidaOuEstimada?: 'medida' | 'estimada';
   volumeCalculado?: number;
+  volumeCalculadoSemCasca?: number;
   modeloUtilizado?: string;
   // Novos campos do módulo de cubagem
   modoColeta?: 'relativa' | 'seccional';
@@ -147,7 +149,9 @@ export interface ParcelaSnapshot {
   areaParcela: number;
   fatorExpansao: number;
   volumeTotal: number;
+  volumeTotalSemCasca: number;
   volumePorHa: number;
+  volumePorHaSemCasca: number;
   areaBasalPorHa: number;
   densidadePorHa: number;
   numeroArvores: number;
@@ -160,7 +164,9 @@ export interface TalhaoConsolidation {
   parcelasUtilizadas: number;
   arvoresUtilizadas: number;
   volumeMedioHa: number;
+  volumeMedioHaSemCasca: number;
   volumeTotalEstimado: number;
+  volumeTotalEstimadoSemCasca: number;
   areaBasalMediaHa: number;
   densidadeMediaHa: number;
   dapMedio: number;
@@ -174,7 +180,9 @@ export interface StratumConsolidation {
   parcelasUtilizadas: number;
   arvoresUtilizadas: number;
   volumeMedioHa: number;
+  volumeMedioHaSemCasca: number;
   volumeTotalEstimado: number;
+  volumeTotalEstimadoSemCasca: number;
   areaBasalMediaHa: number;
   densidadeMediaHa: number;
   dapMedio: number;
@@ -189,7 +197,9 @@ export interface TrabalhoConsolidation {
   numeroParcelas: number;
   numeroArvores: number;
   volumeMedioHa: number;
+  volumeMedioHaSemCasca: number;
   volumeTotalEstimado: number;
+  volumeTotalEstimadoSemCasca: number;
   areaBasalMediaHa: number;
   densidadeMedia: number;
   dapMedio: number;
@@ -211,7 +221,10 @@ export interface InventoryProcessing {
   numeroParcelas: number;
   areaAmostrada: number;
   volumeTotalEstimado: number;
+  volumeTotalEstimadoSemCasca: number;
   volumeMedioHa: number;
+  volumeMedioHaSemCasca: number;
+  fatorCasca: number;
   areaBasalMediaHa: number;
   dapMedio: number;
   alturaMedia: number;
