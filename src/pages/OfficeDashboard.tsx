@@ -16,7 +16,7 @@ import {
 
 export const OfficeDashboard = () => {
   const navigate = useNavigate();
-  const { fieldWorks, talhoes, inventories, strata, createStratum, deleteStratum, saveInventory, isSynced, createTalhao, deleteTalhao, createFieldWork, heightModels, volumeModels } = useInventory();
+  const { fieldWorks, talhoes, inventories, strata, createStratum, deleteStratum, saveInventory, isSynced, createTalhao, deleteTalhao, createFieldWork, heightModels, volumeModels, duplicateFieldWork } = useInventory();
   const { currentUser, signOut, status, uidToUse, theme, toggleTheme } = useAuth();
 
   const [showSettingsModal, setShowSettingsModal] = useState(false);
@@ -1110,7 +1110,36 @@ export const OfficeDashboard = () => {
                   {isActive && (
                     <div style={{ position: 'absolute', left: '0', top: '50%', transform: 'translateY(-50%)', width: '3px', height: '20px', background: 'var(--primary-color)', borderRadius: '0 4px 4px 0' }} />
                   )}
-                  <h4 style={{ fontSize: '13.5px', margin: 0, fontWeight: '700', color: isActive ? 'var(--primary-hover)' : '#fff' }}>{fw.nome}</h4>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <h4 style={{ fontSize: '13.5px', margin: 0, fontWeight: '700', color: isActive ? 'var(--primary-hover)' : '#fff', flex: 1, paddingRight: '8px' }}>{fw.nome}</h4>
+                    <button
+                      type="button"
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        if (confirm(`Deseja duplicar o trabalho de campo "${fw.nome}"?`)) {
+                          try {
+                            await duplicateFieldWork(fw.id);
+                            alert("Trabalho de campo duplicado com sucesso.");
+                          } catch (err: any) {
+                            alert("Erro ao duplicar: " + err.message);
+                          }
+                        }
+                      }}
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        borderRadius: '6px',
+                        color: 'var(--text-muted)',
+                        fontSize: '9.5px',
+                        fontWeight: 'bold',
+                        cursor: 'pointer',
+                        padding: '4px 6px',
+                        transition: 'all 0.2s'
+                      }}
+                    >
+                      Duplicar
+                    </button>
+                  </div>
                   <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginTop: '4px' }}>
                     Local: {fw.local}
                   </span>

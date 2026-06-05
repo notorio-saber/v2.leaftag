@@ -15,8 +15,10 @@ export const CubagemSetup = () => {
   const [observacoes, setObservacoes] = useState('');
   const [modoColeta, setModoColeta] = useState<'relativa' | 'seccional' | ''>('');
   const [metodoCalculo, setMetodoCalculo] = useState<'smalian' | 'huber' | 'newton' | ''>('');
+  const [isStarting, setIsStarting] = useState(false);
 
   const handleStart = async () => {
+    if (isStarting) return;
     if (!fieldWorkId) {
       alert('Erro: Trabalho de campo não identificado. Volte para a tela anterior.');
       return;
@@ -34,6 +36,7 @@ export const CubagemSetup = () => {
       return;
     }
 
+    setIsStarting(true);
     const newCubage = {
       id: Date.now(),
       fieldWorkId,
@@ -59,6 +62,7 @@ export const CubagemSetup = () => {
     } catch (err: any) {
       console.error(err);
       alert('Erro ao iniciar a cubagem: ' + err.message);
+      setIsStarting(false);
     }
   };
 
@@ -204,8 +208,10 @@ export const CubagemSetup = () => {
         />
 
         <div style={{ display: 'flex', gap: '12px', marginTop: '20px' }}>
-          <button className="btn btn-secondary" onClick={() => navigate(-1)}>Cancelar</button>
-          <button className="btn btn-primary" onClick={handleStart}>Iniciar Coleta</button>
+          <button className="btn btn-secondary" onClick={() => navigate(-1)} disabled={isStarting}>Cancelar</button>
+          <button className="btn btn-primary" onClick={handleStart} disabled={isStarting}>
+            {isStarting ? 'Iniciando...' : 'Iniciar Coleta'}
+          </button>
         </div>
       </div>
     </div>

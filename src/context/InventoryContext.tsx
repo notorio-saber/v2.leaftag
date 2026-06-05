@@ -18,6 +18,7 @@ interface InventoryContextType {
   deleteInventory: (id: number) => Promise<void>;
   createFieldWork: (fw: FieldWork) => Promise<void>;
   deleteFieldWork: (id: string) => Promise<void>;
+  duplicateFieldWork: (id: string) => Promise<void>;
   createTalhao: (t: Talhao) => Promise<void>;
   deleteTalhao: (id: string) => Promise<void>;
   createStratum: (s: Stratum) => Promise<void>;
@@ -414,6 +415,67 @@ export const InventoryProvider: React.FC<{ children: ReactNode }> = ({ children 
     await deleteDoc(docRef);
   };
 
+  const duplicateFieldWork = async (originalId: string) => {
+    if (!currentUser || !uidToUse) return;
+
+    const originalFw = fieldWorks.find(f => f.id === originalId);
+    if (!originalFw) throw new Error("Trabalho de campo original não encontrado.");
+
+    const newFwId = Date.now().toString();
+    const newFw: FieldWork = {
+      ...originalFw,
+      id: newFwId,
+      nome: `${originalFw.nome} (Cópia)`,
+      dataInicio: new Date().toLocaleDateString('pt-BR')
+    };
+
+    // 1. Salva o novo FieldWork
+    await setDoc(doc(db, `users/${uidToUse}/fieldWorks`, newFwId), cleanObject(newFw));
+
+    // 2. Duplica os talhões e guarda um mapa de { oldTalhaoId: newTalhaoId }
+    const talhaoMap: Record<string, string> = {};
+    const originalTalhoes = talhoes.filter(t => t.fieldWorkId === originalId);
+    for (const t of originalTalhoes) {
+      const newTId = Math.random().toString(36).substring(2, 9) + Date.now();
+      talhaoMap[t.id] = newTId;
+      const newT: Talhao = {
+        ...t,
+        id: newTId,
+        fieldWorkId: newFwId
+      };
+      await setDoc(doc(db, `users/${uidToUse}/talhoes`, newTId), cleanObject(newT));
+    }
+
+    // 3. Duplica os estratos e guarda um mapa de { oldStratumId: newStratumId }
+    const stratumMap: Record<string, string> = {};
+    const originalStrata = strata.filter(s => s.fieldWorkId === originalId);
+    for (const s of originalStrata) {
+      const newSId = Math.random().toString(36).substring(2, 9) + Date.now();
+      stratumMap[s.id] = newSId;
+      const newS: Stratum = {
+        ...s,
+        id: newSId,
+        fieldWorkId: newFwId
+      };
+      await setDoc(doc(db, `users/${uidToUse}/strata`, newSId), cleanObject(newS));
+    }
+
+    // 4. Duplica os inventories (parcelas e cubagens)
+    const originalInvs = inventories.filter(i => i.fieldWorkId === originalId);
+    let idx = 0;
+    for (const inv of originalInvs) {
+      const newInvId = Date.now() + (++idx);
+      const newInv: Inventory = {
+        ...inv,
+        id: newInvId,
+        fieldWorkId: newFwId,
+        talhaoId: inv.talhaoId ? (talhaoMap[inv.talhaoId] || undefined) : undefined,
+        stratumId: inv.stratumId ? (stratumMap[inv.stratumId] || undefined) : undefined
+      };
+      await setDoc(doc(db, `users/${uidToUse}/inventories`, newInvId.toString()), cleanObject(newInv));
+    }
+  };
+
   return (
     <InventoryContext.Provider
       value={{
@@ -429,6 +491,7 @@ export const InventoryProvider: React.FC<{ children: ReactNode }> = ({ children 
         deleteInventory,
         createFieldWork,
         deleteFieldWork,
+        duplicateFieldWork,
         createTalhao,
         deleteTalhao,
         createStratum,

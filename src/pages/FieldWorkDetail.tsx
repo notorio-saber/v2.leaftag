@@ -10,7 +10,7 @@ const generateId = () => Date.now().toString();
 export const FieldWorkDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { fieldWorks, talhoes, inventories, setCurrentInventory, deleteFieldWork, createTalhao, deleteTalhao, isSynced, strata, createFieldWork } = useInventory();
+  const { fieldWorks, talhoes, inventories, setCurrentInventory, deleteFieldWork, createTalhao, deleteTalhao, isSynced, strata, createFieldWork, deleteInventory } = useInventory();
   const [showMap, setShowMap] = useState(false);
   const [showDashboard, setShowDashboard] = useState(false);
   const [talhaoDashboardId, setTalhaoDashboardId] = useState<string | null>(null);
@@ -807,9 +807,46 @@ export const FieldWorkDetail = () => {
                     setCurrentInventory(inv);
                     navigate(`/cubagem/collect/${inv.id}`);
                 }}
-                style={{ cursor: 'pointer', borderLeft: '4px solid #00e676 !important' }}
+                style={{ cursor: 'pointer', borderLeft: '4px solid #00e676 !important', position: 'relative' }}
               >
-                <div className="inventory-card-title" style={{ fontSize: '16px' }}>{inv.nome}</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div className="inventory-card-title" style={{ fontSize: '16px', paddingRight: '28px' }}>{inv.nome}</div>
+                  <button
+                    type="button"
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      if (confirm(`Deseja realmente excluir a cubagem "${inv.nome}"? Esta ação não pode ser desfeita.`)) {
+                        try {
+                          await deleteInventory(inv.id);
+                          alert("Sessão de cubagem excluída com sucesso.");
+                        } catch (err: any) {
+                          alert("Erro ao excluir: " + err.message);
+                        }
+                      }
+                    }}
+                    style={{
+                      background: 'rgba(255, 77, 109, 0.1)',
+                      border: '1px solid rgba(255, 77, 109, 0.25)',
+                      borderRadius: '8px',
+                      color: '#ff4d6d',
+                      cursor: 'pointer',
+                      padding: '5px 7px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'all 0.2s',
+                      position: 'absolute',
+                      top: '12px',
+                      right: '12px',
+                      zIndex: 2
+                    }}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="3 6 5 6 21 6"></polyline>
+                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                    </svg>
+                  </button>
+                </div>
                 <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
                   {currentTal ? `Talhão: ${currentTal.nome}` : 'Sem Talhão'}
                 </div>

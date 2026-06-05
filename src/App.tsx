@@ -27,7 +27,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 const Home = () => {
-  const { fieldWorks, createFieldWork, talhoes, inventories, isSynced } = useInventory();
+  const { fieldWorks, createFieldWork, talhoes, inventories, isSynced, duplicateFieldWork } = useInventory();
   const { currentUser, signOut, status, uidToUse, theme, toggleTheme } = useAuth();
   const isOwner = currentUser && currentUser.uid === uidToUse && (status === 'active' || status === 'admin');
   const userName = currentUser?.displayName ? currentUser.displayName.split(' ')[0] : 'Usuário';
@@ -425,7 +425,37 @@ const Home = () => {
                     className="inventory-card" 
                     onClick={() => navigate(`/fieldwork/${fw.id}`)}
                   >
-                    <div className="inventory-card-title">{fw.nome}</div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <div className="inventory-card-title">{fw.nome}</div>
+                      <button
+                        type="button"
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          if (confirm(`Deseja duplicar o trabalho de campo "${fw.nome}"?`)) {
+                            try {
+                              await duplicateFieldWork(fw.id);
+                              alert("Trabalho de campo duplicado com sucesso.");
+                            } catch (err: any) {
+                              alert("Erro ao duplicar: " + err.message);
+                            }
+                          }
+                        }}
+                        style={{
+                          background: 'rgba(255, 255, 255, 0.05)',
+                          border: '1px solid rgba(255, 255, 255, 0.1)',
+                          borderRadius: '8px',
+                          color: 'var(--text-muted)',
+                          fontSize: '10px',
+                          fontWeight: 'bold',
+                          cursor: 'pointer',
+                          padding: '5px 10px',
+                          transition: 'all 0.2s',
+                          zIndex: 2
+                        }}
+                      >
+                        Duplicar
+                      </button>
+                    </div>
                     <div className="inventory-card-info">Local: {fw.local}</div>
                     <div className="inventory-card-info">Data: {fw.dataInicio}</div>
                     <div className="inventory-card-info" style={{ marginTop: '4px', fontSize: '11.5px', opacity: 0.7 }}>
