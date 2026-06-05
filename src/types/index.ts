@@ -27,6 +27,12 @@ export interface IndividualData {
   alturaMedidaOuEstimada?: 'medida' | 'estimada';
   volumeCalculado?: number;
   modeloUtilizado?: string;
+  // Novos campos do módulo de cubagem
+  modoColeta?: 'relativa' | 'seccional';
+  metodoCalculo?: 'smalian' | 'huber' | 'newton';
+  volumeTotal?: number;
+  volumePorSecao?: { secao: number; volume: number }[];
+  dataCalculo?: string;
   [key: string]: any; 
 }
 
@@ -108,4 +114,6 @@ export interface Inventory {
   formatoParcela?: string;
   coordenadas?: string;
   observacoes?: string;
+  modoColeta?: 'relativa' | 'seccional';
+  metodoCalculo?: 'smalian' | 'huber' | 'newton';
 }

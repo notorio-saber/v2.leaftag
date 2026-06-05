@@ -102,7 +102,8 @@ export const OfficeDashboard = () => {
 
   const [activeFwId, setActiveFwId] = useState<string>('');
   const [searchProjectQuery, setSearchProjectQuery] = useState('');
-  const [activeTab, setActiveTab] = useState<'talhoes' | 'parcelas' | 'estratos'>('talhoes');
+  const [activeTab, setActiveTab] = useState<'talhoes' | 'parcelas' | 'estratos' | 'cubagem'>('talhoes');
+  const [cubageSortOrder, setCubageSortOrder] = useState<'asc' | 'desc' | null>('desc');
   
   // States for sub-dashboards and audits
   const [auditParcelId, setAuditParcelId] = useState<number | null>(null);
@@ -407,6 +408,34 @@ export const OfficeDashboard = () => {
   const activeStrata = useMemo(() => {
     return strata.filter(s => s.fieldWorkId === activeFwId);
   }, [strata, activeFwId]);
+
+  const activeCubageSessions = useMemo(() => {
+    return inventories.filter(i => i.fieldWorkId === activeFwId && i.template === 'cubagem');
+  }, [inventories, activeFwId]);
+
+  const allCubagedTrees = useMemo(() => {
+    const treesList: any[] = [];
+    activeCubageSessions.forEach(session => {
+      if (session.dados && Array.isArray(session.dados)) {
+        session.dados.forEach(tree => {
+          treesList.push({
+            ...tree,
+            sessionName: session.nome,
+            modoColeta: session.modoColeta || tree.modo || 'relativo',
+            metodoCalculo: tree.metodoCalculo || session.metodoCalculo || 'smalian'
+          });
+        });
+      }
+    });
+
+    if (cubageSortOrder === 'asc') {
+      treesList.sort((a, b) => (a.volumeTotal || 0) - (b.volumeTotal || 0));
+    } else if (cubageSortOrder === 'desc') {
+      treesList.sort((a, b) => (b.volumeTotal || 0) - (a.volumeTotal || 0));
+    }
+
+    return treesList;
+  }, [activeCubageSessions, cubageSortOrder]);
 
   // Helper to calculate KPIs for any list of parcels
   const getKpisForParcels = (parcelsList: typeof activeParcels) => {
@@ -1295,6 +1324,21 @@ export const OfficeDashboard = () => {
               >
                 Estratos ({activeStrata.length})
               </button>
+              <button 
+                onClick={() => setActiveTab('cubagem')}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  borderBottom: activeTab === 'cubagem' ? '2px solid var(--primary-color)' : '2px solid transparent',
+                  color: activeTab === 'cubagem' ? 'var(--primary-hover)' : 'var(--text-muted)',
+                  padding: '12px 20px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold',
+                  fontSize: '14.5px'
+                }}
+              >
+                Cubagem ({allCubagedTrees.length})
+              </button>
             </div>
 
             {/* TAB CONTENT */}
@@ -1687,7 +1731,7 @@ export const OfficeDashboard = () => {
                   </div>
                 )}
               </div>
-            ) : (
+            ) : activeTab === 'estratos' ? (
               /* ESTRATOS TAB VIEW */
               <div className="glass-card" style={{ padding: 24, border: '1px solid rgba(255,255,255,0.05)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
@@ -1801,7 +1845,75 @@ export const OfficeDashboard = () => {
                   </>
                 )}
               </div>
-            )}
+            ) : activeTab === 'cubagem' ? (
+              /* CUBAGEM TAB VIEW */
+              <div className="glass-card" style={{ padding: 0, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.05)' }}>
+                {allCubagedTrees.length === 0 ? (
+                  <div style={{ padding: '48px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                    Nenhuma árvore cubada neste trabalho de campo.
+                  </div>
+                ) : (
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                      <thead>
+                        <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                          <th style={{ padding: '16px 24px', textAlign: 'left', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Árvore</th>
+                          <th style={{ padding: '16px 24px', textAlign: 'left', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Sessão de Cubagem</th>
+                          <th style={{ padding: '16px 24px', textAlign: 'left', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Espécie</th>
+                          <th style={{ padding: '16px 24px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', width: '120px' }}>Altura (m)</th>
+                          <th style={{ padding: '16px 24px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', width: '150px' }}>Método Utilizado</th>
+                          <th 
+                            style={{ 
+                              padding: '16px 24px', 
+                              textAlign: 'center', 
+                              fontSize: '11px', 
+                              color: 'var(--primary-hover)', 
+                              textTransform: 'uppercase', 
+                              width: '180px',
+                              cursor: 'pointer',
+                              userSelect: 'none'
+                            }}
+                            onClick={() => {
+                              setCubageSortOrder(prev => prev === 'desc' ? 'asc' : 'desc');
+                            }}
+                          >
+                            Volume Total (m³) {cubageSortOrder === 'desc' ? '▼' : cubageSortOrder === 'asc' ? '▲' : ''}
+                          </th>
+                          <th style={{ padding: '16px 24px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', width: '140px' }}>Data do Cálculo</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {allCubagedTrees.map((tree, idx) => (
+                          <tr key={tree.id || idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                            <td style={{ padding: '18px 24px', fontWeight: 'bold' }}>#{tree.numeroIndividuo}</td>
+                            <td style={{ padding: '18px 24px', color: 'var(--text-muted)' }}>{tree.sessionName}</td>
+                            <td style={{ padding: '18px 24px', fontStyle: 'italic' }}>{tree.especie}</td>
+                            <td style={{ padding: '18px 24px', textAlign: 'center' }}>{tree.alturaTotal ? `${tree.alturaTotal.toFixed(2)} m` : '-'}</td>
+                            <td style={{ padding: '18px 24px', textAlign: 'center', textTransform: 'capitalize' }}>
+                              <span style={{
+                                padding: '4px 8px',
+                                borderRadius: '6px',
+                                fontSize: '12px',
+                                background: 'rgba(255, 255, 255, 0.05)',
+                                color: '#fff'
+                              }}>
+                                {tree.metodoCalculo}
+                              </span>
+                            </td>
+                            <td style={{ padding: '18px 24px', textAlign: 'center', color: '#00e676', fontWeight: 'bold', fontSize: '15px' }}>
+                              {tree.volumeTotal ? `${tree.volumeTotal.toFixed(4).replace('.', ',')}` : '0,0000'}
+                            </td>
+                            <td style={{ padding: '18px 24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
+                              {tree.dataCalculo || '-'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            ) : null}
 
           </div>
         ) : (

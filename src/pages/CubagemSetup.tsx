@@ -13,6 +13,8 @@ export const CubagemSetup = () => {
   const [nome, setNome] = useState('');
   const [selectedTalhaoId, setSelectedTalhaoId] = useState(talhaoId || '');
   const [observacoes, setObservacoes] = useState('');
+  const [modoColeta, setModoColeta] = useState<'relativa' | 'seccional' | ''>('');
+  const [metodoCalculo, setMetodoCalculo] = useState<'smalian' | 'huber' | 'newton' | ''>('');
 
   const handleStart = async () => {
     if (!fieldWorkId) {
@@ -21,6 +23,14 @@ export const CubagemSetup = () => {
     }
     if (!nome.trim()) {
       alert('Por favor, insira um nome ou identificador para a sessão de cubagem.');
+      return;
+    }
+    if (!modoColeta) {
+      alert('Por favor, selecione o modo de coleta.');
+      return;
+    }
+    if (!metodoCalculo) {
+      alert('Por favor, selecione o método de cálculo.');
       return;
     }
 
@@ -37,7 +47,9 @@ export const CubagemSetup = () => {
       colunas: [], // Não usa colunas dinâmicas como inventário tradicional
       dados: [], // Array de CubagemIndividualData
       template: 'cubagem',
-      observacoes: observacoes.trim() || undefined
+      observacoes: observacoes.trim() || undefined,
+      modoColeta,
+      metodoCalculo
     };
 
     try {
@@ -86,7 +98,103 @@ export const CubagemSetup = () => {
           ))}
         </select>
 
-        <label className="input-label" style={{ marginTop: '12px' }}>Observações (Opcional)</label>
+        <label className="input-label" style={{ marginTop: '12px' }}>Modo de Coleta (Obrigatório)</label>
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+          <button 
+            type="button"
+            className="btn"
+            style={{ 
+              flex: 1, 
+              background: modoColeta === 'relativa' ? 'rgba(0,230,118,0.1)' : 'rgba(255,255,255,0.02)',
+              border: modoColeta === 'relativa' ? '1.5px solid #00e676' : '1px solid rgba(255,255,255,0.1)',
+              color: modoColeta === 'relativa' ? '#fff' : 'var(--text-muted)',
+              fontWeight: 'bold',
+              height: '38px',
+              borderRadius: '12px',
+              cursor: 'pointer'
+            }}
+            onClick={() => setModoColeta('relativa')}
+          >
+            Relativa
+          </button>
+          <button 
+            type="button"
+            className="btn"
+            style={{ 
+              flex: 1, 
+              background: modoColeta === 'seccional' ? 'rgba(0,230,118,0.1)' : 'rgba(255,255,255,0.02)',
+              border: modoColeta === 'seccional' ? '1.5px solid #00e676' : '1px solid rgba(255,255,255,0.1)',
+              color: modoColeta === 'seccional' ? '#fff' : 'var(--text-muted)',
+              fontWeight: 'bold',
+              height: '38px',
+              borderRadius: '12px',
+              cursor: 'pointer'
+            }}
+            onClick={() => setModoColeta('seccional')}
+          >
+            Seccional
+          </button>
+        </div>
+
+        <label className="input-label">Método de Cálculo (Obrigatório)</label>
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+          <button 
+            type="button"
+            className="btn"
+            style={{ 
+              flex: 1, 
+              background: metodoCalculo === 'smalian' ? 'rgba(0,230,118,0.1)' : 'rgba(255,255,255,0.02)',
+              border: metodoCalculo === 'smalian' ? '1.5px solid #00e676' : '1px solid rgba(255,255,255,0.1)',
+              color: metodoCalculo === 'smalian' ? '#fff' : 'var(--text-muted)',
+              fontWeight: 'bold',
+              height: '38px',
+              borderRadius: '12px',
+              cursor: 'pointer',
+              fontSize: '13px'
+            }}
+            onClick={() => setMetodoCalculo('smalian')}
+          >
+            Smalian
+          </button>
+          <button 
+            type="button"
+            className="btn"
+            style={{ 
+              flex: 1, 
+              background: metodoCalculo === 'huber' ? 'rgba(0,230,118,0.1)' : 'rgba(255,255,255,0.02)',
+              border: metodoCalculo === 'huber' ? '1.5px solid #00e676' : '1px solid rgba(255,255,255,0.1)',
+              color: metodoCalculo === 'huber' ? '#fff' : 'var(--text-muted)',
+              fontWeight: 'bold',
+              height: '38px',
+              borderRadius: '12px',
+              cursor: 'pointer',
+              fontSize: '13px'
+            }}
+            onClick={() => setMetodoCalculo('huber')}
+          >
+            Huber
+          </button>
+          <button 
+            type="button"
+            className="btn"
+            style={{ 
+              flex: 1, 
+              background: metodoCalculo === 'newton' ? 'rgba(0,230,118,0.1)' : 'rgba(255,255,255,0.02)',
+              border: metodoCalculo === 'newton' ? '1.5px solid #00e676' : '1px solid rgba(255,255,255,0.1)',
+              color: metodoCalculo === 'newton' ? '#fff' : 'var(--text-muted)',
+              fontWeight: 'bold',
+              height: '38px',
+              borderRadius: '12px',
+              cursor: 'pointer',
+              fontSize: '13px'
+            }}
+            onClick={() => setMetodoCalculo('newton')}
+          >
+            Newton
+          </button>
+        </div>
+
+        <label className="input-label">Observações (Opcional)</label>
         <textarea 
           className="input-field" 
           placeholder="Ex: Amostragem de Eucalyptus saligna com bifurcação..." 

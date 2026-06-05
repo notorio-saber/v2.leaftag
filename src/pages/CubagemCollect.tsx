@@ -28,6 +28,8 @@ interface CubageTree {
     volume: number;
   }[];
   volumeTotal: number;
+  volumePorSecao?: { secao: number; volume: number }[];
+  dataCalculo?: string;
 }
 
 const PONTOS_RELATIVOS = [
@@ -46,7 +48,6 @@ export const CubagemCollect = () => {
   const [activeTreeId, setActiveTreeId] = useState<string>('');
   const [showTreeModal, setShowTreeModal] = useState(false);
   const [newTreeEspecie, setNewTreeEspecie] = useState('Eucalyptus');
-  const [newTreeModo, setNewTreeModo] = useState<'relativo' | 'seccional'>('relativo');
 
   // Estado da árvore ativa sendo editada
   const [especie, setEspecie] = useState('');
@@ -73,6 +74,7 @@ export const CubagemCollect = () => {
   } | null>(null);
 
   const [tab, setTab] = useState<'coleta' | 'tabela' | 'afilamento'>('coleta');
+  const [showSummaryId, setShowSummaryId] = useState<string | null>(null);
 
   // Carrega árvores da sessão do Firestore/Context
   useEffect(() => {
@@ -89,6 +91,8 @@ export const CubagemCollect = () => {
         dadosRelativos: tree.dadosRelativos || {},
         secoes: tree.secoes || [],
         volumeTotal: tree.volumeTotal || 0,
+        volumePorSecao: tree.volumePorSecao || [],
+        dataCalculo: tree.dataCalculo || '',
       }));
       setTrees(loadedTrees);
 
@@ -138,9 +142,11 @@ export const CubagemCollect = () => {
   // Atalho para salvar alterações no banco
   const persistSession = async (updatedTrees: CubageTree[]) => {
     const updatedDados = updatedTrees.map(t => {
-      // Calcula volume total antes de salvar
-      const vol = calculateTreeVolume(t);
-      const isConcluido = checkTreeCompletion(t);
+      let vol = t.volumeTotal || 0;
+      if (t.status !== 'Concluído') {
+        const { volumeTotal } = computeDetailedVolume(t);
+        vol = volumeTotal;
+      }
 
       return {
         id: t.id,
@@ -148,12 +154,14 @@ export const CubagemCollect = () => {
         especie: t.especie,
         modo: t.modo,
         alturaTotal: t.alturaTotal,
-        status: isConcluido ? 'Concluído' : 'Em Andamento',
+        status: t.status,
         timestamp: t.timestamp,
         metodoCalculo: t.metodoCalculo,
         dadosRelativos: t.dadosRelativos,
         secoes: t.secoes,
         volumeTotal: vol,
+        volumePorSecao: t.volumePorSecao || [],
+        dataCalculo: t.dataCalculo || '',
         multipleStems: false
       };
     });
@@ -170,32 +178,6 @@ export const CubagemCollect = () => {
   };
 
   // Funções de Cálculo Matemático de Volumes
-  const calculateTreeVolume = (tree: CubageTree): number => {
-    if (tree.modo === 'relativo') {
-      const h = tree.alturaTotal || 10; // default 10m se não inserido
-      const L_sec = h * 0.1; // 10 seções de 10%
-      let vol = 0;
-
-      for (let i = 0; i < PONTOS_RELATIVOS.length - 1; i++) {
-        const p1 = PONTOS_RELATIVOS[i];
-        const p2 = PONTOS_RELATIVOS[i+1];
-        const d1 = parseFloat(tree.dadosRelativos[p1] || '0');
-        const d2 = parseFloat(tree.dadosRelativos[p2] || '0');
-
-        if (d1 > 0 && d2 > 0) {
-          // Volume Smalian da seção
-          const a1 = (Math.PI * Math.pow(d1, 2)) / 40000;
-          const a2 = (Math.PI * Math.pow(d2, 2)) / 40000;
-          vol += ((a1 + a2) / 2) * L_sec;
-        }
-      }
-      return vol;
-    } else {
-      // Modo Seccional: soma dos volumes de cada seção
-      return tree.secoes.reduce((acc, sec) => acc + sec.volume, 0);
-    }
-  };
-
   const calculateSectionVolume = (
     method: 'smalian' | 'huber' | 'newton',
     L: number,
@@ -217,30 +199,118 @@ export const CubagemCollect = () => {
     return 0;
   };
 
-  const checkTreeCompletion = (tree: CubageTree): boolean => {
+  const computeDetailedVolume = (tree: CubageTree): { volumeTotal: number; volumePorSecao: { secao: number; volume: number }[] } => {
+    const volumePorSecao: { secao: number; volume: number }[] = [];
+    let volumeTotal = 0;
+    const method = tree.metodoCalculo || 'smalian';
+
     if (tree.modo === 'relativo') {
-      // Conclui se todos os 11 pontos têm diâmetro
-      return PONTOS_RELATIVOS.every(p => parseFloat(tree.dadosRelativos[p] || '0') > 0);
+      const h = tree.alturaTotal || 0;
+      const L = h * 0.1; // 10 seções de 10%
+      
+      for (let i = 0; i < PONTOS_RELATIVOS.length - 1; i++) {
+        const p1 = PONTOS_RELATIVOS[i];
+        const p2 = PONTOS_RELATIVOS[i + 1];
+        const d1 = parseFloat(tree.dadosRelativos[p1] || '0');
+        const d2 = parseFloat(tree.dadosRelativos[p2] || '0');
+        
+        let vol = 0;
+        if (d1 > 0 && d2 > 0) {
+          vol = calculateSectionVolume(method, L, d1, (d1 + d2) / 2, d2);
+        }
+        
+        volumePorSecao.push({
+          secao: i + 1,
+          volume: parseFloat(vol.toFixed(6))
+        });
+        volumeTotal += vol;
+      }
     } else {
-      // Conclui se tem pelo menos 1 seção e todas estão preenchidas
-      return tree.secoes.length > 0;
+      // Modo Seccional
+      tree.secoes.forEach((sec, idx) => {
+        const L = parseFloat(sec.comprimento || '0');
+        const dIni = parseFloat(sec.dInicial || '0');
+        const dMed = parseFloat(sec.dMedio || '0');
+        const dFin = parseFloat(sec.dFinal || '0');
+        
+        const vol = calculateSectionVolume(method, L, dIni, dMed, dFin);
+        volumePorSecao.push({
+          secao: idx + 1,
+          volume: parseFloat(vol.toFixed(6))
+        });
+        volumeTotal += vol;
+      });
     }
+    
+    return {
+      volumeTotal: parseFloat(volumeTotal.toFixed(6)),
+      volumePorSecao
+    };
+  };
+
+  const validateTreeForConclusion = (tree: CubageTree): string | null => {
+    if (!tree.alturaTotal || tree.alturaTotal <= 0) {
+      return 'A altura total da árvore deve ser informada e maior que zero.';
+    }
+    
+    if (tree.modo === 'relativo') {
+      for (const p of PONTOS_RELATIVOS) {
+        const d = parseFloat(tree.dadosRelativos[p] || '0');
+        if (isNaN(d) || d <= 0) {
+          return `O diâmetro no ponto ${p} deve ser informado e maior que zero.`;
+        }
+      }
+    } else {
+      if (!tree.secoes || tree.secoes.length === 0) {
+        return 'Adicione pelo menos uma seção para concluir a cubagem.';
+      }
+      for (let i = 0; i < tree.secoes.length; i++) {
+        const sec = tree.secoes[i];
+        const L = parseFloat(sec.comprimento || '0');
+        if (isNaN(L) || L <= 0) {
+          return `A seção ${i + 1} possui comprimento inválido.`;
+        }
+        const dIni = parseFloat(sec.dInicial || '0');
+        const dMed = parseFloat(sec.dMedio || '0');
+        const dFin = parseFloat(sec.dFinal || '0');
+        
+        if (tree.metodoCalculo === 'smalian') {
+          if (isNaN(dIni) || dIni <= 0 || isNaN(dFin) || dFin <= 0) {
+            return `A seção ${i + 1} exige diâmetros inicial e final válidos para o método Smalian.`;
+          }
+        } else if (tree.metodoCalculo === 'huber') {
+          if (isNaN(dMed) || dMed <= 0) {
+            return `A seção ${i + 1} exige diâmetro médio válido para o método Huber.`;
+          }
+        } else if (tree.metodoCalculo === 'newton') {
+          if (isNaN(dIni) || dIni <= 0 || isNaN(dMed) || dMed <= 0 || isNaN(dFin) || dFin <= 0) {
+            return `A seção ${i + 1} exige diâmetros inicial, médio e final válidos para o método Newton.`;
+          }
+        }
+      }
+    }
+    return null;
   };
 
   // Manipulação de Árvores
   const handleCreateTree = async () => {
     const nextNum = trees.length + 1;
+    const finalModo = session?.modoColeta === 'relativa' ? 'relativo' : 'seccional';
+    const finalMetodo = session?.metodoCalculo || 'smalian';
+
     const newTree: CubageTree = {
       id: Date.now().toString(),
       numeroIndividuo: nextNum,
       especie: newTreeEspecie.trim() || 'Eucalyptus',
-      modo: newTreeModo,
+      modo: finalModo,
       status: 'Novo',
       timestamp: new Date().toLocaleString('pt-BR'),
-      metodoCalculo: 'smalian',
+      metodoCalculo: finalMetodo,
       dadosRelativos: {},
       secoes: [],
-      volumeTotal: 0
+      volumeTotal: 0,
+      volumePorSecao: [],
+      dataCalculo: ''
     };
 
     const updated = [...trees, newTree];
@@ -265,6 +335,36 @@ export const CubagemCollect = () => {
 
     setTrees(updated);
     await persistSession(updated);
+  };
+
+  const handleConcluirCubagem = async () => {
+    if (!activeTree) return;
+    
+    const err = validateTreeForConclusion(activeTree);
+    if (err) {
+      alert(err);
+      return;
+    }
+    
+    const { volumeTotal, volumePorSecao } = computeDetailedVolume(activeTree);
+    const dataCalculo = new Date().toLocaleDateString('pt-BR');
+    
+    const updated = trees.map(t => {
+      if (t.id === activeTree.id) {
+        return {
+          ...t,
+          status: 'Concluído' as const,
+          volumeTotal,
+          volumePorSecao,
+          dataCalculo
+        };
+      }
+      return t;
+    });
+    
+    setTrees(updated);
+    await persistSession(updated);
+    setShowSummaryId(activeTree.id);
   };
 
   // Modo Relativo: Inserção de diâmetro
@@ -839,34 +939,21 @@ export const CubagemCollect = () => {
               </div>
 
               <div>
-                <label className="input-label">Modo de Coleta</label>
-                <div style={{ display: 'flex', background: 'rgba(0,0,0,0.25)', padding: '3px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.08)' }}>
-                  <button 
-                    onClick={() => {
-                      setModo('relativo');
-                      handleUpdateTreeMeta('modo', 'relativo');
-                    }}
-                    style={{
-                      flex: 1, height: '28px', border: 'none', borderRadius: '8px', fontSize: '10.5px', fontWeight: 'bold', cursor: 'pointer',
-                      background: modo === 'relativo' ? 'var(--primary-color)' : 'transparent',
-                      color: '#fff', transition: 'all 0.2s'
-                    }}
-                  >
-                    Relativo
-                  </button>
-                  <button 
-                    onClick={() => {
-                      setModo('seccional');
-                      handleUpdateTreeMeta('modo', 'seccional');
-                    }}
-                    style={{
-                      flex: 1, height: '28px', border: 'none', borderRadius: '8px', fontSize: '10.5px', fontWeight: 'bold', cursor: 'pointer',
-                      background: modo === 'seccional' ? 'var(--primary-color)' : 'transparent',
-                      color: '#fff', transition: 'all 0.2s'
-                    }}
-                  >
-                    Seccional
-                  </button>
+                <label className="input-label">Modo / Método</label>
+                <div style={{
+                  height: '38px',
+                  borderRadius: '12px',
+                  background: 'rgba(255,255,255,0.02)',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: '0 12px',
+                  fontSize: '12px',
+                  color: '#fff',
+                  textTransform: 'capitalize',
+                  fontWeight: 'bold'
+                }}>
+                  {modo === 'relativo' ? 'Relativo' : 'Seccional'} • {metodoCalculo}
                 </div>
               </div>
             </div>
@@ -994,26 +1081,18 @@ export const CubagemCollect = () => {
                     </h3>
                     
                     {/* Método de Cubagem */}
-                    <select
-                      className="input-field"
-                      style={{ width: 'auto', marginBottom: 0, padding: '4px 24px 4px 8px', fontSize: '11px', height: '28px',
-                        appearance: 'none',
-                        background: 'rgba(255,255,255,0.05) url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'white\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'%3e%3cpolyline points=\'6 9 12 15 18 9\'%3e%3c/polyline%3e%3c/svg%3e") no-repeat right 6px center',
-                        backgroundSize: '10px',
-                        borderColor: 'rgba(255,255,255,0.1)',
-                        fontWeight: 'bold',
-                        color: 'var(--primary-hover)'
-                      }}
-                      value={metodoCalculo}
-                      onChange={e => {
-                        setMetodoCalculo(e.target.value as any);
-                        handleUpdateTreeMeta('metodoCalculo', e.target.value);
-                      }}
-                    >
-                      <option value="smalian">Smalian</option>
-                      <option value="huber">Huber</option>
-                      <option value="newton">Newton</option>
-                    </select>
+                    <span style={{ 
+                      fontSize: '11px', 
+                      fontWeight: 'bold',
+                      color: 'var(--primary-hover)',
+                      textTransform: 'capitalize',
+                      background: 'rgba(0, 230, 118, 0.08)',
+                      padding: '4px 8px',
+                      borderRadius: '8px',
+                      border: '1px solid rgba(0, 230, 118, 0.15)'
+                    }}>
+                      {metodoCalculo}
+                    </span>
                   </div>
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
@@ -1211,6 +1290,28 @@ export const CubagemCollect = () => {
 
             </div>
 
+            {/* Botão de Finalização da Árvore */}
+            <div style={{ marginTop: '12px' }}>
+              <button 
+                className="btn btn-primary" 
+                style={{ 
+                  width: '100%', 
+                  padding: '14px', 
+                  fontSize: '16px', 
+                  fontWeight: 'bold',
+                  background: 'linear-gradient(135deg, #2e7d32 0%, #00e676 100%)',
+                  borderColor: 'transparent',
+                  borderRadius: '16px',
+                  color: '#fff',
+                  boxShadow: '0 4px 15px rgba(0, 230, 118, 0.2)',
+                  cursor: 'pointer'
+                }}
+                onClick={handleConcluirCubagem}
+              >
+                Concluir Cubagem
+              </button>
+            </div>
+
           </div>
 
         </div>
@@ -1239,41 +1340,85 @@ export const CubagemCollect = () => {
               placeholder="Ex: Eucalyptus grandis, Pinus elliottii" 
             />
 
-            <label className="input-label">Modo da Cubagem</label>
-            <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
-              <button 
-                className="btn"
-                style={{ 
-                  flex: 1, 
-                  background: newTreeModo === 'relativo' ? 'rgba(0,230,118,0.1)' : 'rgba(255,255,255,0.02)',
-                  border: newTreeModo === 'relativo' ? '1.5px solid #00e676' : '1px solid rgba(255,255,255,0.1)',
-                  color: newTreeModo === 'relativo' ? '#fff' : 'var(--text-muted)'
-                }}
-                onClick={() => setNewTreeModo('relativo')}
-              >
-                Relativo (%)
-              </button>
-              <button 
-                className="btn"
-                style={{ 
-                  flex: 1, 
-                  background: newTreeModo === 'seccional' ? 'rgba(0,230,118,0.1)' : 'rgba(255,255,255,0.02)',
-                  border: newTreeModo === 'seccional' ? '1.5px solid #00e676' : '1px solid rgba(255,255,255,0.1)',
-                  color: newTreeModo === 'seccional' ? '#fff' : 'var(--text-muted)'
-                }}
-                onClick={() => setNewTreeModo('seccional')}
-              >
-                Seccional (Fuste)
-              </button>
-            </div>
-
-            <div style={{ display: 'flex', gap: '12px' }}>
+            <div style={{ display: 'flex', gap: '12px', marginTop: '20px' }}>
               <button className="btn btn-secondary" onClick={() => setShowTreeModal(false)}>Cancelar</button>
               <button className="btn btn-primary" onClick={handleCreateTree}>Iniciar Coleta</button>
             </div>
           </div>
         </div>
       )}
+
+      {/* Modal Resumo de Cubagem */}
+      {showSummaryId && (() => {
+        const sumTree = trees.find(t => t.id === showSummaryId);
+        if (!sumTree) return null;
+        return (
+          <div style={{ 
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
+            background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', 
+            zIndex: 1000, padding: '20px', backdropFilter: 'blur(8px)' 
+          }}>
+            <div className="glass-card" style={{ width: '100%', maxWidth: '440px', marginBottom: 0, padding: '24px' }}>
+              <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+                <h3 style={{ color: 'var(--primary-hover)', fontSize: '20px', fontWeight: '800' }}>
+                  Resumo da Cubagem
+                </h3>
+                <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+                  Árvore finalizada e calculada com sucesso
+                </span>
+              </div>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
+                <div style={{ background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                  <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block' }}>Árvore</span>
+                  <span style={{ fontSize: '18px', fontWeight: 'bold', color: '#fff' }}>#{sumTree.numeroIndividuo}</span>
+                </div>
+                <div style={{ background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                  <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block' }}>Método</span>
+                  <span style={{ fontSize: '16px', fontWeight: 'bold', color: '#fff', textTransform: 'capitalize' }}>{sumTree.metodoCalculo}</span>
+                </div>
+                <div style={{ background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)', gridColumn: 'span 2', textAlign: 'center' }}>
+                  <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block' }}>Volume Total</span>
+                  <span style={{ fontSize: '26px', fontWeight: '800', color: '#00e676' }}>{sumTree.volumeTotal.toFixed(3).replace('.', ',')} m³</span>
+                </div>
+                <div style={{ background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)', gridColumn: 'span 2' }}>
+                  <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block' }}>Número de Seções</span>
+                  <span style={{ fontSize: '16px', fontWeight: 'bold', color: '#fff' }}>{sumTree.volumePorSecao?.length || 0}</span>
+                </div>
+              </div>
+
+              <div style={{ maxHeight: '180px', overflowY: 'auto', marginBottom: '20px', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                      <th style={{ padding: '8px 12px', fontSize: '10px', color: 'var(--text-muted)', textAlign: 'left', textTransform: 'uppercase' }}>Seção</th>
+                      <th style={{ padding: '8px 12px', fontSize: '10px', color: 'var(--text-muted)', textAlign: 'right', textTransform: 'uppercase' }}>Volume (m³)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sumTree.volumePorSecao?.map(sec => (
+                      <tr key={sec.secao} style={{ borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
+                        <td style={{ padding: '8px 12px', fontSize: '12px', color: 'var(--text-muted)' }}>Seção {sec.secao}</td>
+                        <td style={{ padding: '8px 12px', fontSize: '12px', color: '#00e676', textAlign: 'right', fontWeight: 'bold' }}>
+                          {sec.volume.toFixed(4).replace('.', ',')}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <button 
+                className="btn btn-primary" 
+                style={{ width: '100%', padding: '12px', borderRadius: '12px', fontWeight: 'bold' }}
+                onClick={() => setShowSummaryId(null)}
+              >
+                Salvar e Voltar
+              </button>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Estilos locais de animação */}
       <style>{`
