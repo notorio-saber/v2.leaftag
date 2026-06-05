@@ -220,6 +220,24 @@ h1, h2, h3, h4, h5 {
   letter-spacing: 0.08em;
 }
 
+select {
+  background-color: #0c140e !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 12px;
+  padding: 10px 14px;
+  outline: none;
+  font-family: 'Inter', sans-serif;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+option {
+  background-color: #0c140e !important;
+  color: #ffffff !important;
+  font-family: 'Inter', sans-serif;
+}
+
 /* Custom premium scrollbar style */
 ::-webkit-scrollbar {
   width: 6px;
