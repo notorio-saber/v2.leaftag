@@ -23,6 +23,10 @@ import type {
   TrabalhoConsolidation 
 } from '../types';
 
+const PONTOS_RELATIVOS = [
+  'Base', '10%', '20%', '30%', '40%', '50%', '60%', '70%', '80%', '90%', 'Topo'
+];
+
 export const OfficeDashboard = () => {
   const navigate = useNavigate();
   const { 
@@ -183,6 +187,11 @@ export const OfficeDashboard = () => {
   const [newProcessConsolidationMode, setNewProcessConsolidationMode] = useState<'talhao' | 'stratum' | 'auto'>('auto');
   const [newProcessFatorCasca, setNewProcessFatorCasca] = useState('0.90');
   const [selectedReportProcessing, setSelectedReportProcessing] = useState<InventoryProcessing | null>(null);
+
+  // States for desktop stem and taper visualizer
+  const [selectedVisualizerTree, setSelectedVisualizerTree] = useState<any | null>(null);
+  const [selectedVisualizerPoint, setSelectedVisualizerPoint] = useState<string>('Base');
+  const [selectedVisualizerSectionId, setSelectedVisualizerSectionId] = useState<string | null>(null);
 
   // Estados para o menu de 3 pontinhos e edição de trabalhos no escritório
   const [activeMenuFwId, setActiveMenuFwId] = useState<string | null>(null);
@@ -2146,7 +2155,7 @@ export const OfficeDashboard = () => {
     const worksheet = XLSX.utils.json_to_sheet(allData);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Dados Talhão");
-    XLSX.writeFile(workbook, `Talhao_${talhaoNome.replace(/\s+/g, '_')}.xlsx`);
+    XLSX.writeFile(workbook, `Talhão_${talhaoNome.replace(/\s+/g, '_')}.xlsx`);
   };
 
   // Parcela level processed Excel Export
@@ -2206,6 +2215,257 @@ export const OfficeDashboard = () => {
     if (!auditParcel) return null;
     return getKpisForParcels([auditParcel]);
   }, [auditParcel]);
+
+  // SVG Stem drawing for desktop visualization modal
+  const renderTrunkVisualizerSvg = (tree: any) => {
+    if (!tree) return null;
+
+    if (tree.modoColeta === 'relativo') {
+      return (
+        <svg viewBox="0 0 160 480" style={{ width: '100%', height: '420px', display: 'block' }}>
+          <defs>
+            <linearGradient id="trunkVisualGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#1b3f20" />
+              <stop offset="50%" stopColor="#2e7d32" />
+              <stop offset="100%" stopColor="#122c15" />
+            </linearGradient>
+          </defs>
+
+          {/* Background Trunk */}
+          <path d="M 50 450 L 60 50 L 100 50 L 110 450 Z" fill="rgba(255,255,255,0.03)" stroke="rgba(255,255,255,0.08)" strokeWidth="1" />
+
+          {/* Filled segments */}
+          {PONTOS_RELATIVOS.map((p, i) => {
+            if (i === 0) return null;
+            const prevP = PONTOS_RELATIVOS[i - 1];
+            const hasPrev = parseFloat(tree.dadosRelativos?.[prevP] || '0') > 0;
+            const hasCurr = parseFloat(tree.dadosRelativos?.[p] || '0') > 0;
+            
+            const y1 = 450 - (i - 1) * 40;
+            const y2 = 450 - i * 40;
+            const xLeft1 = 50 + (i - 1) * 1;
+            const xLeft2 = 50 + i * 1;
+            const xRight1 = 110 - (i - 1) * 1;
+            const xRight2 = 110 - i * 1;
+
+            const isFilled = hasPrev && hasCurr;
+            const isHighlighted = selectedVisualizerPoint === p || selectedVisualizerPoint === prevP;
+
+            return (
+              <path
+                key={i}
+                d={`M ${xLeft1} ${y1} L ${xLeft2} ${y2} L ${xRight2} ${y2} L ${xRight1} ${y1} Z`}
+                fill={isFilled ? 'url(#trunkVisualGrad)' : 'rgba(255,255,255,0.02)'}
+                stroke={isHighlighted ? '#00e676' : 'transparent'}
+                strokeWidth={isHighlighted ? 2.5 : 0}
+                style={{ transition: 'all 0.3s ease' }}
+              />
+            );
+          })}
+
+          {/* Interactive measuring points */}
+          {PONTOS_RELATIVOS.map((p, i) => {
+            const y = 450 - i * 40;
+            const x = 80;
+            const isCompleted = parseFloat(tree.dadosRelativos?.[p] || '0') > 0;
+            const isSelected = selectedVisualizerPoint === p;
+
+            return (
+              <g 
+                key={p} 
+                onClick={() => setSelectedVisualizerPoint(p)}
+                style={{ cursor: 'pointer' }}
+              >
+                {isSelected && (
+                  <circle cx={x} cy={y} r="12" fill="rgba(0, 230, 118, 0.25)" />
+                )}
+                <circle 
+                  cx={x} 
+                  cy={y} 
+                  r={isSelected ? '7' : '5'} 
+                  fill={isCompleted ? '#00e676' : 'rgba(255,255,255,0.15)'}
+                  stroke={isSelected ? '#ffffff' : 'rgba(0,0,0,0.5)'}
+                  strokeWidth="1.5"
+                  style={{ transition: 'all 0.2s ease' }}
+                />
+                <text 
+                  x={x + 14} 
+                  y={y + 4} 
+                  fill={isSelected ? '#ffffff' : 'rgba(255,255,255,0.4)'} 
+                  fontSize="9.5px" 
+                  fontWeight={isSelected ? 'bold' : 'normal'}
+                  fontFamily="'Plus Jakarta Sans', sans-serif"
+                >
+                  {p} {tree.dadosRelativos?.[p] ? `(${tree.dadosRelativos[p]} cm)` : ''}
+                </text>
+              </g>
+            );
+          })}
+        </svg>
+      );
+    } else {
+      let currentHeight = 0;
+      const stack = (tree.secoes || []).map((s: any) => {
+        const comp = parseFloat(s.comprimento || '0');
+        const startH = currentHeight;
+        currentHeight += comp;
+        return {
+          ...s,
+          startH,
+          endH: currentHeight
+        };
+      });
+
+      const totalH = Math.max(currentHeight, 10);
+
+      return (
+        <svg viewBox="0 0 160 480" style={{ width: '100%', height: '420px', display: 'block' }}>
+          <defs>
+            <linearGradient id="secVisualGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#1b5e20" />
+              <stop offset="50%" stopColor="#388e3c" />
+              <stop offset="100%" stopColor="#1b5e20" />
+            </linearGradient>
+          </defs>
+
+          {/* Reference Background */}
+          <path d="M 50 450 L 65 50 L 95 50 L 110 450 Z" fill="rgba(255,255,255,0.02)" stroke="rgba(255,255,255,0.06)" />
+
+          {/* Render sections */}
+          {stack.map((s: any, idx: number) => {
+            const y1 = 450 - (s.startH / totalH) * 400;
+            const y2 = 450 - (s.endH / totalH) * 400;
+            
+            const w1 = 110 - (s.startH / totalH) * 30;
+            const w2 = 110 - (s.endH / totalH) * 30;
+
+            const xLeft1 = 80 - w1 / 2;
+            const xRight1 = 80 + w1 / 2;
+            const xLeft2 = 80 - w2 / 2;
+            const xRight2 = 80 + w2 / 2;
+
+            const isSelected = selectedVisualizerSectionId === s.id;
+
+            return (
+              <g 
+                key={s.id} 
+                onClick={() => setSelectedVisualizerSectionId(s.id)}
+                style={{ cursor: 'pointer' }}
+              >
+                <path
+                  d={`M ${xLeft1} ${y1} L ${xLeft2} ${y2} L ${xRight2} ${y2} L ${xRight1} ${y1} Z`}
+                  fill="url(#secVisualGrad)"
+                  stroke={isSelected ? '#00e676' : 'rgba(0, 0, 0, 0.4)'}
+                  strokeWidth={isSelected ? 2.5 : 1}
+                  style={{ transition: 'all 0.3s ease' }}
+                />
+                <text 
+                  x="80" 
+                  y={(y1 + y2) / 2 + 3} 
+                  textAnchor="middle" 
+                  fill="#ffffff" 
+                  fontSize="8.5px" 
+                  fontWeight="bold"
+                  style={{ pointerEvents: 'none', textShadow: '0 1px 3px rgba(0,0,0,0.8)' }}
+                >
+                  S{idx + 1} ({s.comprimento}m)
+                </text>
+              </g>
+            );
+          })}
+        </svg>
+      );
+    }
+  };
+
+  // SVG Taper curve graph for desktop visualization modal
+  const renderTaperVisualizerGraph = (tree: any) => {
+    if (!tree) return null;
+
+    let coords: { h: number; d: number }[] = [];
+
+    if (tree.modoColeta === 'relativo') {
+      const hTotal = tree.alturaTotal || 10;
+      PONTOS_RELATIVOS.forEach((p, idx) => {
+        const val = parseFloat(tree.dadosRelativos?.[p] || '0');
+        if (val > 0) {
+          const pct = idx * 10;
+          coords.push({
+            h: (pct / 100) * hTotal,
+            d: val
+          });
+        }
+      });
+    } else {
+      let curH = 0;
+      (tree.secoes || []).forEach((s: any) => {
+        const comp = parseFloat(s.comprimento || '0');
+        const dIni = parseFloat(s.dInicial || s.dMedio || '0');
+        const dFin = parseFloat(s.dFinal || s.dMedio || '0');
+        if (dIni > 0) {
+          coords.push({ h: curH, d: dIni });
+        }
+        curH += comp;
+        if (dFin > 0) {
+          coords.push({ h: curH, d: dFin });
+        }
+      });
+    }
+
+    if (coords.length < 2) {
+      return (
+        <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px', fontStyle: 'italic' }}>
+          Dados insuficientes para traçar a curva de afilamento.
+        </div>
+      );
+    }
+
+    coords.sort((a, b) => a.h - b.h);
+
+    const maxH = Math.max(...coords.map(c => c.h), 5);
+    const maxD = Math.max(...coords.map(c => c.d), 10);
+
+    const graphWidth = 260;
+    const graphHeight = 350;
+    const padding = 35;
+
+    const getX = (d: number) => padding + (d / maxD) * (graphWidth - padding * 2);
+    const getY = (h: number) => graphHeight - padding - (h / maxH) * (graphHeight - padding * 2);
+
+    const linePath = coords.map((c, i) => `${i === 0 ? 'M' : 'L'} ${getX(c.d)} ${getY(c.h)}`).join(' ');
+
+    return (
+      <div style={{ textAlign: 'center' }}>
+        <h4 style={{ fontSize: '13.5px', color: 'var(--primary-hover)', fontWeight: 'bold', marginBottom: '12px' }}>Curva de Afilamento (Altura x Diâmetro)</h4>
+        <svg viewBox={`0 0 ${graphWidth} ${graphHeight}`} style={{ width: '100%', maxWidth: '320px', margin: '0 auto', background: 'rgba(0,0,0,0.2)', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.06)' }}>
+          {[0, 0.25, 0.5, 0.75, 1].map(r => {
+            const hVal = r * maxH;
+            const dVal = r * maxD;
+            const y = getY(hVal);
+            const x = getX(dVal);
+            return (
+              <g key={r}>
+                <line x1={padding} y1={y} x2={graphWidth - padding} y2={y} stroke="rgba(255,255,255,0.04)" strokeDasharray="3" />
+                <text x={padding - 8} y={y + 3} fill="rgba(255,255,255,0.3)" fontSize="8px" textAnchor="end">{hVal.toFixed(1)} m</text>
+                
+                <line x1={x} y1={padding} x2={x} y2={graphHeight - padding} stroke="rgba(255,255,255,0.04)" strokeDasharray="3" />
+                <text x={x} y={graphHeight - padding + 12} fill="rgba(255,255,255,0.3)" fontSize="8px" textAnchor="middle">{dVal.toFixed(0)} cm</text>
+              </g>
+            );
+          })}
+
+          <line x1={padding} y1={padding} x2={padding} y2={graphHeight - padding} stroke="rgba(255,255,255,0.2)" strokeWidth="1" />
+          <line x1={padding} y1={graphHeight - padding} x2={graphWidth - padding} y2={graphHeight - padding} stroke="rgba(255,255,255,0.2)" strokeWidth="1" />
+
+          <path d={linePath} fill="none" stroke="#00e676" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ filter: 'drop-shadow(0 0 4px rgba(0,230,118,0.4))' }} />
+
+          {coords.map((c, i) => (
+            <circle key={i} cx={getX(c.d)} cy={getY(c.h)} r="4" fill="#00b0ff" stroke="#ffffff" strokeWidth="1" />
+          ))}
+        </svg>
+      </div>
+    );
+  };
 
   return (
     <div className="office-dashboard-layout" style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg-color)', color: 'var(--text-main)', fontFamily: "'Plus Jakarta Sans', sans-serif", overflowX: 'hidden' }}>
@@ -3347,6 +3607,7 @@ export const OfficeDashboard = () => {
                             Volume Total (m³) {cubageSortOrder === 'desc' ? '▼' : cubageSortOrder === 'asc' ? '▲' : ''}
                           </th>
                           <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', width: '140px' }}>Data do Cálculo</th>
+                          <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', width: '120px' }}>Ações</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -3372,6 +3633,34 @@ export const OfficeDashboard = () => {
                             </td>
                             <td style={{ padding: '12px 16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
                               {tree.dataCalculo || '-'}
+                            </td>
+                            <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                              <button 
+                                className="btn btn-secondary" 
+                                style={{ 
+                                  width: 'auto', 
+                                  padding: '6px 12px', 
+                                  fontSize: '11.5px', 
+                                  height: '28px', 
+                                  display: 'inline-flex', 
+                                  alignItems: 'center', 
+                                  gap: '4px',
+                                  borderColor: 'rgba(0, 230, 118, 0.3)',
+                                  background: 'rgba(0, 230, 118, 0.04)',
+                                  color: '#00e676'
+                                }}
+                                onClick={() => {
+                                  setSelectedVisualizerTree(tree);
+                                  if (tree.modoColeta === 'relativo') {
+                                    setSelectedVisualizerPoint('Base');
+                                  } else {
+                                    setSelectedVisualizerSectionId(tree.secoes?.[0]?.id || null);
+                                  }
+                                }}
+                              >
+                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                                Ver Fuste
+                              </button>
                             </td>
                           </tr>
                         ))}
@@ -5165,6 +5454,221 @@ export const OfficeDashboard = () => {
               )}
             </div>
          </div>
+      )}
+
+      {/* Desktop Stem & Taper Visualizer Modal */}
+      {selectedVisualizerTree && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100000, padding: '20px', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
+          <div className="glass-card" style={{ width: '100%', maxWidth: '1000px', display: 'flex', flexDirection: 'column', gap: '20px', maxHeight: '90vh', overflowY: 'auto', padding: '24px' }}>
+            
+            {/* Modal Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255, 255, 255, 0.08)', paddingBottom: '12px' }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <h3 style={{ color: '#ffffff', fontSize: '20px', fontWeight: '800', margin: 0 }}>
+                    Árvore #{selectedVisualizerTree.numeroIndividuo}
+                  </h3>
+                  <span style={{
+                    padding: '3px 8px',
+                    borderRadius: '6px',
+                    fontSize: '11px',
+                    fontWeight: 'bold',
+                    background: 'rgba(0, 230, 118, 0.12)',
+                    color: '#00e676',
+                    textTransform: 'uppercase'
+                  }}>
+                    {selectedVisualizerTree.modoColeta}
+                  </span>
+                </div>
+                <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+                  Sessão: {selectedVisualizerTree.sessionName}
+                </span>
+              </div>
+              <button 
+                onClick={() => setSelectedVisualizerTree(null)} 
+                style={{ background: 'transparent', color: 'white', border: 'none', fontSize: '28px', cursor: 'pointer', lineHeight: 1 }}
+              >
+                &times;
+              </button>
+            </div>
+
+            {/* Three Column Side-by-Side Content */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr', gap: '24px', alignItems: 'start' }}>
+              
+              {/* Left Column: Metrics & interactive reading */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                
+                {/* General KPI Card */}
+                <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                  <h4 style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--primary-hover)', fontWeight: 'bold', marginBottom: '12px', letterSpacing: '0.5px' }}>
+                    Dados Fisiográficos & Volume
+                  </h4>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <div style={{ padding: '8px 12px', background: 'rgba(0,0,0,0.2)', borderRadius: '8px' }}>
+                      <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Espécie</span>
+                      <div style={{ fontSize: '14px', fontWeight: 'bold', fontStyle: 'italic', marginTop: '2px' }}>{selectedVisualizerTree.especie || 'N/A'}</div>
+                    </div>
+                    <div style={{ padding: '8px 12px', background: 'rgba(0,0,0,0.2)', borderRadius: '8px' }}>
+                      <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Altura Total</span>
+                      <div style={{ fontSize: '14px', fontWeight: 'bold', marginTop: '2px' }}>{selectedVisualizerTree.alturaTotal ? `${selectedVisualizerTree.alturaTotal.toFixed(2)} m` : 'N/A'}</div>
+                    </div>
+                    <div style={{ padding: '8px 12px', background: 'rgba(0,0,0,0.2)', borderRadius: '8px' }}>
+                      <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Volume Com Casca</span>
+                      <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#00e676', marginTop: '2px' }}>
+                        {selectedVisualizerTree.volumeTotal ? `${selectedVisualizerTree.volumeTotal.toFixed(4)} m³` : '0,0000 m³'}
+                      </div>
+                    </div>
+                    <div style={{ padding: '8px 12px', background: 'rgba(0,0,0,0.2)', borderRadius: '8px' }}>
+                      <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Volume Sem Casca</span>
+                      <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#00b0ff', marginTop: '2px' }}>
+                        {selectedVisualizerTree.volumeTotalSemCasca ? `${selectedVisualizerTree.volumeTotalSemCasca.toFixed(4)} m³` : '0,0000 m³'}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ marginTop: '12px', padding: '8px 12px', background: 'rgba(255,255,255,0.01)', border: '1px dashed rgba(255,255,255,0.08)', borderRadius: '8px', fontSize: '12px', color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between' }}>
+                    <span>Cálculo: <strong style={{ color: '#fff', textTransform: 'capitalize' }}>{selectedVisualizerTree.metodoCalculo}</strong></span>
+                    <span>Status: <strong style={{ color: selectedVisualizerTree.status === 'Concluído' ? '#00e676' : '#ff9800' }}>{selectedVisualizerTree.status || 'N/A'}</strong></span>
+                  </div>
+                </div>
+
+                {/* Detail card of selected point/section */}
+                {selectedVisualizerTree.modoColeta === 'relativo' ? (
+                  <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(0, 230, 118, 0.2)', minHeight: '140px' }}>
+                    <h4 style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--primary-hover)', fontWeight: 'bold', marginBottom: '8px' }}>
+                      Ponto Selecionado: {selectedVisualizerPoint}
+                    </h4>
+                    {selectedVisualizerTree.dadosRelativos?.[selectedVisualizerPoint] ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13.5px' }}>
+                          <span style={{ color: 'var(--text-muted)' }}>Diâmetro:</span>
+                          <strong style={{ color: '#fff' }}>{selectedVisualizerTree.dadosRelativos[selectedVisualizerPoint]} cm</strong>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13.5px' }}>
+                          <span style={{ color: 'var(--text-muted)' }}>Espessura Casca:</span>
+                          <strong style={{ color: '#00b0ff' }}>
+                            {selectedVisualizerTree.cascaRelativos?.[selectedVisualizerPoint] 
+                              ? `${selectedVisualizerTree.cascaRelativos[selectedVisualizerPoint]} mm` 
+                              : 'Não informada'}
+                          </strong>
+                        </div>
+                        {selectedVisualizerTree.alturaTotal && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13.5px' }}>
+                            <span style={{ color: 'var(--text-muted)' }}>Altura do Ponto:</span>
+                            <strong style={{ color: '#fff' }}>
+                              {(selectedVisualizerPoint === 'Base' ? 0.3 : 
+                                selectedVisualizerPoint === 'Topo' ? selectedVisualizerTree.alturaTotal : 
+                                selectedVisualizerPoint === '10%' ? selectedVisualizerTree.alturaTotal * 0.1 : 
+                                selectedVisualizerPoint === '20%' ? selectedVisualizerTree.alturaTotal * 0.2 : 
+                                selectedVisualizerPoint === '30%' ? selectedVisualizerTree.alturaTotal * 0.3 : 
+                                selectedVisualizerPoint === '40%' ? selectedVisualizerTree.alturaTotal * 0.4 : 
+                                selectedVisualizerPoint === '50%' ? selectedVisualizerTree.alturaTotal * 0.5 : 
+                                selectedVisualizerPoint === '60%' ? selectedVisualizerTree.alturaTotal * 0.6 : 
+                                selectedVisualizerPoint === '70%' ? selectedVisualizerTree.alturaTotal * 0.7 : 
+                                selectedVisualizerPoint === '80%' ? selectedVisualizerTree.alturaTotal * 0.8 : 
+                                selectedVisualizerPoint === '90%' ? selectedVisualizerTree.alturaTotal * 0.9 : 0.3).toFixed(2)} m
+                            </strong>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <p style={{ color: 'var(--text-muted)', fontSize: '12.5px', fontStyle: 'italic', margin: '12px 0 0 0' }}>
+                        Sem dados medidos neste ponto.
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(0, 230, 118, 0.2)', minHeight: '140px' }}>
+                    {(() => {
+                      const currentSecIdx = (selectedVisualizerTree.secoes || []).findIndex((s: any) => s.id === selectedVisualizerSectionId);
+                      const currentSec = (selectedVisualizerTree.secoes || [])[currentSecIdx];
+                      return currentSec ? (
+                        <>
+                          <h4 style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--primary-hover)', fontWeight: 'bold', marginBottom: '8px' }}>
+                            Seção Selecionada: S{currentSecIdx + 1}
+                          </h4>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '12.5px', marginTop: '10px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <span style={{ color: 'var(--text-muted)' }}>Comprimento:</span>
+                              <strong>{currentSec.comprimento} m</strong>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <span style={{ color: 'var(--text-muted)' }}>Diâmetro Inicial:</span>
+                              <strong>{currentSec.dInicial ? `${currentSec.dInicial} cm` : '-'}</strong>
+                            </div>
+                            {currentSec.dMedio && (
+                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span style={{ color: 'var(--text-muted)' }}>Diâmetro Médio:</span>
+                                <strong>{currentSec.dMedio} cm</strong>
+                              </div>
+                            )}
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <span style={{ color: 'var(--text-muted)' }}>Diâmetro Final:</span>
+                              <strong>{currentSec.dFinal ? `${currentSec.dFinal} cm` : '-'}</strong>
+                            </div>
+                            {(currentSec.eInicial || currentSec.eMedio || currentSec.eFinal) && (
+                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span style={{ color: 'var(--text-muted)' }}>Casca (Ini/Med/Fin):</span>
+                                <strong style={{ color: '#00b0ff' }}>
+                                  {currentSec.eInicial || '0'} / {currentSec.eMedio || '0'} / {currentSec.eFinal || '0'} mm
+                                </strong>
+                              </div>
+                            )}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '6px', marginTop: '4px' }}>
+                              <span style={{ color: 'var(--text-muted)' }}>Volume Secional CC:</span>
+                              <strong style={{ color: '#00e676' }}>{(currentSec.volume || 0).toFixed(4)} m³</strong>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <span style={{ color: 'var(--text-muted)' }}>Volume Secional SC:</span>
+                              <strong style={{ color: '#00b0ff' }}>{(currentSec.volumeSemCasca || 0).toFixed(4)} m³</strong>
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <p style={{ color: 'var(--text-muted)', fontSize: '12.5px', fontStyle: 'italic', margin: '12px 0 0 0' }}>
+                          Clique em uma seção no desenho do tronco para ver os detalhes seccionais.
+                        </p>
+                      );
+                    })()}
+                  </div>
+                )}
+                
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center', marginTop: '8px' }}>
+                  {selectedVisualizerTree.modoColeta === 'relativo' 
+                    ? 'Use os pontos do tronco para navegar e ver detalhes.' 
+                    : 'Clique nas seções empilhadas para inspecionar os diâmetros.'
+                  }
+                </span>
+
+              </div>
+
+              {/* Middle Column: SVG Stem drawing */}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', background: 'rgba(0,0,0,0.15)', padding: '20px', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                <h4 style={{ fontSize: '12px', textTransform: 'uppercase', color: 'var(--primary-hover)', fontWeight: 'bold', marginBottom: '12px', letterSpacing: '0.5px' }}>
+                  Esquema Tridimensional do Fuste
+                </h4>
+                {renderTrunkVisualizerSvg(selectedVisualizerTree)}
+              </div>
+
+              {/* Right Column: Taper graph plot */}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', background: 'rgba(0,0,0,0.15)', padding: '20px', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                {renderTaperVisualizerGraph(selectedVisualizerTree)}
+              </div>
+
+            </div>
+
+            {/* Modal Footer */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid rgba(255, 255, 255, 0.08)', paddingTop: '14px', marginTop: '8px' }}>
+              <button 
+                className="btn btn-secondary" 
+                style={{ width: 'auto', padding: '10px 24px' }} 
+                onClick={() => setSelectedVisualizerTree(null)}
+              >
+                Fechar Visualização
+              </button>
+            </div>
+
+          </div>
+        </div>
       )}
 
       {editingFw && (

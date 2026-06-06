@@ -292,7 +292,7 @@ export const FieldWorkDetail = () => {
     const worksheet = XLSX.utils.json_to_sheet(allData);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Dados Talhão");
-    XLSX.writeFile(workbook, `Talhao_${talhaoNome.replace(/\s+/g, '_')}.xlsx`);
+    XLSX.writeFile(workbook, `Talhão_${talhaoNome.replace(/\s+/g, '_')}.xlsx`);
   };
 
   const renderParcelCard = (inv: any) => (
