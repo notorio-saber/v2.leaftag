@@ -3,7 +3,23 @@ import { BarChart, Bar, AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContai
 import html2canvas from 'html2canvas';
 import type { Inventory, IndividualData } from '../types';
 import { useInventory } from '../context/InventoryContext';
+import { useAuth } from '../context/AuthContext';
 import { calculateShannonIndex, calculateSimpsonIndex, calculatePielouIndex, calculateBasalArea, calculateVolume } from '../utils/forestryCalculations';
+
+const getContrastColor = (baseColor: string, isLight: boolean) => {
+  if (!isLight) return baseColor;
+  switch (baseColor) {
+    case '#4fc3f7': return '#0284c7'; // Sky-600
+    case '#aed581': return '#16a34a'; // Green-600
+    case '#ba68c8': return '#9333ea'; // Purple-600
+    case '#e57373': return '#dc2626'; // Red-600
+    case '#ffb74d': return '#d97706'; // Amber-600
+    case '#ff8a65': return '#ea580c'; // Orange-600
+    case '#26a69a': return '#0d9488'; // Teal-600
+    case '#78909c': return '#475569'; // Slate-600
+    default: return baseColor;
+  }
+};
 
 interface DashboardProps {
   inventories: Inventory[];
@@ -11,21 +27,21 @@ interface DashboardProps {
 }
 
 // Custom Glassmorphic Tooltip Component for Premium Analytics
-const CustomTooltip = ({ active, payload, label }: any) => {
+const CustomTooltip = ({ active, payload, label, isLight }: any) => {
   if (active && payload && payload.length) {
     return (
       <div style={{
-        background: 'rgba(5, 13, 8, 0.85)',
+        background: isLight ? 'rgba(255, 255, 255, 0.95)' : 'rgba(5, 13, 8, 0.85)',
         backdropFilter: 'blur(16px)',
         WebkitBackdropFilter: 'blur(16px)',
-        border: '1px solid rgba(255, 255, 255, 0.08)',
+        border: isLight ? '1px solid #cbd5e1' : '1px solid rgba(255, 255, 255, 0.08)',
         padding: '12px 16px',
         borderRadius: '12px',
-        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)'
+        boxShadow: isLight ? '0 8px 32px rgba(0, 0, 0, 0.08)' : '0 8px 32px rgba(0, 0, 0, 0.5)'
       }}>
-        <p style={{ margin: 0, fontSize: '11px', color: 'var(--text-muted)', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{label}</p>
-        <p style={{ margin: '6px 0 0', fontSize: '14.5px', color: 'var(--primary-hover)', fontWeight: '800' }}>
-          {payload[0].name}: <span style={{ color: '#fff', fontWeight: 'bold' }}>{payload[0].value}</span>
+        <p style={{ margin: 0, fontSize: '11px', color: isLight ? '#64748b' : 'var(--text-muted)', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{label}</p>
+        <p style={{ margin: '6px 0 0', fontSize: '14.5px', color: isLight ? '#16a34a' : 'var(--primary-hover)', fontWeight: '800' }}>
+          {payload[0].name}: <span style={{ color: isLight ? '#0f172a' : '#fff', fontWeight: 'bold' }}>{payload[0].value}</span>
         </p>
       </div>
     );
@@ -35,6 +51,8 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 
 export const StatisticalDashboard: React.FC<DashboardProps> = ({ inventories, onClose }) => {
   const { talhoes, strata } = useInventory();
+  const { theme } = useAuth();
+  const isLight = theme === 'light';
   const [classInterval, setClassInterval] = useState<number>(10);
   const [alturaInterval, setAlturaInterval] = useState<number>(5);
   const [fatorForma, setFatorForma] = useState<number>(0.7);
@@ -304,70 +322,87 @@ export const StatisticalDashboard: React.FC<DashboardProps> = ({ inventories, on
     }
   };
 
-  const TopStatCard = ({ title, value, sub, color, icon }: { title: string, value: string, sub: string, color: string, icon: React.ReactNode }) => (
-    <div style={{ 
-      flex: '1 1 200px', 
-      background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0.01) 100%)', 
-      padding: '20px', 
-      borderRadius: '20px', 
-      border: '1px solid rgba(255, 255, 255, 0.06)', 
-      backdropFilter: 'blur(20px)',
-      WebkitBackdropFilter: 'blur(20px)',
-      boxSizing: 'border-box',
-      display: 'flex',
-      flexDirection: 'column',
-      justifyContent: 'space-between',
-      minHeight: '120px',
-      position: 'relative',
-      overflow: 'hidden'
-    }}>
-      {/* Decorative inner glowing blob */}
-      <div style={{
-        position: 'absolute',
-        top: '-20px',
-        right: '-20px',
-        width: '60px',
-        height: '60px',
-        background: color,
-        opacity: 0.08,
-        borderRadius: '50%',
-        filter: 'blur(16px)',
-        pointerEvents: 'none'
-      }} />
+  const TopStatCard = ({ title, value, sub, color, icon }: { title: string, value: string, sub: string, color: string, icon: React.ReactNode }) => {
+    const contrastColor = getContrastColor(color, isLight);
+    return (
+      <div style={{ 
+        background: isLight ? '#ffffff' : 'linear-gradient(135deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0.01) 100%)', 
+        padding: '12px 14px', 
+        borderRadius: '16px', 
+        border: isLight ? '1px solid rgba(0,0,0,0.06)' : '1px solid rgba(255, 255, 255, 0.06)', 
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
+        boxShadow: isLight ? '0 10px 25px rgba(0, 0, 0, 0.03)' : 'none',
+        boxSizing: 'border-box',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'space-between',
+        minHeight: '100px', 
+        position: 'relative',
+        overflow: 'hidden'
+      }}>
+        {/* Decorative inner glowing blob */}
+        <div style={{
+          position: 'absolute',
+          top: '-20px',
+          right: '-20px',
+          width: '60px',
+          height: '60px',
+          background: contrastColor,
+          opacity: isLight ? 0.05 : 0.08,
+          borderRadius: '50%',
+          filter: 'blur(16px)',
+          pointerEvents: 'none'
+        }} />
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <span style={{ fontSize: '10.5px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: '800', letterSpacing: '0.8px' }}>
-          {title}
-        </span>
-        <div style={{ color: color, opacity: 0.8 }}>
-          {icon}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <span style={{ fontSize: '9px', color: isLight ? '#64748b' : 'var(--text-muted)', textTransform: 'uppercase', fontWeight: '800', letterSpacing: '0.5px', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+            {title}
+          </span>
+          <div style={{ color: contrastColor, opacity: 0.9, flexShrink: 0, marginLeft: '4px' }}>
+            {icon}
+          </div>
+        </div>
+        
+        <div style={{ marginTop: '6px' }}>
+          <div style={{ fontSize: '18px', fontWeight: '800', color: isLight ? '#0f172a' : '#ffffff', fontFamily: "'Manrope', sans-serif", letterSpacing: '-0.5px', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+            {value}
+          </div>
+          <div style={{ fontSize: '10px', color: contrastColor, fontWeight: '700', marginTop: '2px', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+            {sub}
+          </div>
         </div>
       </div>
-      
-      <div style={{ marginTop: '12px' }}>
-        <div style={{ fontSize: '26px', fontWeight: '800', color: '#ffffff', fontFamily: "'Manrope', sans-serif", letterSpacing: '-0.5px' }}>
-          {value}
-        </div>
-        <div style={{ fontSize: '11.5px', color: color, fontWeight: '700', marginTop: '2px' }}>
-          {sub}
-        </div>
-      </div>
-    </div>
-  );
+    );
+  };
+
+  const gridStroke = isLight ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255, 255, 255, 0.03)';
+  const axisStroke = isLight ? '#cbd5e1' : '#666';
+  const tickFill = isLight ? '#64748b' : '#aaa';
+
+  const colorColetor = getContrastColor('#ffb74d', isLight);
+  const colorDiametrico = getContrastColor('#4fc3f7', isLight);
+  const colorVolume = getContrastColor('#ba68c8', isLight);
+  const colorBasal = getContrastColor('#e57373', isLight);
+  const colorAltura = getContrastColor('#aed581', isLight);
+  const colorEspecie = isLight ? '#2e7d32' : '#4caf50';
 
   return (
     <div style={{
       position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-      background: 'var(--bg-color)', zIndex: 9999, display: 'flex', flexDirection: 'column',
+      background: isLight 
+        ? 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 50%, #e2e8f0 100%)' 
+        : 'linear-gradient(135deg, #020503 0%, #050d08 50%, #000000 100%)', 
+      zIndex: 9999, display: 'flex', flexDirection: 'column',
       overflowX: 'hidden', maxWidth: '100vw'
     }}>
       {/* Premium Header */}
       <div style={{ 
         padding: '20px 24px', 
-        background: 'rgba(5, 13, 8, 0.4)', 
+        background: isLight ? '#ffffff' : 'rgba(5, 13, 8, 0.4)', 
         backdropFilter: 'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',
-        borderBottom: '1px solid var(--border-color)', 
+        borderBottom: isLight ? '1px solid #e2e8f0' : '1px solid var(--border-color)', 
         display: 'flex', 
         justifyContent: 'space-between', 
         alignItems: 'center',
@@ -375,7 +410,9 @@ export const StatisticalDashboard: React.FC<DashboardProps> = ({ inventories, on
       }}>
         <div>
           <h2 style={{ 
-            background: 'linear-gradient(135deg, #ffffff 0%, var(--primary-hover) 100%)',
+            background: isLight 
+              ? 'linear-gradient(135deg, #0f172a 0%, #334155 100%)' 
+              : 'linear-gradient(135deg, #ffffff 0%, var(--primary-hover) 100%)',
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent',
             fontSize: '18px',
@@ -386,7 +423,7 @@ export const StatisticalDashboard: React.FC<DashboardProps> = ({ inventories, on
           }}>
             Dashboard Analítico
           </h2>
-          <span style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginTop: '3px', fontWeight: '500' }}>
+          <span style={{ fontSize: '12px', color: isLight ? '#475569' : 'var(--text-muted)', display: 'block', marginTop: '3px', fontWeight: '500' }}>
             Análise Fitossociológica de Parcelas Florestais
             {areaHa !== undefined && ` • Área Total: ${areaHa.toFixed(2)} ha`}
             {totalSampleAreaHa > 0 && ` • Área Amostrada: ${totalSampleAreaHa.toFixed(4)} ha`}
@@ -400,8 +437,9 @@ export const StatisticalDashboard: React.FC<DashboardProps> = ({ inventories, on
             borderRadius: '12px',
             fontSize: '13px',
             fontWeight: '800',
-            background: 'rgba(255,255,255,0.04)',
-            border: '1px solid rgba(255,255,255,0.08)'
+            background: isLight ? '#f1f5f9' : 'rgba(255,255,255,0.04)',
+            border: isLight ? '1px solid #cbd5e1' : '1px solid rgba(255,255,255,0.08)',
+            color: isLight ? '#1e293b' : 'var(--text-main)'
           }} 
           onClick={onClose}
         >
@@ -410,370 +448,399 @@ export const StatisticalDashboard: React.FC<DashboardProps> = ({ inventories, on
       </div>
 
       <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '20px', width: '100%', boxSizing: 'border-box' }} ref={containerRef}>
-        
-        {/* Dynamic Parameter Grid (Leverages vertical/horizontal spaces cleanly) */}
-        <div className="glass-card" style={{ 
-          marginBottom: '24px', 
-          padding: '20px', 
-          borderRadius: '20px', 
-          display: 'grid', 
-          gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', 
-          gap: '16px',
-          alignItems: 'end',
-          border: '1px solid rgba(255, 255, 255, 0.06)'
-        }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', opacity: stats.isProcessed ? 0.5 : 1 }}>
-            <label style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '0.5px' }}>
-              Fator de Forma Geral (v) {stats.isProcessed && <span style={{ color: '#ff8a80', fontSize: '9px', textTransform: 'none' }}>(Inativo)</span>}
-            </label>
-            <input 
-              type="number" 
-              step="0.01" 
-              className="input-field" 
-              style={{ marginBottom: 0, padding: '10px 14px', borderRadius: '12px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.08)' }} 
-              value={fatorForma} 
-              onChange={e => setFatorForma(parseFloat(e.target.value) || 0.7)} 
-              disabled={stats.isProcessed}
-            />
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <label style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '0.5px' }}>Classe de DAP (cm)</label>
-            <input 
-              type="number" 
-              className="input-field" 
-              style={{ marginBottom: 0, padding: '10px 14px', borderRadius: '12px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.08)' }} 
-              value={classInterval} 
-              onChange={e => setClassInterval(parseInt(e.target.value) || 10)} 
-            />
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <label style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '0.5px' }}>Classe de HT (m)</label>
-            <input 
-              type="number" 
-              className="input-field" 
-              style={{ marginBottom: 0, padding: '10px 14px', borderRadius: '12px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.08)' }} 
-              value={alturaInterval} 
-              onChange={e => setAlturaInterval(parseInt(e.target.value) || 5)} 
-            />
-          </div>
-          <button 
-            className="btn btn-primary" 
-            style={{ 
-              height: '42px', 
-              borderRadius: '12px', 
-              fontSize: '12px', 
-              fontWeight: 'bold', 
-              textTransform: 'uppercase',
-              letterSpacing: '0.5px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px'
-            }} 
-            onClick={handleExportSnapshot} 
-            disabled={isExporting}
-          >
-            {isExporting ? (
-              'Processando...'
-            ) : (
-              <>
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                  <polyline points="7 10 12 15 17 10"></polyline>
-                  <line x1="12" y1="15" x2="12" y2="3"></line>
-                </svg>
-                Gerar Laudo (PNG)
-              </>
-            )}
-          </button>
-        </div>
-
-        {/* Modelos Florestais Utilizados (Processamento Profissional) */}
-        {stats.isProcessed && (
-          <div className="glass-card" style={{
-            marginBottom: '24px',
-            padding: '20px',
-            borderRadius: '20px',
-            border: '1px solid rgba(46, 125, 50, 0.25)',
-            background: 'linear-gradient(135deg, rgba(46, 125, 50, 0.06) 0%, rgba(255, 255, 255, 0.01) 100%)',
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: '24px',
-            justifyContent: 'space-between'
+        <div style={{ maxWidth: '1440px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          
+          {/* Dynamic Parameter Grid (Leverages vertical/horizontal spaces cleanly) */}
+          <div className="glass-card" style={{ 
+            padding: '20px', 
+            borderRadius: '20px', 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', 
+            gap: '16px',
+            alignItems: 'end',
+            background: isLight ? '#ffffff' : 'rgba(255, 255, 255, 0.02)',
+            border: isLight ? '1px solid #e2e8f0' : '1px solid rgba(255, 255, 255, 0.06)'
           }}>
-            <div style={{ flex: '1 1 200px' }}>
-              <span style={{ fontSize: '11px', color: 'var(--primary-hover)', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '0.5px', display: 'block', marginBottom: '6px' }}>
-                Modelo Hipsométrico (Altura)
-              </span>
-              <span style={{ fontSize: '15px', color: '#fff', fontWeight: 'bold' }}>
-                {stats.hModelName}
-              </span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', opacity: stats.isProcessed ? 0.5 : 1 }}>
+              <label style={{ fontSize: '11px', color: isLight ? '#475569' : 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '0.5px' }}>
+                Fator de Forma Geral (v) {stats.isProcessed && <span style={{ color: '#ff8a80', fontSize: '9px', textTransform: 'none' }}>(Inativo)</span>}
+              </label>
+              <input 
+                type="number" 
+                step="0.01" 
+                className="input-field" 
+                style={{ 
+                  marginBottom: 0, 
+                  padding: '10px 14px', 
+                  borderRadius: '12px', 
+                  background: isLight ? '#f8fafc' : 'rgba(0,0,0,0.3)', 
+                  border: isLight ? '1px solid #cbd5e1' : '1px solid rgba(255,255,255,0.08)',
+                  color: isLight ? '#0f172a' : '#ffffff'
+                }} 
+                value={fatorForma} 
+                onChange={e => setFatorForma(parseFloat(e.target.value) || 0.7)} 
+                disabled={stats.isProcessed}
+              />
             </div>
-            <div style={{ flex: '1 1 200px' }}>
-              <span style={{ fontSize: '11px', color: 'var(--primary-hover)', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '0.5px', display: 'block', marginBottom: '6px' }}>
-                Modelo Volumétrico (Volume)
-              </span>
-              <span style={{ fontSize: '15px', color: '#fff', fontWeight: 'bold' }}>
-                {stats.vModelName}
-              </span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <label style={{ fontSize: '11px', color: isLight ? '#475569' : 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '0.5px' }}>Classe de DAP (cm)</label>
+              <input 
+                type="number" 
+                className="input-field" 
+                style={{ 
+                  marginBottom: 0, 
+                  padding: '10px 14px', 
+                  borderRadius: '12px', 
+                  background: isLight ? '#f8fafc' : 'rgba(0,0,0,0.3)', 
+                  border: isLight ? '1px solid #cbd5e1' : '1px solid rgba(255,255,255,0.08)',
+                  color: isLight ? '#0f172a' : '#ffffff'
+                }} 
+                value={classInterval} 
+                onChange={e => setClassInterval(parseInt(e.target.value) || 10)} 
+              />
             </div>
-            <div style={{ flex: '1 1 200px' }}>
-              <span style={{ fontSize: '11px', color: 'var(--primary-hover)', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '0.5px', display: 'block', marginBottom: '6px' }}>
-                Alturas Amostradas
-              </span>
-              <div style={{ display: 'flex', gap: '16px', fontSize: '14px', fontWeight: 'bold', color: '#fff' }}>
-                <div>📐 Medidas: <span style={{ color: '#a5d6a7' }}>{stats.measuredHtCount}</span></div>
-                <div>📊 Estimadas: <span style={{ color: '#ffb74d' }}>{stats.estimatedHtCount}</span></div>
-              </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <label style={{ fontSize: '11px', color: isLight ? '#475569' : 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '0.5px' }}>Classe de HT (m)</label>
+              <input 
+                type="number" 
+                className="input-field" 
+                style={{ 
+                  marginBottom: 0, 
+                  padding: '10px 14px', 
+                  borderRadius: '12px', 
+                  background: isLight ? '#f8fafc' : 'rgba(0,0,0,0.3)', 
+                  border: isLight ? '1px solid #cbd5e1' : '1px solid rgba(255,255,255,0.08)',
+                  color: isLight ? '#0f172a' : '#ffffff'
+                }} 
+                value={alturaInterval} 
+                onChange={e => setAlturaInterval(parseInt(e.target.value) || 5)} 
+              />
             </div>
+            <button 
+              className="btn btn-primary" 
+              style={{ 
+                height: '42px', 
+                borderRadius: '12px', 
+                fontSize: '12px', 
+                fontWeight: 'bold', 
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px'
+              }} 
+              onClick={handleExportSnapshot} 
+              disabled={isExporting}
+            >
+              {isExporting ? (
+                'Processando...'
+              ) : (
+                <>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                  </svg>
+                  Gerar Laudo (PNG)
+                </>
+              )}
+            </button>
           </div>
-        )}
 
-        {/* Top High Level Stats (Premium Grids) */}
-        <div style={{ 
-          display: 'grid', 
-          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', 
-          gap: '16px', 
-          marginBottom: '32px' 
-        }}>
-           <TopStatCard 
-             title={areaHa !== undefined ? "Fustes (Estimado)" : "Amostragem Base"} 
-             value={areaHa !== undefined && scaledStats.nTotalEst !== undefined
-               ? Math.round(scaledStats.nTotalEst).toLocaleString()
-               : stats.totalFustes.toString()
-             } 
-             sub={areaHa !== undefined
-               ? `${scaledStats.nHa.toFixed(1)}/ha (Amostra: ${stats.totalFustes})`
-               : `${stats.totalInd} Indivíduos`
-             } 
-             color="#4fc3f7"
-             icon={
-               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                 <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
-               </svg>
-             }
-           />
-           <TopStatCard 
-             title="Especialização" 
-             value={stats.speciesCount.toString()} 
-             sub="Espécies Mapeadas" 
-             color="#aed581"
-             icon={
-               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                 <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-               </svg>
-             }
-           />
-           <TopStatCard 
-             title={areaHa !== undefined ? "Volume (Estimado)" : "Volume Amostrado"} 
-             value={areaHa !== undefined && scaledStats.vTotalEst !== undefined
-               ? `${scaledStats.vTotalEst.toFixed(2)} m³`
-               : `${stats.totalV.toFixed(2)} m³`
-             } 
-             sub={areaHa !== undefined
-               ? `${scaledStats.vHa.toFixed(2)} m³/ha (Amostra: ${stats.totalV.toFixed(1)} m³)`
-               : "Biomassa Estimada"
-             } 
-             color="#ba68c8"
-             icon={
-               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                 <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
-                 <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
-                 <line x1="12" y1="22.08" x2="12" y2="12"/>
-               </svg>
-             }
-           />
-           <TopStatCard 
-             title={areaHa !== undefined ? "Área Basal (Estimada)" : "Área Basal Amostrada"} 
-             value={areaHa !== undefined && scaledStats.gTotalEst !== undefined
-               ? `${scaledStats.gTotalEst.toFixed(4)} m²`
-               : `${stats.totalG.toFixed(4)} m²`
-             } 
-             sub={areaHa !== undefined
-               ? `${scaledStats.gHa.toFixed(4)} m²/ha (Amostra: ${stats.totalG.toFixed(3)} m²)`
-               : "Basimetria"
-             } 
-             color="#e57373"
-             icon={
-               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                 <circle cx="12" cy="12" r="10"></circle>
-                 <circle cx="12" cy="12" r="6"></circle>
-                 <circle cx="12" cy="12" r="2"></circle>
-               </svg>
-             }
-           />
-           <TopStatCard 
-             title="Shannon (H')" 
-             value={stats.shannon.toFixed(4)} 
-             sub="Índice de Diversidade" 
-             color="#ffb74d"
-             icon={
-               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                 <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>
-               </svg>
-             }
-           />
-           <TopStatCard 
-             title="Simpson (1-D)" 
-             value={stats.simpson.toFixed(4)} 
-             sub="Riqueza Ecológica" 
-             color="#ff8a65"
-             icon={
-               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                 <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
-               </svg>
-             }
-           />
-           <TopStatCard 
-             title="Pielou (J')" 
-             value={stats.pielou.toFixed(4)} 
-             sub="Equitabilidade" 
-             color="#26a69a"
-             icon={
-               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                 <line x1="18" y1="20" x2="18" y2="10"></line>
-                 <line x1="12" y1="20" x2="12" y2="4"></line>
-                 <line x1="6" y1="20" x2="6" y2="14"></line>
-               </svg>
-             }
-           />
-        </div>
-
-        {/* Dynamic Chart Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px' }}>
-           
-           {/* Collector's Curve (Suficiência Amostral) */}
-           <div className="glass-card" style={{ padding: '24px', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.06)' }}>
-              <h3 style={{ marginBottom: '18px', color: '#ffb74d', fontSize: '15px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Curva do Coletor (Suficiência)</h3>
-              <div style={{ height: '300px', width: '100%' }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={stats.collectorCurveData} margin={{ top: 10, right: 20, left: -20, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="collectorGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#ffb74d" stopOpacity={0.35}/>
-                        <stop offset="95%" stopColor="#ffb74d" stopOpacity={0.0}/>
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255, 255, 255, 0.03)" vertical={false} />
-                    <XAxis dataKey="ind" stroke="#666" tick={{ fill: '#aaa', fontSize: 10 }} />
-                    <YAxis stroke="#666" tick={{ fill: '#aaa', fontSize: 10 }} />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Area type="monotone" dataKey="speciesCount" name="Espécies" stroke="#ffb74d" strokeWidth={3} fill="url(#collectorGrad)" isAnimationActive={true} />
-                  </AreaChart>
-                </ResponsiveContainer>
+          {/* Modelos Florestais Utilizados (Processamento Profissional) */}
+          {stats.isProcessed && (
+            <div className="glass-card" style={{
+              padding: '20px',
+              borderRadius: '20px',
+              border: isLight ? '1px solid rgba(0, 0, 0, 0.06)' : '1px solid rgba(46, 125, 50, 0.25)',
+              background: isLight ? '#ffffff' : 'linear-gradient(135deg, rgba(46, 125, 50, 0.06) 0%, rgba(255, 255, 255, 0.01) 100%)',
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: '24px',
+              justifyContent: 'space-between'
+            }}>
+              <div style={{ flex: '1 1 200px' }}>
+                <span style={{ fontSize: '11px', color: isLight ? '#16a34a' : 'var(--primary-hover)', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '0.5px', display: 'block', marginBottom: '6px' }}>
+                  Modelo Hipsométrico (Altura)
+                </span>
+                <span style={{ fontSize: '15px', color: isLight ? '#0f172a' : '#fff', fontWeight: 'bold' }}>
+                  {stats.hModelName}
+                </span>
               </div>
-           </div>
-
-           {/* Diametric Chart */}
-           <div className="glass-card" style={{ padding: '24px', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.06)' }}>
-              <h3 style={{ marginBottom: '18px', color: '#4fc3f7', fontSize: '15px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Distribuição Diamétrica</h3>
-              <div style={{ height: '300px', width: '100%' }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={stats.diametricFinal} margin={{ top: 10, right: 20, left: -20, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="diametricGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#4fc3f7" stopOpacity={0.8}/>
-                        <stop offset="95%" stopColor="#4fc3f7" stopOpacity={0.15}/>
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255, 255, 255, 0.03)" vertical={false} />
-                    <XAxis dataKey="name" stroke="#666" tick={{ fill: '#aaa', fontSize: 10 }} />
-                    <YAxis stroke="#666" tick={{ fill: '#aaa', fontSize: 10 }} />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Bar dataKey="value" name="Fustes" fill="url(#diametricGrad)" stroke="#4fc3f7" strokeWidth={1} radius={[6, 6, 0, 0]} isAnimationActive={true} />
-                  </BarChart>
-                </ResponsiveContainer>
+              <div style={{ flex: '1 1 200px' }}>
+                <span style={{ fontSize: '11px', color: isLight ? '#16a34a' : 'var(--primary-hover)', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '0.5px', display: 'block', marginBottom: '6px' }}>
+                  Modelo Volumétrico (Volume)
+                </span>
+                <span style={{ fontSize: '15px', color: isLight ? '#0f172a' : '#fff', fontWeight: 'bold' }}>
+                  {stats.vModelName}
+                </span>
               </div>
-           </div>
-
-           {/* Volume Chart */}
-           <div className="glass-card" style={{ padding: '24px', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.06)' }}>
-              <h3 style={{ marginBottom: '18px', color: '#ba68c8', fontSize: '15px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Volume por Classe (m³)</h3>
-              <div style={{ height: '300px', width: '100%' }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={stats.volumeFinal} margin={{ top: 10, right: 20, left: -20, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="volumeGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#ba68c8" stopOpacity={0.8}/>
-                        <stop offset="95%" stopColor="#ba68c8" stopOpacity={0.15}/>
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255, 255, 255, 0.03)" vertical={false} />
-                    <XAxis dataKey="name" stroke="#666" tick={{ fill: '#aaa', fontSize: 10 }} />
-                    <YAxis stroke="#666" tick={{ fill: '#aaa', fontSize: 10 }} />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Bar dataKey="value" name="Volume" fill="url(#volumeGrad)" stroke="#ba68c8" strokeWidth={1} radius={[6, 6, 0, 0]} isAnimationActive={true} />
-                  </BarChart>
-                </ResponsiveContainer>
+              <div style={{ flex: '1 1 200px' }}>
+                <span style={{ fontSize: '11px', color: isLight ? '#16a34a' : 'var(--primary-hover)', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '0.5px', display: 'block', marginBottom: '6px' }}>
+                  Alturas Amostradas
+                </span>
+                <div style={{ display: 'flex', gap: '16px', fontSize: '14px', fontWeight: 'bold', color: isLight ? '#1e293b' : '#fff' }}>
+                  <div style={{ display: 'flex', alignItems: 'center' }}>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px' }}>
+                      <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/>
+                      <path d="m9 12 2 2 4-4"/>
+                    </svg>
+                    Medidas: <span style={{ marginLeft: '4px', color: isLight ? '#16a34a' : '#a5d6a7' }}>{stats.measuredHtCount}</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center' }}>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px' }}>
+                      <path d="M3 3v18h18" />
+                      <path d="m19 9-5 5-4-4-3 3" />
+                    </svg>
+                    Estimadas: <span style={{ marginLeft: '4px', color: isLight ? '#d97706' : '#ffb74d' }}>{stats.estimatedHtCount}</span>
+                  </div>
+                </div>
               </div>
-           </div>
+            </div>
+          )}
 
-           {/* Basal Area Chart */}
-           <div className="glass-card" style={{ padding: '24px', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.06)' }}>
-              <h3 style={{ marginBottom: '18px', color: '#e57373', fontSize: '15px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Área Basal por Classe (m²)</h3>
-              <div style={{ height: '300px', width: '100%' }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={stats.basalFinal} margin={{ top: 10, right: 20, left: -20, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="basalGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#e57373" stopOpacity={0.8}/>
-                        <stop offset="95%" stopColor="#e57373" stopOpacity={0.15}/>
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255, 255, 255, 0.03)" vertical={false} />
-                    <XAxis dataKey="name" stroke="#666" tick={{ fill: '#aaa', fontSize: 10 }} />
-                    <YAxis stroke="#666" tick={{ fill: '#aaa', fontSize: 10 }} />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Bar dataKey="value" name="Área Basal" fill="url(#basalGrad)" stroke="#e57373" strokeWidth={1} radius={[6, 6, 0, 0]} isAnimationActive={true} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-           </div>
+          {/* Top High Level Stats (Premium Grids) */}
+          <div className="dashboard-kpi-grid">
+             <TopStatCard 
+               title={areaHa !== undefined ? "Fustes (Estimado)" : "Amostragem Base"} 
+               value={areaHa !== undefined && scaledStats.nTotalEst !== undefined
+                 ? Math.round(scaledStats.nTotalEst).toLocaleString()
+                 : stats.totalFustes.toString()
+               } 
+               sub={areaHa !== undefined
+                 ? `${scaledStats.nHa.toFixed(1)}/ha (Amostra: ${stats.totalFustes})`
+                 : `${stats.totalInd} Indivíduos`
+               } 
+               color="#4fc3f7"
+               icon={
+                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                   <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                 </svg>
+               }
+             />
+             <TopStatCard 
+               title="Especialização" 
+               value={stats.speciesCount.toString()} 
+               sub="Espécies Mapeadas" 
+               color="#aed581"
+               icon={
+                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                   <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                 </svg>
+               }
+             />
+             <TopStatCard 
+               title={areaHa !== undefined ? "Volume (Estimado)" : "Volume Amostrado"} 
+               value={areaHa !== undefined && scaledStats.vTotalEst !== undefined
+                 ? `${scaledStats.vTotalEst.toFixed(2)} m³`
+                 : `${stats.totalV.toFixed(2)} m³`
+               } 
+               sub={areaHa !== undefined
+                 ? `${scaledStats.vHa.toFixed(2)} m³/ha (Amostra: ${stats.totalV.toFixed(1)} m³)`
+                 : "Biomassa Estimada"
+               } 
+               color="#ba68c8"
+               icon={
+                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                   <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                   <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+                   <line x1="12" y1="22.08" x2="12" y2="12"/>
+                 </svg>
+               }
+             />
+             <TopStatCard 
+               title={areaHa !== undefined ? "Área Basal (Estimada)" : "Área Basal Amostrada"} 
+               value={areaHa !== undefined && scaledStats.gTotalEst !== undefined
+                 ? `${scaledStats.gTotalEst.toFixed(4)} m²`
+                 : `${stats.totalG.toFixed(4)} m²`
+               } 
+               sub={areaHa !== undefined
+                 ? `${scaledStats.gHa.toFixed(4)} m²/ha (Amostra: ${stats.totalG.toFixed(3)} m²)`
+                 : "Basimetria"
+               } 
+               color="#e57373"
+               icon={
+                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                   <circle cx="12" cy="12" r="10"></circle>
+                   <circle cx="12" cy="12" r="6"></circle>
+                   <circle cx="12" cy="12" r="2"></circle>
+                 </svg>
+               }
+             />
+             <TopStatCard 
+               title="Shannon (H')" 
+               value={stats.shannon.toFixed(4)} 
+               sub="Índice de Diversidade" 
+               color="#ffb74d"
+               icon={
+                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                   <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>
+                 </svg>
+               }
+             />
+             <TopStatCard 
+               title="Simpson (1-D)" 
+               value={stats.simpson.toFixed(4)} 
+               sub="Riqueza Ecológica" 
+               color="#ff8a65"
+               icon={
+                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                   <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                 </svg>
+               }
+             />
+             <TopStatCard 
+               title="Pielou (J')" 
+               value={stats.pielou.toFixed(4)} 
+               sub="Equitabilidade" 
+               color="#26a69a"
+               icon={
+                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                   <line x1="18" y1="20" x2="18" y2="10"></line>
+                   <line x1="12" y1="20" x2="12" y2="4"></line>
+                   <line x1="6" y1="20" x2="6" y2="14"></line>
+                 </svg>
+               }
+             />
+          </div>
 
-           {/* Height Chart */}
-           <div className="glass-card" style={{ padding: '24px', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.06)' }}>
-              <h3 style={{ marginBottom: '18px', color: '#aed581', fontSize: '15px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Distribuição de Alturas</h3>
-              <div style={{ height: '300px', width: '100%' }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={stats.alturaFinal} margin={{ top: 10, right: 20, left: -20, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="alturaGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#aed581" stopOpacity={0.8}/>
-                        <stop offset="95%" stopColor="#aed581" stopOpacity={0.15}/>
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255, 255, 255, 0.03)" vertical={false} />
-                    <XAxis dataKey="name" stroke="#666" tick={{ fill: '#aaa', fontSize: 10 }} />
-                    <YAxis stroke="#666" tick={{ fill: '#aaa', fontSize: 10 }} />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Bar dataKey="value" name="Árvores" fill="url(#alturaGrad)" stroke="#aed581" strokeWidth={1} radius={[6, 6, 0, 0]} isAnimationActive={true} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-           </div>
+          {/* Dynamic Chart Grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px' }}>
+             
+             {/* Collector's Curve (Suficiência Amostral) */}
+             <div className="glass-card" style={{ padding: '24px' }}>
+                <h3 style={{ marginBottom: '18px', color: colorColetor, fontSize: '15px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Curva do Coletor (Suficiência)</h3>
+                <div style={{ height: '300px', width: '100%' }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={stats.collectorCurveData} margin={{ top: 10, right: 20, left: -20, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="collectorGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor={colorColetor} stopOpacity={isLight ? 0.25 : 0.35}/>
+                          <stop offset="95%" stopColor={colorColetor} stopOpacity={0.0}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} vertical={false} />
+                      <XAxis dataKey="ind" stroke={axisStroke} tick={{ fill: tickFill, fontSize: 10 }} />
+                      <YAxis stroke={axisStroke} tick={{ fill: tickFill, fontSize: 10 }} />
+                      <Tooltip content={<CustomTooltip isLight={isLight} />} />
+                      <Area type="monotone" dataKey="speciesCount" name="Espécies" stroke={colorColetor} strokeWidth={3} fill="url(#collectorGrad)" isAnimationActive={true} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+             </div>
 
-           {/* Species Chart (Expands dynamically to span full width where helpful) */}
-           <div className="glass-card" style={{ padding: '24px', borderRadius: '24px', gridColumn: '1 / -1', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.06)' }}>
-              <h3 style={{ marginBottom: '18px', color: 'var(--primary-color)', fontSize: '15px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Frequência de Espécies (Top 10)</h3>
-              <div style={{ height: '360px', width: '100%' }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={stats.speciesFinal} layout="vertical" margin={{ top: 10, right: 20, left: 30, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="speciesGrad" x1="0" y1="0" x2="1" y2="0">
-                        <stop offset="5%" stopColor="var(--primary-color)" stopOpacity={0.85}/>
-                        <stop offset="95%" stopColor="var(--primary-hover)" stopOpacity={0.2}/>
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255, 255, 255, 0.03)" horizontal={true} vertical={false} />
-                    <XAxis type="number" stroke="#666" tick={{ fill: '#aaa', fontSize: 10 }} allowDecimals={false} />
-                    <YAxis type="category" dataKey="name" stroke="#666" width={110} tick={{ fill: '#aaa', fontSize: 11 }} interval={0} />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Bar dataKey="count" name="Indivíduos" fill="url(#speciesGrad)" stroke="var(--primary-hover)" strokeWidth={1} radius={[0, 6, 6, 0]} isAnimationActive={true} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-           </div>
+             {/* Diametric Chart */}
+             <div className="glass-card" style={{ padding: '24px' }}>
+                <h3 style={{ marginBottom: '18px', color: colorDiametrico, fontSize: '15px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Distribuição Diamétrica</h3>
+                <div style={{ height: '300px', width: '100%' }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={stats.diametricFinal} margin={{ top: 10, right: 20, left: -20, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="diametricGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor={colorDiametrico} stopOpacity={isLight ? 0.75 : 0.8}/>
+                          <stop offset="95%" stopColor={colorDiametrico} stopOpacity={0.15}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} vertical={false} />
+                      <XAxis dataKey="name" stroke={axisStroke} tick={{ fill: tickFill, fontSize: 10 }} />
+                      <YAxis stroke={axisStroke} tick={{ fill: tickFill, fontSize: 10 }} />
+                      <Tooltip content={<CustomTooltip isLight={isLight} />} />
+                      <Bar dataKey="value" name="Fustes" fill="url(#diametricGrad)" stroke={colorDiametrico} strokeWidth={1} radius={[6, 6, 0, 0]} isAnimationActive={true} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+             </div>
 
+             {/* Volume Chart */}
+             <div className="glass-card" style={{ padding: '24px' }}>
+                <h3 style={{ marginBottom: '18px', color: colorVolume, fontSize: '15px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Volume por Classe (m³)</h3>
+                <div style={{ height: '300px', width: '100%' }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={stats.volumeFinal} margin={{ top: 10, right: 20, left: -20, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="volumeGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor={colorVolume} stopOpacity={isLight ? 0.75 : 0.8}/>
+                          <stop offset="95%" stopColor={colorVolume} stopOpacity={0.15}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} vertical={false} />
+                      <XAxis dataKey="name" stroke={axisStroke} tick={{ fill: tickFill, fontSize: 10 }} />
+                      <YAxis stroke={axisStroke} tick={{ fill: tickFill, fontSize: 10 }} />
+                      <Tooltip content={<CustomTooltip isLight={isLight} />} />
+                      <Bar dataKey="value" name="Volume" fill="url(#volumeGrad)" stroke={colorVolume} strokeWidth={1} radius={[6, 6, 0, 0]} isAnimationActive={true} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+             </div>
+
+             {/* Basal Area Chart */}
+             <div className="glass-card" style={{ padding: '24px' }}>
+                <h3 style={{ marginBottom: '18px', color: colorBasal, fontSize: '15px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Área Basal por Classe (m²)</h3>
+                <div style={{ height: '300px', width: '100%' }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={stats.basalFinal} margin={{ top: 10, right: 20, left: -20, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="basalGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor={colorBasal} stopOpacity={isLight ? 0.75 : 0.8}/>
+                          <stop offset="95%" stopColor={colorBasal} stopOpacity={0.15}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} vertical={false} />
+                      <XAxis dataKey="name" stroke={axisStroke} tick={{ fill: tickFill, fontSize: 10 }} />
+                      <YAxis stroke={axisStroke} tick={{ fill: tickFill, fontSize: 10 }} />
+                      <Tooltip content={<CustomTooltip isLight={isLight} />} />
+                      <Bar dataKey="value" name="Área Basal" fill="url(#basalGrad)" stroke={colorBasal} strokeWidth={1} radius={[6, 6, 0, 0]} isAnimationActive={true} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+             </div>
+
+             {/* Height Chart */}
+             <div className="glass-card" style={{ padding: '24px' }}>
+                <h3 style={{ marginBottom: '18px', color: colorAltura, fontSize: '15px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Distribuição de Alturas</h3>
+                <div style={{ height: '300px', width: '100%' }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={stats.alturaFinal} margin={{ top: 10, right: 20, left: -20, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="alturaGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor={colorAltura} stopOpacity={isLight ? 0.75 : 0.8}/>
+                          <stop offset="95%" stopColor={colorAltura} stopOpacity={0.15}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} vertical={false} />
+                      <XAxis dataKey="name" stroke={axisStroke} tick={{ fill: tickFill, fontSize: 10 }} />
+                      <YAxis stroke={axisStroke} tick={{ fill: tickFill, fontSize: 10 }} />
+                      <Tooltip content={<CustomTooltip isLight={isLight} />} />
+                      <Bar dataKey="value" name="Árvores" fill="url(#alturaGrad)" stroke={colorAltura} strokeWidth={1} radius={[6, 6, 0, 0]} isAnimationActive={true} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+             </div>
+
+             {/* Species Chart (Expands dynamically to span full width where helpful) */}
+             <div className="glass-card" style={{ padding: '24px', gridColumn: '1 / -1', overflow: 'hidden' }}>
+                <h3 style={{ marginBottom: '18px', color: colorEspecie, fontSize: '15px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Frequência de Espécies (Top 10)</h3>
+                <div style={{ height: '360px', width: '100%' }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={stats.speciesFinal} layout="vertical" margin={{ top: 10, right: 20, left: 30, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="speciesGrad" x1="0" y1="0" x2="1" y2="0">
+                          <stop offset="5%" stopColor={colorEspecie} stopOpacity={0.85}/>
+                          <stop offset="95%" stopColor={isLight ? '#22c55e' : '#4caf50'} stopOpacity={0.2}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} horizontal={true} vertical={false} />
+                      <XAxis type="number" stroke={axisStroke} tick={{ fill: tickFill, fontSize: 10 }} allowDecimals={false} />
+                      <YAxis type="category" dataKey="name" stroke={axisStroke} width={110} tick={{ fill: tickFill, fontSize: 11 }} interval={0} />
+                      <Tooltip content={<CustomTooltip isLight={isLight} />} />
+                      <Bar dataKey="count" name="Indivíduos" fill="url(#speciesGrad)" stroke={colorEspecie} strokeWidth={1} radius={[0, 6, 6, 0]} isAnimationActive={true} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+             </div>
+
+          </div>
         </div>
       </div>
     </div>
