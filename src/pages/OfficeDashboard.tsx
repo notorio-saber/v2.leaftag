@@ -2661,6 +2661,113 @@ export const OfficeDashboard = () => {
               )}
             </div>
 
+            {/* Abas layout for Talões / Parcelas / Estratos */}
+            <div className="office-tab-bar">
+              <button 
+                onClick={() => setActiveTab('talhoes')}
+                className={`office-tab-button ${activeTab === 'talhoes' ? 'active' : ''}`}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: '8px' }}>
+                  <path d="M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z"/>
+                </svg>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                  <span style={{ fontSize: '13.5px', fontWeight: 'bold' }}>Talões</span>
+                  <span style={{ fontSize: '10.5px', opacity: 0.7, marginTop: '2px' }}>{activeTalhoes.length} cadastrados</span>
+                </div>
+              </button>
+
+              <button 
+                onClick={() => setActiveTab('parcelas')}
+                className={`office-tab-button ${activeTab === 'parcelas' ? 'active' : ''}`}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: '8px' }}>
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <line x1="22" y1="12" x2="18" y2="12"></line>
+                  <line x1="6" y1="12" x2="2" y2="12"></line>
+                  <line x1="12" y1="6" x2="12" y2="2"></line>
+                  <line x1="12" y1="22" x2="12" y2="18"></line>
+                </svg>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                  <span style={{ fontSize: '13.5px', fontWeight: 'bold' }}>Parcelas</span>
+                  <span style={{ fontSize: '10.5px', opacity: 0.7, marginTop: '2px' }}>{activeParcels.length} registradas</span>
+                </div>
+              </button>
+
+              <button 
+                onClick={() => setActiveTab('estratos')}
+                className={`office-tab-button ${activeTab === 'estratos' ? 'active' : ''}`}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: '8px' }}>
+                  <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+                  <polyline points="2 17 12 22 22 17"></polyline>
+                  <polyline points="2 12 12 17 22 12"></polyline>
+                </svg>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                  <span style={{ fontSize: '13.5px', fontWeight: 'bold' }}>Estratos</span>
+                  <span style={{ fontSize: '10.5px', opacity: 0.7, marginTop: '2px' }}>{activeStrata.length} grupos</span>
+                </div>
+              </button>
+
+              <button 
+                onClick={() => setActiveTab('cubagem')}
+                className={`office-tab-button ${activeTab === 'cubagem' ? 'active' : ''}`}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: '8px' }}>
+                  <path d="M12 20V10M18 20V4M6 20V16"/>
+                  <line x1="2" y1="20" x2="22" y2="20"></line>
+                </svg>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                  <span style={{ fontSize: '13.5px', fontWeight: 'bold' }}>Cubagem</span>
+                  <span style={{ fontSize: '10.5px', opacity: 0.7, marginTop: '2px' }}>{allCubagedTrees.length} fustes</span>
+                </div>
+              </button>
+
+              <button 
+                onClick={() => setActiveTab('extrapolacao')}
+                className={`office-tab-button ${activeTab === 'extrapolacao' ? 'active' : ''}`}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: '8px' }}>
+                  <line x1="18" y1="20" x2="18" y2="10"></line>
+                  <line x1="12" y1="20" x2="12" y2="4"></line>
+                  <line x1="6" y1="20" x2="6" y2="14"></line>
+                  <line x1="2" y1="20" x2="22" y2="20"></line>
+                </svg>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                  <span style={{ fontSize: '13.5px', fontWeight: 'bold' }}>Extrapolação</span>
+                  <span style={{ fontSize: '10.5px', opacity: 0.7, marginTop: '2px' }}>Médias e Totais</span>
+                </div>
+              </button>
+
+              <button 
+                onClick={() => setActiveTab('processamentos')}
+                className={`office-tab-button ${activeTab === 'processamentos' ? 'active' : ''}`}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: '8px' }}>
+                  <circle cx="12" cy="12" r="3"></circle>
+                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                </svg>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                  <span style={{ fontSize: '13.5px', fontWeight: 'bold' }}>Processamentos</span>
+                  <span style={{ fontSize: '10.5px', opacity: 0.7, marginTop: '2px' }}>{activeProcessings.length} snapshots</span>
+                </div>
+              </button>
+
+              <button 
+                onClick={() => setActiveTab('sortimento')}
+                className={`office-tab-button ${activeTab === 'sortimento' ? 'active' : ''}`}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: '8px' }}>
+                  <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                  <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                  <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                </svg>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                  <span style={{ fontSize: '13.5px', fontWeight: 'bold' }}>Sortimento</span>
+                  <span style={{ fontSize: '10.5px', opacity: 0.7, marginTop: '2px' }}>Otimização e Toras</span>
+                </div>
+              </button>
+            </div>
+
             {/* KPI Cards Row */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '32px' }}>
               
@@ -2690,115 +2797,6 @@ export const OfficeDashboard = () => {
 
             </div>
 
-            {/* Abas layout for Talhões / Parcelas / Estratos */}
-            <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid rgba(255,255,255,0.05)', marginBottom: '20px' }}>
-              <button 
-                onClick={() => setActiveTab('talhoes')}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  borderBottom: activeTab === 'talhoes' ? '2px solid var(--primary-color)' : '2px solid transparent',
-                  color: activeTab === 'talhoes' ? 'var(--primary-hover)' : 'var(--text-muted)',
-                  padding: '12px 20px',
-                  cursor: 'pointer',
-                  fontWeight: 'bold',
-                  fontSize: '14.5px'
-                }}
-              >
-                Talhões ({activeTalhoes.length})
-              </button>
-              <button 
-                onClick={() => setActiveTab('parcelas')}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  borderBottom: activeTab === 'parcelas' ? '2px solid var(--primary-color)' : '2px solid transparent',
-                  color: activeTab === 'parcelas' ? 'var(--primary-hover)' : 'var(--text-muted)',
-                  padding: '12px 20px',
-                  cursor: 'pointer',
-                  fontWeight: 'bold',
-                  fontSize: '14.5px'
-                }}
-              >
-                Parcelas ({activeParcels.length})
-              </button>
-              <button 
-                onClick={() => setActiveTab('estratos')}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  borderBottom: activeTab === 'estratos' ? '2px solid var(--primary-color)' : '2px solid transparent',
-                  color: activeTab === 'estratos' ? 'var(--primary-hover)' : 'var(--text-muted)',
-                  padding: '12px 20px',
-                  cursor: 'pointer',
-                  fontWeight: 'bold',
-                  fontSize: '14.5px'
-                }}
-              >
-                Estratos ({activeStrata.length})
-              </button>
-              <button 
-                onClick={() => setActiveTab('cubagem')}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  borderBottom: activeTab === 'cubagem' ? '2px solid var(--primary-color)' : '2px solid transparent',
-                  color: activeTab === 'cubagem' ? 'var(--primary-hover)' : 'var(--text-muted)',
-                  padding: '12px 20px',
-                  cursor: 'pointer',
-                  fontWeight: 'bold',
-                  fontSize: '14.5px'
-                }}
-              >
-                Cubagem ({allCubagedTrees.length})
-              </button>
-              <button 
-                onClick={() => setActiveTab('extrapolacao')}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  borderBottom: activeTab === 'extrapolacao' ? '2px solid var(--primary-color)' : '2px solid transparent',
-                  color: activeTab === 'extrapolacao' ? 'var(--primary-hover)' : 'var(--text-muted)',
-                  padding: '12px 20px',
-                  cursor: 'pointer',
-                  fontWeight: 'bold',
-                  fontSize: '14.5px'
-                }}
-              >
-                Extrapolação
-              </button>
-              <button 
-                onClick={() => setActiveTab('processamentos')}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  borderBottom: activeTab === 'processamentos' ? '2px solid var(--primary-color)' : '2px solid transparent',
-                  color: activeTab === 'processamentos' ? 'var(--primary-hover)' : 'var(--text-muted)',
-                  padding: '12px 20px',
-                  cursor: 'pointer',
-                  fontWeight: 'bold',
-                  fontSize: '14.5px'
-                }}
-              >
-                Processamentos ({activeProcessings.length})
-              </button>
-              <button 
-                onClick={() => setActiveTab('sortimento')}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  borderBottom: activeTab === 'sortimento' ? '2px solid var(--primary-color)' : '2px solid transparent',
-                  color: activeTab === 'sortimento' ? 'var(--primary-hover)' : 'var(--text-muted)',
-                  padding: '12px 20px',
-                  cursor: 'pointer',
-                  fontWeight: 'bold',
-                  fontSize: '14.5px'
-                }}
-              >
-                Sortimento
-              </button>
-            </div>
-
             {/* TAB CONTENT */}
             {activeTab === 'talhoes' ? (
               <div className="glass-card" style={{ padding: 0, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.05)' }}>
@@ -2811,12 +2809,12 @@ export const OfficeDashboard = () => {
                     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                       <thead>
                         <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                          <th style={{ padding: '16px 24px', textAlign: 'left', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Nome do Talhão</th>
-                          <th style={{ padding: '16px 24px', textAlign: 'left', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', width: '120px' }}>Área (ha)</th>
-                          <th style={{ padding: '16px 24px', textAlign: 'left', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Observações</th>
-                          <th style={{ padding: '16px 24px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', width: '100px' }}>Nº Parcelas</th>
-                          <th style={{ padding: '16px 24px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', width: '100px' }}>Nº Árvores</th>
-                          <th style={{ padding: '16px 24px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', width: '380px' }}>Ações</th>
+                          <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Nome do Talhão</th>
+                          <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', width: '120px' }}>Área (ha)</th>
+                          <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Observações</th>
+                          <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', width: '100px' }}>Nº Parcelas</th>
+                          <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', width: '100px' }}>Nº Árvores</th>
+                          <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', width: '380px' }}>Ações</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -2827,18 +2825,18 @@ export const OfficeDashboard = () => {
 
                           return (
                             <tr key={t.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-                              <td style={{ padding: '18px 24px', fontWeight: 'bold' }}>{t.nome}</td>
-                              <td style={{ padding: '18px 24px', fontWeight: 'bold', color: '#00e676' }}>
+                              <td style={{ padding: '12px 16px', fontWeight: 'bold' }}>{t.nome}</td>
+                              <td style={{ padding: '12px 16px', fontWeight: 'bold', color: '#00e676' }}>
                                 {t.area !== undefined ? `${t.area.toFixed(2)} ha` : '-'}
                               </td>
-                              <td style={{ padding: '18px 24px', color: 'var(--text-muted)', fontSize: '13px' }}>{t.observacoes || 'Sem observações'}</td>
-                              <td style={{ padding: '18px 24px', textAlign: 'center', fontWeight: 'bold' }}>{talParcels.length}</td>
-                              <td style={{ padding: '18px 24px', textAlign: 'center', color: '#4fc3f7', fontWeight: 'bold' }}>{treesCount}</td>
-                              <td style={{ padding: '18px 24px', textAlign: 'center' }}>
-                                <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', flexWrap: 'wrap' }}>
+                              <td style={{ padding: '12px 16px', color: 'var(--text-muted)', fontSize: '13px' }}>{t.observacoes || 'Sem observações'}</td>
+                              <td style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 'bold' }}>{talParcels.length}</td>
+                              <td style={{ padding: '12px 16px', textAlign: 'center', color: '#4fc3f7', fontWeight: 'bold' }}>{treesCount}</td>
+                              <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                                <div style={{ display: 'inline-flex', gap: '6px', justifyContent: 'center', alignItems: 'center', whiteSpace: 'nowrap' }}>
                                   <button 
                                     className="btn btn-secondary" 
-                                    style={{ width: 'auto', padding: '6px 12px', fontSize: '11px', borderColor: '#00e676', color: '#00e676', background: 'rgba(0, 230, 118, 0.08)' }} 
+                                    style={{ width: 'auto', padding: '4px 8px', fontSize: '10px', height: '26px', borderColor: '#00e676', color: '#00e676', background: 'rgba(0, 230, 118, 0.08)', margin: 0 }} 
                                     onClick={() => {
                                       setSelectedTalhaoId(t.id);
                                       setActiveTab('parcelas');
@@ -2850,14 +2848,14 @@ export const OfficeDashboard = () => {
                                     <>
                                       <button 
                                         className="btn btn-secondary" 
-                                        style={{ width: 'auto', padding: '6px 12px', fontSize: '11px', borderColor: '#ffb74d', color: '#ffb74d', background: 'rgba(255, 183, 77, 0.08)' }} 
+                                        style={{ width: 'auto', padding: '4px 8px', fontSize: '10px', height: '26px', borderColor: '#ffb74d', color: '#ffb74d', background: 'rgba(255, 183, 77, 0.08)', margin: 0 }} 
                                         onClick={() => setTalhaoDashboardId(t.id)}
                                       >
                                         Dashboard
                                       </button>
                                       <button 
                                         className="btn btn-secondary" 
-                                        style={{ width: 'auto', padding: '6px 12px', fontSize: '11px', borderColor: '#00838f', color: '#80deea', background: 'rgba(0, 131, 143, 0.08)' }} 
+                                        style={{ width: 'auto', padding: '4px 8px', fontSize: '10px', height: '26px', borderColor: '#00838f', color: '#80deea', background: 'rgba(0, 131, 143, 0.08)', margin: 0 }} 
                                         onClick={() => handleExportTalhao(t.id, t.nome)}
                                       >
                                         Excel
@@ -2866,7 +2864,7 @@ export const OfficeDashboard = () => {
                                   )}
                                   <button 
                                     className="btn btn-secondary" 
-                                    style={{ width: 'auto', padding: '6px 12px', fontSize: '11px', borderColor: '#4fc3f7', color: '#4fc3f7', background: 'rgba(79, 195, 247, 0.08)' }} 
+                                    style={{ width: 'auto', padding: '4px 8px', fontSize: '10px', height: '26px', borderColor: '#4fc3f7', color: '#4fc3f7', background: 'rgba(79, 195, 247, 0.08)', margin: 0 }} 
                                     onClick={() => {
                                       setEditingTalhao(t);
                                       setEditTalhaoName(t.nome);
@@ -2878,7 +2876,7 @@ export const OfficeDashboard = () => {
                                   </button>
                                   <button 
                                     className="btn btn-danger" 
-                                    style={{ width: 'auto', padding: '4px 10px', fontSize: '10px', height: 'auto', lineHeight: 'normal' }} 
+                                    style={{ width: 'auto', padding: '4px 8px', fontSize: '10px', height: '26px', margin: 0, lineHeight: 'normal' }} 
                                     onClick={() => {
                                       if (confirm(`Excluir o talhão "${t.nome}" apagará permanentemente todas as parcelas (${talParcels.length}) vinculadas a ele. Deseja prosseguir?`)) {
                                         deleteTalhao(t.id);
@@ -3102,15 +3100,15 @@ export const OfficeDashboard = () => {
                     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                       <thead>
                         <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                          <th style={{ padding: '16px 24px', textAlign: 'left', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Nome da Parcela</th>
-                          <th style={{ padding: '16px 24px', textAlign: 'left', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Talhão</th>
+                          <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Nome da Parcela</th>
+                          <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Talhão</th>
                           {activeStrata.length > 0 && (
-                            <th style={{ padding: '16px 24px', textAlign: 'left', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Estrato</th>
+                            <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Estrato</th>
                           )}
-                          <th style={{ padding: '16px 24px', textAlign: 'left', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Coordenadas GPS</th>
-                          <th style={{ padding: '16px 24px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', width: '110px' }}>Área (m²)</th>
-                          <th style={{ padding: '16px 24px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', width: '110px' }}>Árvores</th>
-                          <th style={{ padding: '16px 24px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', width: '320px' }}>Ações de Auditoria</th>
+                          <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Coordenadas GPS</th>
+                          <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', width: '110px' }}>Área (m²)</th>
+                          <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', width: '110px' }}>Árvores</th>
+                          <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', width: '320px' }}>Ações de Auditoria</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -3118,10 +3116,10 @@ export const OfficeDashboard = () => {
                           const talName = activeTalhoes.find(t => t.id === p.talhaoId)?.nome || 'Sem Talhão';
                           return (
                             <tr key={p.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-                              <td style={{ padding: '18px 24px', fontWeight: 'bold' }}>{p.nome}</td>
-                              <td style={{ padding: '18px 24px', color: '#ff9800', fontSize: '13.5px', fontWeight: 'bold' }}>{talName}</td>
+                              <td style={{ padding: '12px 16px', fontWeight: 'bold' }}>{p.nome}</td>
+                              <td style={{ padding: '12px 16px', color: '#ff9800', fontSize: '13.5px', fontWeight: 'bold' }}>{talName}</td>
                               {activeStrata.length > 0 && (
-                                <td style={{ padding: '18px 24px' }}>
+                                <td style={{ padding: '12px 16px' }}>
                                   <select 
                                     value={p.stratumId || ''} 
                                     onChange={async (e) => {
@@ -3149,14 +3147,14 @@ export const OfficeDashboard = () => {
                                   </select>
                                 </td>
                               )}
-                              <td style={{ padding: '18px 24px', fontFamily: 'monospace', fontSize: '12px', color: 'var(--text-muted)' }}>{p.coordenadas || 'Não coletada'}</td>
-                              <td style={{ padding: '18px 24px', textAlign: 'center' }}>{p.areaParcela}</td>
-                              <td style={{ padding: '18px 24px', textAlign: 'center', color: '#aed581', fontWeight: 'bold' }}>{p.dados.length}</td>
-                              <td style={{ padding: '18px 24px', textAlign: 'center' }}>
-                                <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                              <td style={{ padding: '12px 16px', fontFamily: 'monospace', fontSize: '12px', color: 'var(--text-muted)' }}>{p.coordenadas || 'Não coletada'}</td>
+                              <td style={{ padding: '12px 16px', textAlign: 'center' }}>{p.areaParcela}</td>
+                              <td style={{ padding: '12px 16px', textAlign: 'center', color: '#aed581', fontWeight: 'bold' }}>{p.dados.length}</td>
+                              <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                                <div style={{ display: 'inline-flex', gap: '6px', justifyContent: 'center', alignItems: 'center', whiteSpace: 'nowrap' }}>
                                   <button 
                                     className="btn btn-secondary" 
-                                    style={{ width: 'auto', padding: '6px 12px', fontSize: '11px' }} 
+                                    style={{ width: 'auto', padding: '4px 8px', fontSize: '10px', height: '26px', margin: 0 }} 
                                     onClick={() => setAuditParcelId(p.id)}
                                   >
                                     Auditar Dados
@@ -3165,14 +3163,14 @@ export const OfficeDashboard = () => {
                                     <>
                                       <button 
                                         className="btn btn-secondary" 
-                                        style={{ width: 'auto', padding: '6px 12px', fontSize: '11px', borderColor: '#2e7d32', color: '#a5d6a7', background: 'rgba(46, 125, 50, 0.08)' }} 
+                                        style={{ width: 'auto', padding: '4px 8px', fontSize: '10px', height: '26px', borderColor: '#2e7d32', color: '#a5d6a7', background: 'rgba(46, 125, 50, 0.08)', margin: 0 }} 
                                         onClick={() => setShowParcelDashboardId(p.id)}
                                       >
                                         Dashboard
                                       </button>
                                       <button 
                                         className="btn btn-secondary" 
-                                        style={{ width: 'auto', padding: '6px 12px', fontSize: '11px', borderColor: 'var(--primary-color)', color: 'var(--primary-color)' }} 
+                                        style={{ width: 'auto', padding: '4px 8px', fontSize: '10px', height: '26px', borderColor: 'var(--primary-color)', color: 'var(--primary-color)', margin: 0 }} 
                                         onClick={() => handleExportParcelProcessed(p)}
                                       >
                                         Exportar Excel
@@ -3215,28 +3213,28 @@ export const OfficeDashboard = () => {
                       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                         <thead>
                           <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                            <th style={{ padding: '12px 20px', textAlign: 'left', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Nome do Estrato</th>
-                            <th style={{ padding: '12px 20px', textAlign: 'left', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Descrição</th>
-                            <th style={{ padding: '12px 20px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', width: '120px' }}>Área (ha)</th>
-                            <th style={{ padding: '12px 20px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', width: '120px' }}>Peso (Wh)</th>
-                            <th style={{ padding: '12px 20px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', width: '120px' }}>Nº Parcelas</th>
-                            <th style={{ padding: '12px 20px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', width: '220px' }}>Ações</th>
+                            <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Nome do Estrato</th>
+                            <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Descrição</th>
+                            <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', width: '120px' }}>Área (ha)</th>
+                            <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', width: '120px' }}>Peso (Wh)</th>
+                            <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', width: '120px' }}>Nº Parcelas</th>
+                            <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', width: '220px' }}>Ações</th>
                           </tr>
                         </thead>
                         <tbody>
                           {stratifiedStats.strataDetails.map(d => (
                             <tr key={d.stratum.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-                              <td style={{ padding: '14px 20px', fontWeight: 'bold' }}>{d.stratum.nome}</td>
-                              <td style={{ padding: '14px 20px', color: 'var(--text-muted)', fontSize: '12.5px' }}>{d.stratum.descricao || 'Sem descrição'}</td>
-                              <td style={{ padding: '14px 20px', textAlign: 'center', fontWeight: 'bold' }}>{d.stratum.area} ha</td>
-                              <td style={{ padding: '14px 20px', textAlign: 'center', color: '#ffb74d', fontWeight: 'bold' }}>{(d.Wh * 100).toFixed(1)}%</td>
-                              <td style={{ padding: '14px 20px', textAlign: 'center', fontWeight: 'bold', color: '#4fc3f7' }}>{d.nh}</td>
-                              <td style={{ padding: '14px 20px', textAlign: 'center' }}>
-                                <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                              <td style={{ padding: '12px 16px', fontWeight: 'bold' }}>{d.stratum.nome}</td>
+                              <td style={{ padding: '12px 16px', color: 'var(--text-muted)', fontSize: '12.5px' }}>{d.stratum.descricao || 'Sem descrição'}</td>
+                              <td style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 'bold' }}>{d.stratum.area} ha</td>
+                              <td style={{ padding: '12px 16px', textAlign: 'center', color: '#ffb74d', fontWeight: 'bold' }}>{(d.Wh * 100).toFixed(1)}%</td>
+                              <td style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 'bold', color: '#4fc3f7' }}>{d.nh}</td>
+                              <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                                <div style={{ display: 'inline-flex', gap: '6px', justifyContent: 'center', alignItems: 'center', whiteSpace: 'nowrap' }}>
                                   {d.nh > 0 && (
                                     <button 
                                       className="btn btn-secondary" 
-                                      style={{ width: 'auto', padding: '6px 12px', fontSize: '11px', borderColor: '#2e7d32', color: '#a5d6a7', background: 'rgba(46, 125, 50, 0.08)' }} 
+                                      style={{ width: 'auto', padding: '4px 8px', fontSize: '10px', height: '26px', borderColor: '#2e7d32', color: '#a5d6a7', background: 'rgba(46, 125, 50, 0.08)', margin: 0 }} 
                                       onClick={() => setStratumDashboardId(d.stratum.id)}
                                     >
                                       Dashboard
@@ -3244,7 +3242,7 @@ export const OfficeDashboard = () => {
                                   )}
                                   <button 
                                     className="btn btn-danger" 
-                                    style={{ width: 'auto', padding: '4px 10px', fontSize: '10px', height: 'auto' }} 
+                                    style={{ width: 'auto', padding: '4px 8px', fontSize: '10px', height: '26px', margin: 0, lineHeight: 'normal' }} 
                                     onClick={() => {
                                       if (confirm(`Deseja deletar o estrato ${d.stratum.nome}? Todas as parcelas associadas a ele ficarão sem estrato.`)) {
                                         deleteStratum(d.stratum.id);
@@ -3278,8 +3276,18 @@ export const OfficeDashboard = () => {
                           <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Erro de Amostragem Relativo</span>
                           <span style={{ fontSize: '18px', color: stratifiedStats.errorRel <= 10 ? '#aed581' : '#ffb74d', fontWeight: '800', display: 'block', marginTop: '4px' }}>
                             {stratifiedStats.errorRel.toFixed(2)}%
-                            <span style={{ fontSize: '10px', display: 'block', color: 'var(--text-muted)', fontWeight: 'normal', marginTop: '2px' }}>
-                              {stratifiedStats.errorRel <= 10 ? '✅ Dentro do limite (10%)' : '⚠️ Fora do limite (10%)'}
+                            <span style={{ fontSize: '10px', display: 'flex', alignItems: 'center', color: 'var(--text-muted)', fontWeight: 'normal', marginTop: '4px' }}>
+                              {stratifiedStats.errorRel <= 10 ? (
+                                <>
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#aed581" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '4px' }}><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                  Dentro do limite (10%)
+                                </>
+                              ) : (
+                                <>
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ffb74d" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '4px' }}><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                                  Fora do limite (10%)
+                                </>
+                              )}
                             </span>
                           </span>
                         </div>
@@ -3296,8 +3304,9 @@ export const OfficeDashboard = () => {
                           </span>
                         </div>
                       </div>
-                      <div style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: 1.5 }}>
-                        ℹ️ **Nota Silvicultural**: Os cálculos utilizam a metodologia oficial de Amostragem Casual Estratificada (Student t = {2.0} com 95% de confiança). Para resultados estatisticamente válidos, certifique-se de cadastrar pelo menos 2 parcelas em cada estrato.
+                      <div style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: 1.5, display: 'flex', alignItems: 'center' }}>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--primary-color)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px', flexShrink: 0 }}><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                        <span><strong>Nota Silvicultural</strong>: Os cálculos utilizam a metodologia oficial de Amostragem Casual Estratificada (Student t = {2.0} com 95% de confiança). Para resultados estatisticamente válidos, certifique-se de cadastrar pelo menos 2 parcelas em cada estrato.</span>
                       </div>
                     </div>
                   </>
@@ -3315,14 +3324,14 @@ export const OfficeDashboard = () => {
                     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                       <thead>
                         <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                          <th style={{ padding: '16px 24px', textAlign: 'left', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Árvore</th>
-                          <th style={{ padding: '16px 24px', textAlign: 'left', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Sessão de Cubagem</th>
-                          <th style={{ padding: '16px 24px', textAlign: 'left', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Espécie</th>
-                          <th style={{ padding: '16px 24px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', width: '120px' }}>Altura (m)</th>
-                          <th style={{ padding: '16px 24px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', width: '150px' }}>Método Utilizado</th>
+                          <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Árvore</th>
+                          <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Sessão de Cubagem</th>
+                          <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Espécie</th>
+                          <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', width: '120px' }}>Altura (m)</th>
+                          <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', width: '150px' }}>Método Utilizado</th>
                           <th 
                             style={{ 
-                              padding: '16px 24px', 
+                              padding: '12px 16px', 
                               textAlign: 'center', 
                               fontSize: '11px', 
                               color: 'var(--primary-hover)', 
@@ -3337,17 +3346,17 @@ export const OfficeDashboard = () => {
                           >
                             Volume Total (m³) {cubageSortOrder === 'desc' ? '▼' : cubageSortOrder === 'asc' ? '▲' : ''}
                           </th>
-                          <th style={{ padding: '16px 24px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', width: '140px' }}>Data do Cálculo</th>
+                          <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', width: '140px' }}>Data do Cálculo</th>
                         </tr>
                       </thead>
                       <tbody>
                         {allCubagedTrees.map((tree, idx) => (
                           <tr key={tree.id || idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-                            <td style={{ padding: '18px 24px', fontWeight: 'bold' }}>#{tree.numeroIndividuo}</td>
-                            <td style={{ padding: '18px 24px', color: 'var(--text-muted)' }}>{tree.sessionName}</td>
-                            <td style={{ padding: '18px 24px', fontStyle: 'italic' }}>{tree.especie}</td>
-                            <td style={{ padding: '18px 24px', textAlign: 'center' }}>{tree.alturaTotal ? `${tree.alturaTotal.toFixed(2)} m` : '-'}</td>
-                            <td style={{ padding: '18px 24px', textAlign: 'center', textTransform: 'capitalize' }}>
+                            <td style={{ padding: '12px 16px', fontWeight: 'bold' }}>#{tree.numeroIndividuo}</td>
+                            <td style={{ padding: '12px 16px', color: 'var(--text-muted)' }}>{tree.sessionName}</td>
+                            <td style={{ padding: '12px 16px', fontStyle: 'italic' }}>{tree.especie}</td>
+                            <td style={{ padding: '12px 16px', textAlign: 'center' }}>{tree.alturaTotal ? `${tree.alturaTotal.toFixed(2)} m` : '-'}</td>
+                            <td style={{ padding: '12px 16px', textAlign: 'center', textTransform: 'capitalize' }}>
                               <span style={{
                                 padding: '4px 8px',
                                 borderRadius: '6px',
@@ -3358,10 +3367,10 @@ export const OfficeDashboard = () => {
                                 {tree.metodoCalculo}
                               </span>
                             </td>
-                            <td style={{ padding: '18px 24px', textAlign: 'center', color: '#00e676', fontWeight: 'bold', fontSize: '15px' }}>
+                            <td style={{ padding: '12px 16px', textAlign: 'center', color: '#00e676', fontWeight: 'bold', fontSize: '15px' }}>
                               {tree.volumeTotal ? `${tree.volumeTotal.toFixed(4).replace('.', ',')}` : '0,0000'}
                             </td>
-                            <td style={{ padding: '18px 24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
+                            <td style={{ padding: '12px 16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
                               {tree.dataCalculo || '-'}
                             </td>
                           </tr>
@@ -3407,27 +3416,27 @@ export const OfficeDashboard = () => {
                           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                             <thead>
                               <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', background: 'rgba(0,0,0,0.1)' }}>
-                                <th style={{ padding: '16px 20px', textAlign: 'left', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Parcela</th>
-                                <th style={{ padding: '16px 20px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Área (m²)</th>
-                                <th style={{ padding: '16px 20px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Fator Expansão</th>
-                                <th style={{ padding: '16px 20px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Vol. Total (m³)</th>
-                                <th style={{ padding: '16px 20px', textAlign: 'center', fontSize: '11px', color: 'var(--primary-hover)', textTransform: 'uppercase' }}>Vol. / ha (m³)</th>
-                                <th style={{ padding: '16px 20px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>G / ha (m²)</th>
-                                <th style={{ padding: '16px 20px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Árvores / ha</th>
-                                <th style={{ padding: '16px 20px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Status</th>
+                                <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Parcela</th>
+                                <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Área (m²)</th>
+                                <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Fator Expansão</th>
+                                <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Vol. Total (m³)</th>
+                                <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '11px', color: 'var(--primary-hover)', textTransform: 'uppercase' }}>Vol. / ha (m³)</th>
+                                <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>G / ha (m²)</th>
+                                <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Árvores / ha</th>
+                                <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Status</th>
                               </tr>
                             </thead>
                             <tbody>
                               {extrapolationData.processedParcels.map(p => (
                                 <tr key={p.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-                                  <td style={{ padding: '16px 20px', fontWeight: 'bold' }}>{p.nome}</td>
-                                  <td style={{ padding: '16px 20px', textAlign: 'center' }}>{p.areaParcela.toFixed(1)}</td>
-                                  <td style={{ padding: '16px 20px', textAlign: 'center', color: 'var(--text-muted)' }}>{p.isProcessed ? p.fatorExpansao.toFixed(2) : '-'}</td>
-                                  <td style={{ padding: '16px 20px', textAlign: 'center' }}>{p.isProcessed ? p.volumeTotalParcela.toFixed(4) : '-'}</td>
-                                  <td style={{ padding: '16px 20px', textAlign: 'center', fontWeight: 'bold', color: '#00e676' }}>{p.isProcessed ? p.volumePorHa.toFixed(2) : '-'}</td>
-                                  <td style={{ padding: '16px 20px', textAlign: 'center' }}>{p.isProcessed ? p.areaBasalPorHa.toFixed(3) : '-'}</td>
-                                  <td style={{ padding: '16px 20px', textAlign: 'center' }}>{p.isProcessed ? p.densidadePorHa.toFixed(1) : '-'}</td>
-                                  <td style={{ padding: '16px 20px', textAlign: 'center' }}>
+                                  <td style={{ padding: '12px 16px', fontWeight: 'bold' }}>{p.nome}</td>
+                                  <td style={{ padding: '12px 16px', textAlign: 'center' }}>{p.areaParcela.toFixed(1)}</td>
+                                  <td style={{ padding: '12px 16px', textAlign: 'center', color: 'var(--text-muted)' }}>{p.isProcessed ? p.fatorExpansao.toFixed(2) : '-'}</td>
+                                  <td style={{ padding: '12px 16px', textAlign: 'center' }}>{p.isProcessed ? p.volumeTotalParcela.toFixed(4) : '-'}</td>
+                                  <td style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 'bold', color: '#00e676' }}>{p.isProcessed ? p.volumePorHa.toFixed(2) : '-'}</td>
+                                  <td style={{ padding: '12px 16px', textAlign: 'center' }}>{p.isProcessed ? p.areaBasalPorHa.toFixed(3) : '-'}</td>
+                                  <td style={{ padding: '12px 16px', textAlign: 'center' }}>{p.isProcessed ? p.densidadePorHa.toFixed(1) : '-'}</td>
+                                  <td style={{ padding: '12px 16px', textAlign: 'center' }}>
                                     {p.isProcessed ? (
                                       <span style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '11px', background: 'rgba(76, 175, 80, 0.15)', color: '#4caf50', fontWeight: 'bold' }}>Processado</span>
                                     ) : (
@@ -3440,7 +3449,7 @@ export const OfficeDashboard = () => {
                           </table>
                         </div>
                         {extrapolationData.processedParcels.some(p => !p.isProcessed) && (
-                          <div style={{ padding: '16px 20px', background: 'rgba(244, 67, 54, 0.08)', borderTop: '1px solid rgba(244, 67, 54, 0.15)', color: '#ef5350', fontSize: '13px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                          <div style={{ padding: '12px 16px', background: 'rgba(244, 67, 54, 0.08)', borderTop: '1px solid rgba(244, 67, 54, 0.15)', color: '#ef5350', fontSize: '13px', display: 'flex', gap: '8px', alignItems: 'center' }}>
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
                             <span>Esta parcela ainda não foi processada.</span>
                           </div>
@@ -3454,29 +3463,29 @@ export const OfficeDashboard = () => {
                           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                             <thead>
                               <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', background: 'rgba(0,0,0,0.1)' }}>
-                                <th style={{ padding: '16px 20px', textAlign: 'left', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Talhão</th>
-                                <th style={{ padding: '16px 20px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Área Talhão (ha)</th>
-                                <th style={{ padding: '16px 20px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Parcelas Processadas</th>
-                                <th style={{ padding: '16px 20px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Área Amostrada (m²)</th>
-                                <th style={{ padding: '16px 20px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Vol. Médio / ha (m³)</th>
-                                <th style={{ padding: '16px 20px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>G Médio / ha (m²)</th>
-                                <th style={{ padding: '16px 20px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>DAP Médio (cm)</th>
-                                <th style={{ padding: '16px 20px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Altura Média (m)</th>
-                                <th style={{ padding: '16px 20px', textAlign: 'center', fontSize: '11px', color: 'var(--primary-hover)', textTransform: 'uppercase' }}>Volume Total (m³)</th>
+                                <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Talhão</th>
+                                <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Área Talhão (ha)</th>
+                                <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Parcelas Processadas</th>
+                                <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Área Amostrada (m²)</th>
+                                <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Vol. Médio / ha (m³)</th>
+                                <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>G Médio / ha (m²)</th>
+                                <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>DAP Médio (cm)</th>
+                                <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Altura Média (m)</th>
+                                <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '11px', color: 'var(--primary-hover)', textTransform: 'uppercase' }}>Volume Total (m³)</th>
                               </tr>
                             </thead>
                             <tbody>
                               {extrapolationData.talhoesResults.map(t => (
                                 <tr key={t.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-                                  <td style={{ padding: '16px 20px', fontWeight: 'bold' }}>{t.nome}</td>
-                                  <td style={{ padding: '16px 20px', textAlign: 'center' }}>{t.areaTalhaoHa > 0 ? t.areaTalhaoHa.toFixed(2) : 'Não Informado'}</td>
-                                  <td style={{ padding: '16px 20px', textAlign: 'center' }}>{t.numParcelas}</td>
-                                  <td style={{ padding: '16px 20px', textAlign: 'center', color: 'var(--text-muted)' }}>{t.areaAmostradaTotal.toFixed(1)}</td>
-                                  <td style={{ padding: '16px 20px', textAlign: 'center', fontWeight: 'bold' }}>{t.numParcelas > 0 ? t.volumeMedioPorHa.toFixed(2) : '-'}</td>
-                                  <td style={{ padding: '16px 20px', textAlign: 'center' }}>{t.numParcelas > 0 ? t.areaBasalMedioPorHa.toFixed(3) : '-'}</td>
-                                  <td style={{ padding: '16px 20px', textAlign: 'center' }}>{t.numParcelas > 0 ? t.dapMedio.toFixed(2) : '-'}</td>
-                                  <td style={{ padding: '16px 20px', textAlign: 'center' }}>{t.numParcelas > 0 ? t.alturaMedio.toFixed(2) : '-'}</td>
-                                  <td style={{ padding: '16px 20px', textAlign: 'center', fontWeight: 'bold', color: '#00e676', fontSize: '14px' }}>
+                                  <td style={{ padding: '12px 16px', fontWeight: 'bold' }}>{t.nome}</td>
+                                  <td style={{ padding: '12px 16px', textAlign: 'center' }}>{t.areaTalhaoHa > 0 ? t.areaTalhaoHa.toFixed(2) : 'Não Informado'}</td>
+                                  <td style={{ padding: '12px 16px', textAlign: 'center' }}>{t.numParcelas}</td>
+                                  <td style={{ padding: '12px 16px', textAlign: 'center', color: 'var(--text-muted)' }}>{t.areaAmostradaTotal.toFixed(1)}</td>
+                                  <td style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 'bold' }}>{t.numParcelas > 0 ? t.volumeMedioPorHa.toFixed(2) : '-'}</td>
+                                  <td style={{ padding: '12px 16px', textAlign: 'center' }}>{t.numParcelas > 0 ? t.areaBasalMedioPorHa.toFixed(3) : '-'}</td>
+                                  <td style={{ padding: '12px 16px', textAlign: 'center' }}>{t.numParcelas > 0 ? t.dapMedio.toFixed(2) : '-'}</td>
+                                  <td style={{ padding: '12px 16px', textAlign: 'center' }}>{t.numParcelas > 0 ? t.alturaMedio.toFixed(2) : '-'}</td>
+                                  <td style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 'bold', color: '#00e676', fontSize: '14px' }}>
                                     {t.numParcelas > 0 && t.areaTalhaoHa > 0 ? t.volumeTotalTalhao.toFixed(2) : '-'}
                                   </td>
                                 </tr>
@@ -3493,27 +3502,27 @@ export const OfficeDashboard = () => {
                           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                             <thead>
                               <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', background: 'rgba(0,0,0,0.1)' }}>
-                                <th style={{ padding: '16px 20px', textAlign: 'left', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Estrato</th>
-                                <th style={{ padding: '16px 20px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Área Estrato (ha)</th>
-                                <th style={{ padding: '16px 20px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Parcelas Processadas</th>
-                                <th style={{ padding: '16px 20px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Área Amostrada (m²)</th>
-                                <th style={{ padding: '16px 20px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Vol. Médio / ha (m³)</th>
-                                <th style={{ padding: '16px 20px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>G Médio / ha (m²)</th>
-                                <th style={{ padding: '16px 20px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Densidade Média / ha</th>
-                                <th style={{ padding: '16px 20px', textAlign: 'center', fontSize: '11px', color: 'var(--primary-hover)', textTransform: 'uppercase' }}>Volume Total (m³)</th>
+                                <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Estrato</th>
+                                <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Área Estrato (ha)</th>
+                                <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Parcelas Processadas</th>
+                                <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Área Amostrada (m²)</th>
+                                <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Vol. Médio / ha (m³)</th>
+                                <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>G Médio / ha (m²)</th>
+                                <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Densidade Média / ha</th>
+                                <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '11px', color: 'var(--primary-hover)', textTransform: 'uppercase' }}>Volume Total (m³)</th>
                               </tr>
                             </thead>
                             <tbody>
                               {extrapolationData.strataResults.map(s => (
                                 <tr key={s.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-                                  <td style={{ padding: '16px 20px', fontWeight: 'bold' }}>{s.nome}</td>
-                                  <td style={{ padding: '16px 20px', textAlign: 'center' }}>{s.areaEstratoHa > 0 ? s.areaEstratoHa.toFixed(2) : 'Não Informado'}</td>
-                                  <td style={{ padding: '16px 20px', textAlign: 'center' }}>{s.numParcelas}</td>
-                                  <td style={{ padding: '16px 20px', textAlign: 'center', color: 'var(--text-muted)' }}>{s.areaAmostradaTotal.toFixed(1)}</td>
-                                  <td style={{ padding: '16px 20px', textAlign: 'center', fontWeight: 'bold' }}>{s.numParcelas > 0 ? s.volumeMedioPorHa.toFixed(2) : '-'}</td>
-                                  <td style={{ padding: '16px 20px', textAlign: 'center' }}>{s.numParcelas > 0 ? s.areaBasalMedioPorHa.toFixed(3) : '-'}</td>
-                                  <td style={{ padding: '16px 20px', textAlign: 'center' }}>{s.numParcelas > 0 ? s.densidadeMedioPorHa.toFixed(1) : '-'}</td>
-                                  <td style={{ padding: '16px 20px', textAlign: 'center', fontWeight: 'bold', color: '#00e676', fontSize: '14px' }}>
+                                  <td style={{ padding: '12px 16px', fontWeight: 'bold' }}>{s.nome}</td>
+                                  <td style={{ padding: '12px 16px', textAlign: 'center' }}>{s.areaEstratoHa > 0 ? s.areaEstratoHa.toFixed(2) : 'Não Informado'}</td>
+                                  <td style={{ padding: '12px 16px', textAlign: 'center' }}>{s.numParcelas}</td>
+                                  <td style={{ padding: '12px 16px', textAlign: 'center', color: 'var(--text-muted)' }}>{s.areaAmostradaTotal.toFixed(1)}</td>
+                                  <td style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 'bold' }}>{s.numParcelas > 0 ? s.volumeMedioPorHa.toFixed(2) : '-'}</td>
+                                  <td style={{ padding: '12px 16px', textAlign: 'center' }}>{s.numParcelas > 0 ? s.areaBasalMedioPorHa.toFixed(3) : '-'}</td>
+                                  <td style={{ padding: '12px 16px', textAlign: 'center' }}>{s.numParcelas > 0 ? s.densidadeMedioPorHa.toFixed(1) : '-'}</td>
+                                  <td style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 'bold', color: '#00e676', fontSize: '14px' }}>
                                     {s.numParcelas > 0 && s.areaEstratoHa > 0 ? s.volumeTotalEstrato.toFixed(2) : '-'}
                                   </td>
                                 </tr>
@@ -3634,32 +3643,32 @@ export const OfficeDashboard = () => {
                       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                         <thead>
                           <tr style={{ background: 'rgba(0,0,0,0.1)' }}>
-                            <th style={{ padding: '16px 20px', fontSize: '11px', color: 'var(--text-muted)' }}>Nome do Processamento</th>
-                            <th style={{ padding: '16px 20px', fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center' }}>Data</th>
-                            <th style={{ padding: '16px 20px', fontSize: '11px', color: 'var(--text-muted)' }}>Responsável</th>
-                            <th style={{ padding: '16px 20px', fontSize: '11px', color: 'var(--text-muted)' }}>Equações H / V</th>
-                            <th style={{ padding: '16px 20px', fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center' }}>Modo</th>
-                            <th style={{ padding: '16px 20px', fontSize: '11px', color: 'var(--text-muted)', textAlign: 'right' }}>Vol. Total CC / SC (m³)</th>
-                            <th style={{ padding: '16px 20px', fontSize: '11px', color: 'var(--text-muted)', textAlign: 'right' }}>Média CC / SC (m³/ha)</th>
-                            <th style={{ padding: '16px 20px', fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center' }}>Ações</th>
+                            <th style={{ padding: '12px 16px', fontSize: '11px', color: 'var(--text-muted)' }}>Nome do Processamento</th>
+                            <th style={{ padding: '12px 16px', fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center' }}>Data</th>
+                            <th style={{ padding: '12px 16px', fontSize: '11px', color: 'var(--text-muted)' }}>Responsável</th>
+                            <th style={{ padding: '12px 16px', fontSize: '11px', color: 'var(--text-muted)' }}>Equações H / V</th>
+                            <th style={{ padding: '12px 16px', fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center' }}>Modo</th>
+                            <th style={{ padding: '12px 16px', fontSize: '11px', color: 'var(--text-muted)', textAlign: 'right' }}>Vol. Total CC / SC (m³)</th>
+                            <th style={{ padding: '12px 16px', fontSize: '11px', color: 'var(--text-muted)', textAlign: 'right' }}>Média CC / SC (m³/ha)</th>
+                            <th style={{ padding: '12px 16px', fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center' }}>Ações</th>
                           </tr>
                         </thead>
                         <tbody>
                           {activeProcessings.map(proc => (
                             <tr key={proc.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-                              <td style={{ padding: '16px 20px', fontWeight: 'bold', fontSize: '14.5px', color: '#fff' }}>{proc.nomeProcessamento}</td>
-                              <td style={{ padding: '16px 20px', textAlign: 'center', fontSize: '13px', color: 'var(--text-muted)' }}>{proc.dataProcessamento}</td>
-                              <td style={{ padding: '16px 20px', fontSize: '13px' }}>{proc.createdBy}</td>
-                              <td style={{ padding: '16px 20px', fontSize: '12px', color: 'var(--text-muted)', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              <td style={{ padding: '12px 16px', fontWeight: 'bold', fontSize: '14.5px', color: '#fff' }}>{proc.nomeProcessamento}</td>
+                              <td style={{ padding: '12px 16px', textAlign: 'center', fontSize: '13px', color: 'var(--text-muted)' }}>{proc.dataProcessamento}</td>
+                              <td style={{ padding: '12px 16px', fontSize: '13px' }}>{proc.createdBy}</td>
+                              <td style={{ padding: '12px 16px', fontSize: '12px', color: 'var(--text-muted)', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                 H: {proc.heightModelSnapshot ? proc.heightModelSnapshot.nome : 'Medida'} <br />
                                 V: {proc.volumeModelSnapshot ? proc.volumeModelSnapshot.nome : '-'}
                               </td>
-                              <td style={{ padding: '16px 20px', textAlign: 'center', fontSize: '12px' }}>
+                              <td style={{ padding: '12px 16px', textAlign: 'center', fontSize: '12px' }}>
                                 <span style={{ padding: '3px 8px', borderRadius: '6px', background: 'rgba(255,255,255,0.04)', color: 'var(--text-muted)' }}>
                                   {proc.effectiveConsolidationMode === 'stratum' ? 'Estrato' : 'Talhão'}{proc.consolidationMode === 'auto' ? ' (Auto)' : ''}
                                 </span>
                               </td>
-                              <td style={{ padding: '16px 20px', textAlign: 'right', fontSize: '13px' }}>
+                              <td style={{ padding: '12px 16px', textAlign: 'right', fontSize: '13px' }}>
                                 <div style={{ fontWeight: 'bold', color: '#81c784' }} title="Com Casca">
                                   {proc.volumeTotalEstimado.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} CC
                                 </div>
@@ -3667,7 +3676,7 @@ export const OfficeDashboard = () => {
                                   {(proc.volumeTotalEstimadoSemCasca || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} SC
                                 </div>
                               </td>
-                              <td style={{ padding: '16px 20px', textAlign: 'right', fontSize: '13px' }}>
+                              <td style={{ padding: '12px 16px', textAlign: 'right', fontSize: '13px' }}>
                                 <div style={{ color: 'var(--text-muted)' }} title="Com Casca">
                                   {proc.volumeMedioHa.toFixed(2)} CC
                                 </div>
@@ -3675,34 +3684,37 @@ export const OfficeDashboard = () => {
                                   {(proc.volumeMedioHaSemCasca || 0).toFixed(2)} SC
                                 </div>
                               </td>
-                              <td style={{ padding: '16px 20px', textAlign: 'center' }}>
-                                <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
+                              <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                                <div style={{ display: 'inline-flex', gap: '6px', justifyContent: 'center', alignItems: 'center', whiteSpace: 'nowrap' }}>
                                   <button 
                                     className="btn btn-secondary" 
-                                    style={{ width: 'auto', padding: '6px 10px', height: '28px', fontSize: '10px' }}
+                                    style={{ width: 'auto', padding: '6px 10px', height: '28px', fontSize: '10px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
                                     onClick={() => setSelectedReportProcessing(proc)}
                                     title="Visualizar Relatório Executivo"
                                   >
-                                    📄 Relatório
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+                                    Relatório
                                   </button>
                                   <button 
                                     className="btn btn-secondary" 
-                                    style={{ width: 'auto', padding: '6px 10px', height: '28px', fontSize: '10px' }}
+                                    style={{ width: 'auto', padding: '6px 10px', height: '28px', fontSize: '10px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
                                     onClick={() => handleDuplicarConfiguracao(proc)}
                                     title="Duplicar Configurações no Painel"
                                   >
-                                    ⚙️ Duplicar Configuração
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                                    Duplicar Configuração
                                   </button>
                                   <button 
                                     className="btn btn-danger" 
-                                    style={{ width: 'auto', padding: '6px 10px', height: '28px', fontSize: '10px' }}
+                                    style={{ width: 'auto', padding: '6px 10px', height: '28px', fontSize: '10px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
                                     onClick={async () => {
                                       if (confirm(`Deseja realmente deletar permanentemente o processamento "${proc.nomeProcessamento}"?`)) {
                                         await deleteProcessing(proc.id);
                                       }
                                     }}
                                   >
-                                    🗑️ Excluir
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                                    Excluir
                                   </button>
                                 </div>
                               </td>
@@ -3942,17 +3954,19 @@ export const OfficeDashboard = () => {
                     <div style={{ display: 'flex', gap: '8px' }}>
                       <button 
                         className="btn btn-primary" 
-                        style={{ width: 'auto', padding: '8px 16px', fontSize: '11px', height: '36px' }}
+                        style={{ width: 'auto', padding: '8px 16px', fontSize: '11px', height: '36px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
                         onClick={() => window.print()}
                       >
-                        🖨️ Imprimir / PDF
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+                        Imprimir / PDF
                       </button>
                       <button 
                         className="btn btn-secondary" 
-                        style={{ width: 'auto', padding: '8px 16px', fontSize: '11px', height: '36px', borderColor: '#4caf50', color: '#4caf50' }}
+                        style={{ width: 'auto', padding: '8px 16px', fontSize: '11px', height: '36px', borderColor: '#4caf50', color: '#4caf50', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
                         onClick={() => handleExportAdvancedXLSX(selectedReportProcessing)}
                       >
-                        📥 Planilha XLSX
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                        Planilha XLSX
                       </button>
                       <button 
                         className="btn btn-secondary" 

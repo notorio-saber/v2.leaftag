@@ -599,18 +599,20 @@ export const SortimentoTab = ({ activeFw, inventories, activeTalhoes }: Sortimen
                           <button className="btn btn-secondary" style={{ width: 'auto', padding: '6px 8px', height: '26px', fontSize: '10px' }} onClick={() => handleMoveRule(rule, 'down')} disabled={idx === sortimentRules.length - 1}>
                             ▼
                           </button>
-                          <button className="btn btn-secondary" style={{ width: 'auto', padding: '6px 10px', height: '26px', fontSize: '10px' }} onClick={() => handleOpenEditRule(rule)}>
-                            ✏️ Editar
+                          <button className="btn btn-secondary" style={{ width: 'auto', padding: '6px 10px', height: '26px', fontSize: '10px', display: 'inline-flex', alignItems: 'center', gap: '4px' }} onClick={() => handleOpenEditRule(rule)}>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                            Editar
                           </button>
-                          <button className="btn btn-secondary" style={{ width: 'auto', padding: '6px 10px', height: '26px', fontSize: '10px' }} onClick={() => handleDuplicateRule(rule)}>
-                            ⚙️ Copiar
+                          <button className="btn btn-secondary" style={{ width: 'auto', padding: '6px 10px', height: '26px', fontSize: '10px', display: 'inline-flex', alignItems: 'center', gap: '4px' }} onClick={() => handleDuplicateRule(rule)}>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                            Copiar
                           </button>
-                          <button className="btn btn-danger" style={{ width: 'auto', padding: '6px 10px', height: '26px', fontSize: '10px' }} onClick={async () => {
+                          <button className="btn btn-danger" style={{ width: 'auto', padding: '6px 10px', height: '26px', fontSize: '10px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }} onClick={async () => {
                             if (confirm(`Deseja realmente deletar a regra "${rule.nome}"?`)) {
                               await deleteSortimentRule(rule.id);
                             }
                           }}>
-                            🗑️
+                            <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
                           </button>
                         </div>
                       </td>
@@ -691,8 +693,9 @@ export const SortimentoTab = ({ activeFw, inventories, activeTalhoes }: Sortimen
             (selectedTree.secoes && selectedTree.secoes.some((s: any) => parseFloat(s.eInicial || s.eMedio || s.eFinal) > 0)) ||
             (selectedTree.cascaRelativos && Object.keys(selectedTree.cascaRelativos).length > 0)
           ) && (
-            <div style={{ padding: '12px 16px', background: 'rgba(255, 152, 0, 0.15)', border: '1px solid #ff9800', borderRadius: '12px', color: '#ffb74d', fontSize: '13px', lineHeight: '1.4' }}>
-              ⚠️ Esta árvore não possui medições ou estimativas de casca no fuste. O sortimento será calculado utilizando diâmetros <strong>com casca</strong>.
+            <div style={{ padding: '12px 16px', background: 'rgba(255, 152, 0, 0.15)', border: '1px solid #ff9800', borderRadius: '12px', color: '#ffb74d', fontSize: '13px', lineHeight: '1.4', display: 'flex', alignItems: 'center' }}>
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '8px', flexShrink: 0 }}><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+              <span>Esta árvore não possui medições ou estimativas de casca no fuste. O sortimento será calculado utilizando diâmetros <strong>com casca</strong>.</span>
             </div>
           )}
 
@@ -730,8 +733,9 @@ export const SortimentoTab = ({ activeFw, inventories, activeTalhoes }: Sortimen
                   </div>
 
                   <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
-                    <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleSaveSimulation}>
-                      💾 Persistir Sortimento
+                    <button className="btn btn-primary" style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }} onClick={handleSaveSimulation}>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+                      Persistir Sortimento
                     </button>
                   </div>
                 </div>
@@ -870,15 +874,16 @@ export const SortimentoTab = ({ activeFw, inventories, activeTalhoes }: Sortimen
                       </td>
                       <td style={{ padding: '14px 20px', textAlign: 'center' }}>
                         <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
-                          <button className="btn btn-secondary" style={{ width: 'auto', padding: '6px 12px', height: '28px', fontSize: '11px' }} onClick={() => setViewingResult(res)}>
-                            📄 Detalhes
+                          <button className="btn btn-secondary" style={{ width: 'auto', padding: '6px 12px', height: '28px', fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '4px' }} onClick={() => setViewingResult(res)}>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+                            Detalhes
                           </button>
-                          <button className="btn btn-danger" style={{ width: 'auto', padding: '6px 12px', height: '28px', fontSize: '11px' }} onClick={async () => {
+                          <button className="btn btn-danger" style={{ width: 'auto', padding: '6px 12px', height: '28px', fontSize: '11px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }} onClick={async () => {
                             if (confirm(`Deletar resultado de sortimento da Árvore #${res.treeNumber}?`)) {
                               await deleteSortimentResult(res.id);
                             }
                           }}>
-                            🗑️
+                            <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
                           </button>
                         </div>
                       </td>
@@ -904,8 +909,9 @@ export const SortimentoTab = ({ activeFw, inventories, activeTalhoes }: Sortimen
             </div>
             {activeResults.length > 0 && (
               <div style={{ display: 'flex', gap: '8px' }}>
-                <button className="btn btn-secondary" style={{ width: 'auto', padding: '10px 20px', borderColor: '#4caf50', color: '#4caf50' }} onClick={handleExportSortimentoXLSX}>
-                  📥 Exportar Planilha XLSX
+                <button className="btn btn-secondary" style={{ width: 'auto', padding: '10px 20px', borderColor: '#4caf50', color: '#4caf50', display: 'inline-flex', alignItems: 'center', gap: '6px' }} onClick={handleExportSortimentoXLSX}>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                  Exportar Planilha XLSX
                 </button>
               </div>
             )}

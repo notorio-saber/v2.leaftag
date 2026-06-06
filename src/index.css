@@ -597,5 +597,84 @@ body.light-theme .btn-danger:hover {
   }
 }
 
+/* Premium Office Dashboard Tabs */
+.office-tab-bar {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 32px;
+  width: 100%;
+}
+
+.office-tab-button {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 14px;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: space-between;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  color: var(--text-muted);
+  min-width: 130px;
+  flex: 1 1 140px;
+  font-family: inherit;
+  text-align: left;
+  position: relative;
+  outline: none;
+}
+
+.office-tab-button:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.15);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
+  color: #fff;
+}
+
+.office-tab-button.active {
+  background: linear-gradient(135deg, rgba(0, 230, 118, 0.12) 0%, rgba(0, 176, 255, 0.08) 100%);
+  border-color: var(--primary-color);
+  color: #ffffff !important;
+  box-shadow: 0 8px 24px rgba(0, 230, 118, 0.15);
+}
+
+.office-tab-button.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 30%;
+  height: 3px;
+  background: var(--primary-color);
+  border-radius: 3px 3px 0 0;
+  box-shadow: 0 0 10px var(--primary-color);
+}
+
+/* Light theme support */
+body.light-theme .office-tab-button {
+  background: rgba(0, 0, 0, 0.02);
+  border-color: rgba(0, 0, 0, 0.08);
+  color: var(--text-muted);
+}
+
+body.light-theme .office-tab-button:hover {
+  background: rgba(0, 0, 0, 0.04);
+  border-color: rgba(0, 0, 0, 0.15);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.05);
+  color: var(--text-main);
+}
+
+body.light-theme .office-tab-button.active {
+  background: linear-gradient(135deg, rgba(0, 230, 118, 0.1) 0%, rgba(0, 176, 255, 0.06) 100%);
+  border-color: var(--primary-color);
+  color: var(--primary-color) !important;
+  box-shadow: 0 8px 24px rgba(0, 230, 118, 0.08);
+}
+
+
 
 
