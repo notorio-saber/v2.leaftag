@@ -49,6 +49,7 @@ export const OfficeDashboard = () => {
     deleteProcessing
   } = useInventory();
   const { currentUser, signOut, status, uidToUse, theme, toggleTheme } = useAuth();
+  const isLight = theme === 'light';
 
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showTeamModal, setShowTeamModal] = useState(false);
@@ -3096,7 +3097,16 @@ export const OfficeDashboard = () => {
                                 <div style={{ display: 'inline-flex', gap: '6px', justifyContent: 'center', alignItems: 'center', whiteSpace: 'nowrap' }}>
                                   <button 
                                     className="btn btn-secondary" 
-                                    style={{ width: 'auto', padding: '4px 8px', fontSize: '10px', height: '26px', borderColor: '#00e676', color: '#00e676', background: 'rgba(0, 230, 118, 0.08)', margin: 0 }} 
+                                    style={{ 
+                                      width: 'auto', 
+                                      padding: '4px 8px', 
+                                      fontSize: '10px', 
+                                      height: '26px', 
+                                      borderColor: isLight ? '#16a34a' : '#00e676', 
+                                      color: isLight ? '#16a34a' : '#00e676', 
+                                      background: isLight ? 'rgba(22, 163, 74, 0.06)' : 'rgba(0, 230, 118, 0.08)', 
+                                      margin: 0 
+                                    }} 
                                     onClick={() => {
                                       setSelectedTalhaoId(t.id);
                                       setActiveTab('parcelas');
@@ -3108,14 +3118,32 @@ export const OfficeDashboard = () => {
                                     <>
                                       <button 
                                         className="btn btn-secondary" 
-                                        style={{ width: 'auto', padding: '4px 8px', fontSize: '10px', height: '26px', borderColor: '#ffb74d', color: '#ffb74d', background: 'rgba(255, 183, 77, 0.08)', margin: 0 }} 
+                                        style={{ 
+                                          width: 'auto', 
+                                          padding: '4px 8px', 
+                                          fontSize: '10px', 
+                                          height: '26px', 
+                                          borderColor: isLight ? '#d97706' : '#ffb74d', 
+                                          color: isLight ? '#d97706' : '#ffb74d', 
+                                          background: isLight ? 'rgba(217, 119, 6, 0.06)' : 'rgba(255, 183, 77, 0.08)', 
+                                          margin: 0 
+                                        }} 
                                         onClick={() => setTalhaoDashboardId(t.id)}
                                       >
                                         Dashboard
                                       </button>
                                       <button 
                                         className="btn btn-secondary" 
-                                        style={{ width: 'auto', padding: '4px 8px', fontSize: '10px', height: '26px', borderColor: '#00838f', color: '#80deea', background: 'rgba(0, 131, 143, 0.08)', margin: 0 }} 
+                                        style={{ 
+                                          width: 'auto', 
+                                          padding: '4px 8px', 
+                                          fontSize: '10px', 
+                                          height: '26px', 
+                                          borderColor: isLight ? '#0891b2' : '#00838f', 
+                                          color: isLight ? '#0891b2' : '#80deea', 
+                                          background: isLight ? 'rgba(8, 145, 178, 0.06)' : 'rgba(0, 131, 143, 0.08)', 
+                                          margin: 0 
+                                        }} 
                                         onClick={() => handleExportTalhao(t.id, t.nome)}
                                       >
                                         Excel
@@ -3124,7 +3152,16 @@ export const OfficeDashboard = () => {
                                   )}
                                   <button 
                                     className="btn btn-secondary" 
-                                    style={{ width: 'auto', padding: '4px 8px', fontSize: '10px', height: '26px', borderColor: '#4fc3f7', color: '#4fc3f7', background: 'rgba(79, 195, 247, 0.08)', margin: 0 }} 
+                                    style={{ 
+                                      width: 'auto', 
+                                      padding: '4px 8px', 
+                                      fontSize: '10px', 
+                                      height: '26px', 
+                                      borderColor: isLight ? '#0284c7' : '#4fc3f7', 
+                                      color: isLight ? '#0284c7' : '#4fc3f7', 
+                                      background: isLight ? 'rgba(2, 132, 199, 0.06)' : 'rgba(79, 195, 247, 0.08)', 
+                                      margin: 0 
+                                    }} 
                                     onClick={() => {
                                       setEditingTalhao(t);
                                       setEditTalhaoName(t.nome);
@@ -3136,14 +3173,23 @@ export const OfficeDashboard = () => {
                                   </button>
                                   <button 
                                     className="btn btn-danger" 
-                                    style={{ width: 'auto', padding: '4px 8px', fontSize: '10px', height: '26px', margin: 0, lineHeight: 'normal' }} 
+                                    style={{ 
+                                      width: '28px', 
+                                      height: '26px', 
+                                      padding: 0, 
+                                      display: 'inline-flex', 
+                                      alignItems: 'center', 
+                                      justifyContent: 'center', 
+                                      margin: 0 
+                                    }} 
                                     onClick={() => {
                                       if (confirm(`Excluir o talhão "${t.nome}" apagará permanentemente todas as parcelas (${talParcels.length}) vinculadas a ele. Deseja prosseguir?`)) {
                                         deleteTalhao(t.id);
                                       }
                                     }}
+                                    title="Excluir Talhão"
                                   >
-                                    Excluir
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
                                   </button>
                                 </div>
                               </td>
@@ -3494,7 +3540,16 @@ export const OfficeDashboard = () => {
                                   {d.nh > 0 && (
                                     <button 
                                       className="btn btn-secondary" 
-                                      style={{ width: 'auto', padding: '4px 8px', fontSize: '10px', height: '26px', borderColor: '#2e7d32', color: '#a5d6a7', background: 'rgba(46, 125, 50, 0.08)', margin: 0 }} 
+                                      style={{ 
+                                        width: 'auto', 
+                                        padding: '4px 8px', 
+                                        fontSize: '10px', 
+                                        height: '26px', 
+                                        borderColor: isLight ? '#16a34a' : '#2e7d32', 
+                                        color: isLight ? '#16a34a' : '#a5d6a7', 
+                                        background: isLight ? 'rgba(22, 163, 74, 0.06)' : 'rgba(46, 125, 50, 0.08)', 
+                                        margin: 0 
+                                      }} 
                                       onClick={() => setStratumDashboardId(d.stratum.id)}
                                     >
                                       Dashboard
@@ -3502,14 +3557,23 @@ export const OfficeDashboard = () => {
                                   )}
                                   <button 
                                     className="btn btn-danger" 
-                                    style={{ width: 'auto', padding: '4px 8px', fontSize: '10px', height: '26px', margin: 0, lineHeight: 'normal' }} 
+                                    style={{ 
+                                      width: '28px', 
+                                      height: '26px', 
+                                      padding: 0, 
+                                      display: 'inline-flex', 
+                                      alignItems: 'center', 
+                                      justifyContent: 'center', 
+                                      margin: 0 
+                                    }} 
                                     onClick={() => {
                                       if (confirm(`Deseja deletar o estrato ${d.stratum.nome}? Todas as parcelas associadas a ele ficarão sem estrato.`)) {
                                         deleteStratum(d.stratum.id);
                                       }
                                     }}
+                                    title="Excluir Estrato"
                                   >
-                                    Excluir
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
                                   </button>
                                 </div>
                               </td>
@@ -3645,9 +3709,9 @@ export const OfficeDashboard = () => {
                                   display: 'inline-flex', 
                                   alignItems: 'center', 
                                   gap: '4px',
-                                  borderColor: 'rgba(0, 230, 118, 0.3)',
-                                  background: 'rgba(0, 230, 118, 0.04)',
-                                  color: '#00e676'
+                                  borderColor: isLight ? 'rgba(22, 163, 74, 0.4)' : 'rgba(0, 230, 118, 0.3)',
+                                  background: isLight ? 'rgba(22, 163, 74, 0.05)' : 'rgba(0, 230, 118, 0.04)',
+                                  color: isLight ? '#16a34a' : '#00e676'
                                 }}
                                 onClick={() => {
                                   setSelectedVisualizerTree(tree);
@@ -3995,15 +4059,23 @@ export const OfficeDashboard = () => {
                                   </button>
                                   <button 
                                     className="btn btn-danger" 
-                                    style={{ width: 'auto', padding: '6px 10px', height: '28px', fontSize: '10px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                    style={{ 
+                                      width: '28px', 
+                                      height: '28px', 
+                                      padding: 0, 
+                                      display: 'inline-flex', 
+                                      alignItems: 'center', 
+                                      justifyContent: 'center', 
+                                      margin: 0 
+                                    }} 
                                     onClick={async () => {
                                       if (confirm(`Deseja realmente deletar permanentemente o processamento "${proc.nomeProcessamento}"?`)) {
                                         await deleteProcessing(proc.id);
                                       }
                                     }}
+                                    title="Excluir Processamento"
                                   >
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                                    Excluir
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
                                   </button>
                                 </div>
                               </td>
@@ -5196,9 +5268,9 @@ export const OfficeDashboard = () => {
       )}
 
       {/* Embedded Sub-dashboards */}
-      {showProjectDashboard && activeParcels.length > 0 && (
+      {showProjectDashboard && filteredParcelsList.length > 0 && (
         <StatisticalDashboard 
-          inventories={activeParcels} 
+          inventories={filteredParcelsList} 
           onClose={() => setShowProjectDashboard(false)} 
         />
       )}
@@ -5459,7 +5531,20 @@ export const OfficeDashboard = () => {
       {/* Desktop Stem & Taper Visualizer Modal */}
       {selectedVisualizerTree && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100000, padding: '20px', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
-          <div className="glass-card" style={{ width: '100%', maxWidth: '1000px', display: 'flex', flexDirection: 'column', gap: '20px', maxHeight: '90vh', overflowY: 'auto', padding: '24px' }}>
+          <div style={{ 
+            width: '100%', 
+            maxWidth: '1000px', 
+            display: 'flex', 
+            flexDirection: 'column', 
+            gap: '20px', 
+            maxHeight: '90vh', 
+            overflowY: 'auto', 
+            padding: '24px',
+            background: 'rgba(10, 18, 12, 0.98)',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            borderRadius: '24px',
+            boxShadow: '0 20px 40px rgba(0, 0, 0, 0.5)'
+          }}>
             
             {/* Modal Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255, 255, 255, 0.08)', paddingBottom: '12px' }}>
