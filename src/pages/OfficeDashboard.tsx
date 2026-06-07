@@ -144,6 +144,9 @@ export const OfficeDashboard = () => {
   // HUD states
   const [activeLayer, setActiveLayer] = useState<'process' | 'gis' | 'stats'>('process');
   const [focusedNode, setFocusedNode] = useState<number | null>(null);
+  const [expandedStages, setExpandedStages] = useState<Record<number, boolean>>({ 2: true });
+  const [expandedTalhoes, setExpandedTalhoes] = useState<Record<string, boolean>>({});
+  const [expandedParcels, setExpandedParcels] = useState<Record<number, boolean>>({});
   const [interfaceMode, setInterfaceMode] = useState<'hud' | 'classic'>(() => {
     return (localStorage.getItem('interface_mode') as 'hud' | 'classic') || 'hud';
   });
@@ -3300,7 +3303,7 @@ export const OfficeDashboard = () => {
               {latestOfficialProcessing && (
                 <button 
                   className="btn btn-secondary" 
-                  style={{ width: '100%', fontSize: '12px', borderColor: '#fbc02d', color: '#ffd54f', background: 'rgba(251,192,45,0.08)', margin: 0 }} 
+                  style={{ width: '100%', fontSize: '12px', borderColor: '#00e676', color: '#00e676', background: 'rgba(0,230,118,0.08)', margin: 0 }} 
                   onClick={handleExportAllProcessed}
                 >
                   Exportar Processamento (Excel)
@@ -3308,6 +3311,290 @@ export const OfficeDashboard = () => {
               )}
             </div>
           </div>
+        );
+
+      default:
+        return null;
+    }
+  };
+
+  const renderNestedTreeForStage = (id: number) => {
+    if (!activeFw) return null;
+    switch (id) {
+      case 1: // Projeto
+        return (
+          <div className="hud-tree-node">
+            <div 
+              className="hud-tree-card active"
+              onClick={() => {
+                setFocusedNode(1);
+                setShowProjectDashboard(true);
+              }}
+            >
+              <span>🏢 Ver Detalhes</span>
+            </div>
+            <div className="hud-tree-nested">
+              <div className="hud-tree-card leaf-node">
+                <span>📍 Local: {activeFw.local || 'Não especificado'}</span>
+              </div>
+              <div className="hud-tree-card leaf-node">
+                <span>📅 Data: {activeFw.dataInicio}</span>
+              </div>
+              <div className="hud-tree-card leaf-node">
+                <span>👥 Colaboradores: {collaborators.length}</span>
+              </div>
+            </div>
+          </div>
+        );
+
+      case 2: // Talhões
+        if (activeTalhoes.length === 0) {
+          return (
+            <div className="hud-tree-card leaf-node" style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>
+              Sem talhões cadastrados
+            </div>
+          );
+        }
+        return activeTalhoes.map(t => {
+          const isTalhaoExpanded = !!expandedTalhoes[t.id];
+          return (
+            <div key={t.id} className="hud-tree-node">
+              <div 
+                className={`hud-tree-card ${isTalhaoExpanded ? 'active' : ''}`}
+                onClick={() => {
+                  setExpandedTalhoes(prev => ({ ...prev, [t.id]: !prev[t.id] }));
+                  setTalhaoDashboardId(t.id);
+                  setFocusedNode(2);
+                }}
+              >
+                <span>🌳 {t.nome}</span>
+                <span>{t.area} ha</span>
+              </div>
+              {isTalhaoExpanded && (
+                <div className="hud-tree-nested">
+                  {activeParcels.filter(p => p.talhaoId === t.id).map(p => {
+                    const isParcelExpanded = !!expandedParcels[p.id];
+                    return (
+                      <div key={p.id} className="hud-tree-node">
+                        <div 
+                          className={`hud-tree-card ${isParcelExpanded ? 'active' : ''}`}
+                          onClick={() => {
+                            setExpandedParcels(prev => ({ ...prev, [p.id]: !prev[p.id] }));
+                            setShowParcelDashboardId(p.id);
+                            setFocusedNode(4);
+                          }}
+                        >
+                          <span>📍 Parcela {p.nome}</span>
+                          <span>{p.status}</span>
+                        </div>
+                        {isParcelExpanded && (
+                          <div className="hud-tree-nested">
+                            <div className="hud-tree-card leaf-node" onClick={() => { setAuditParcelId(p.id); setFocusedNode(4); }}>
+                              <span>📊 Dados ({p.dados ? p.dados.length : 0} árvores)</span>
+                            </div>
+                            <div className="hud-tree-card leaf-node">
+                              <span>📡 GPS: {p.coordenadas || 'Sem GPS'}</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                  {activeParcels.filter(p => p.talhaoId === t.id).length === 0 && (
+                    <div className="hud-tree-card leaf-node" style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                      Sem parcelas neste talhão
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        });
+
+      case 3: // Estratos
+        if (activeStrata.length === 0) {
+          return (
+            <div className="hud-tree-card leaf-node" style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>
+              Sem estratos cadastrados
+            </div>
+          );
+        }
+        return activeStrata.map(s => (
+          <div 
+            key={s.id} 
+            className="hud-tree-card" 
+            onClick={() => { 
+              setStratumDashboardId(s.id); 
+              setFocusedNode(3); 
+            }}
+          >
+            <span>🧬 {s.nome}</span>
+            <span>{s.area} ha</span>
+          </div>
+        ));
+
+      case 4: // Parcelas
+        if (activeParcels.length === 0) {
+          return (
+            <div className="hud-tree-card leaf-node" style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>
+              Sem parcelas cadastradas
+            </div>
+          );
+        }
+        return activeParcels.map(p => {
+          const isParcelExpanded = !!expandedParcels[p.id];
+          return (
+            <div key={p.id} className="hud-tree-node">
+              <div 
+                className={`hud-tree-card ${isParcelExpanded ? 'active' : ''}`}
+                onClick={() => {
+                  setExpandedParcels(prev => ({ ...prev, [p.id]: !prev[p.id] }));
+                  setShowParcelDashboardId(p.id);
+                  setFocusedNode(4);
+                }}
+              >
+                <span>📍 Parcela {p.nome}</span>
+                <span>{p.status}</span>
+              </div>
+              {isParcelExpanded && (
+                <div className="hud-tree-nested">
+                  <div className="hud-tree-card leaf-node" onClick={() => { setAuditParcelId(p.id); setFocusedNode(4); }}>
+                    <span>📊 Árvores ({p.dados ? p.dados.length : 0})</span>
+                  </div>
+                  <div className="hud-tree-card leaf-node">
+                    <span>📡 GPS: {p.coordenadas || 'Sem GPS'}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        });
+
+      case 5: // Coleta de Campo
+        if (activeParcels.length === 0) {
+          return (
+            <div className="hud-tree-card leaf-node" style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>
+              Sem parcelas para coleta
+            </div>
+          );
+        }
+        return (
+          <>
+            <div className="hud-tree-card active" onClick={() => { setShowColetaModal(true); setFocusedNode(5); }}>
+              <span>📥 Central de Coleta</span>
+            </div>
+            {activeParcels.map(p => (
+              <div key={p.id} className="hud-tree-card leaf-node" onClick={() => { setShowColetaModal(true); setFocusedNode(5); }}>
+                <span>{p.status === 'Concluído' ? '✅' : '⏳'} {p.nome}</span>
+                <span>{p.dados ? p.dados.length : 0}</span>
+              </div>
+            ))}
+          </>
+        );
+
+      case 6: // Cubagem
+        if (activeCubageSessions.length === 0) {
+          return (
+            <div className="hud-tree-card leaf-node" style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>
+              Sem sessões de cubagem
+            </div>
+          );
+        }
+        return activeCubageSessions.map(s => (
+          <div key={s.id} className="hud-tree-card" onClick={() => { setFocusedNode(6); }}>
+            <span>🪵 {s.nome || 'Sessão'}</span>
+            <span>{s.dados ? s.dados.length : 0} fustes</span>
+          </div>
+        ));
+
+      case 7: // Modelos
+        return (
+          <>
+            <div className="hud-tree-card" onClick={() => { setFocusedNode(7); }}>
+              <span>Hipsometria:</span>
+              <span style={{ fontSize: '9px', maxWidth: '90px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {selectedHeightModelId !== 'none' ? heightModels.find(m => m.id === selectedHeightModelId)?.nome : 'Medida'}
+              </span>
+            </div>
+            <div className="hud-tree-card" onClick={() => { setFocusedNode(7); }}>
+              <span>Volume:</span>
+              <span style={{ fontSize: '9px', maxWidth: '90px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {selectedVolumeModelId !== 'legacy' ? volumeModels.find(m => m.id === selectedVolumeModelId)?.nome : `FF: ${processingFatorForma}`}
+              </span>
+            </div>
+          </>
+        );
+
+      case 8: // Processamento
+        return (
+          <>
+            <div className="hud-tree-card active" onClick={() => { setShowBatchProcessModal(true); setFocusedNode(8); }}>
+              <span>⚡ Lote</span>
+            </div>
+            {activeProcessings.map(p => (
+              <div 
+                key={p.id} 
+                className={`hud-tree-card ${p.status === 'Oficial' ? 'active' : ''}`} 
+                onClick={() => { 
+                  setSelectedReportProcessing(p); 
+                  setFocusedNode(8); 
+                }}
+              >
+                <span>⚙️ {p.nomeProcessamento}</span>
+                <span>{p.status}</span>
+              </div>
+            ))}
+            <div className="hud-tree-card leaf-node" onClick={() => { setShowNewProcessModal(true); setFocusedNode(8); }}>
+              <span>➕ Novo Snapshot</span>
+            </div>
+          </>
+        );
+
+      case 9: // Extrapolação
+        return (
+          <>
+            <div className="hud-tree-card" onClick={() => { setFocusedNode(9); }}>
+              <span>Área Total:</span>
+              <span>{activeTalhoes.reduce((acc, t) => acc + (parseFloat(t.area as any) || 0), 0).toFixed(1)} ha</span>
+            </div>
+            <div className="hud-tree-card" onClick={() => { setFocusedNode(9); }}>
+              <span>Vol Total:</span>
+              <span>
+                {latestOfficialProcessing 
+                  ? `${cleanResult(latestOfficialProcessing.volumeTotalEstimado).toLocaleString('pt-BR', { maximumFractionDigits: 0 })} m³` 
+                  : 'Pendente'}
+              </span>
+            </div>
+          </>
+        );
+
+      case 10: // Sortimento
+        return (
+          <>
+            <div className="hud-tree-card" onClick={() => { setFocusedNode(10); }}>
+              <span>Regras ({sortimentRules.length})</span>
+            </div>
+            {activeSortimentResults.map(r => (
+              <div key={r.id} className="hud-tree-card" onClick={() => { setFocusedNode(10); }}>
+                <span>📋 Árvore #{r.treeNumber} ({r.especie})</span>
+                <span>{r.volumeSortidoTotal ? `${r.volumeSortidoTotal.toFixed(2)} m³` : '0.0 m³'}</span>
+              </div>
+            ))}
+          </>
+        );
+
+      case 11: // Relatório Final
+        return (
+          <>
+            <div className="hud-tree-card active" onClick={() => { setShowRelatorioModal(true); setFocusedNode(11); }}>
+              <span>📄 Relatório Executivo</span>
+            </div>
+            {reportGenerated && (
+              <div className="hud-tree-card leaf-node">
+                <span>✅ Exportado</span>
+              </div>
+            )}
+          </>
         );
 
       default:
@@ -3331,7 +3618,7 @@ export const OfficeDashboard = () => {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
             <div>
               <h2 style={{ fontSize: '18px', fontWeight: '800', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ color: '#00b0ff' }}>🛰</span> {activeFw ? activeFw.nome : "Centro de Operações"}
+                <span style={{ color: '#00e676' }}>🛰</span> {activeFw ? activeFw.nome : "Centro de Operações"}
               </h2>
               <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                 {activeFw ? `Fazenda/Local: ${activeFw.local} | Data Inicial: ${activeFw.dataInicio}` : "Missão de Inventário Florestal • LeafTag HUD"}
@@ -3342,21 +3629,33 @@ export const OfficeDashboard = () => {
               <button 
                 className="hud-btn-floating"
                 onClick={() => { setActiveLayer('process'); setFocusedNode(null); }}
-                style={{ background: activeLayer === 'process' ? 'rgba(0,176,255,0.2)' : 'rgba(255,255,255,0.02)', color: activeLayer === 'process' ? '#fff' : '#00b0ff' }}
+                style={{ 
+                  background: activeLayer === 'process' ? 'rgba(0,230,118,0.15)' : 'rgba(255,255,255,0.02)', 
+                  color: activeLayer === 'process' ? '#ffffff' : '#00e676', 
+                  borderColor: activeLayer === 'process' ? '#00e676' : 'rgba(255,255,255,0.1)' 
+                }}
               >
                 Visão de Processo
               </button>
               <button 
                 className="hud-btn-floating"
                 onClick={() => { setActiveLayer('gis'); setFocusedNode(null); }}
-                style={{ background: activeLayer === 'gis' ? 'rgba(0,176,255,0.2)' : 'rgba(255,255,255,0.02)', color: activeLayer === 'gis' ? '#fff' : '#00b0ff' }}
+                style={{ 
+                  background: activeLayer === 'gis' ? 'rgba(0,230,118,0.15)' : 'rgba(255,255,255,0.02)', 
+                  color: activeLayer === 'gis' ? '#ffffff' : '#00e676', 
+                  borderColor: activeLayer === 'gis' ? '#00e676' : 'rgba(255,255,255,0.1)' 
+                }}
               >
                 Camada GIS (Territorial)
               </button>
               <button 
                 className="hud-btn-floating"
                 onClick={() => { setActiveLayer('stats'); setFocusedNode(null); }}
-                style={{ background: activeLayer === 'stats' ? 'rgba(0,176,255,0.2)' : 'rgba(255,255,255,0.02)', color: activeLayer === 'stats' ? '#fff' : '#00b0ff' }}
+                style={{ 
+                  background: activeLayer === 'stats' ? 'rgba(0,230,118,0.15)' : 'rgba(255,255,255,0.02)', 
+                  color: activeLayer === 'stats' ? '#ffffff' : '#00e676', 
+                  borderColor: activeLayer === 'stats' ? '#00e676' : 'rgba(255,255,255,0.1)' 
+                }}
               >
                 Sala Estatística
               </button>
@@ -3379,81 +3678,93 @@ export const OfficeDashboard = () => {
               <StatisticalDashboard inventories={activeParcels} onClose={() => { setActiveLayer('process'); setFocusedNode(null); }} />
             )}
 
-            {/* Nodes and SVG connections Layer */}
+            {/* Nodes Layer - Redesign V2 Horizontal Flow Pipeline with Nested Expandable Tree Nodes */}
             {activeLayer === 'process' && (
-              <div 
-                className="hud-camera-viewport" 
-                style={
-                  focusedNode !== null
-                    ? { transform: `translate(${cols === 1 ? 50 - getNodePos(focusedNode, cols).x : 32 - getNodePos(focusedNode, cols).x}%, ${50 - getNodePos(focusedNode, cols).y}%) scale(${cols === 1 ? 1.6 : 2.2})` }
-                    : { transform: 'translate(0%, 0%) scale(1)' }
-                }
-              >
-                {/* SVG Connections */}
-                <svg className="hud-svg-overlay" viewBox="0 0 100 100" preserveAspectRatio="none">
-                  {[2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map(targetId => {
-                    const startId = targetId === 2 ? 1 : targetId - 1;
-                    const startPos = getNodePos(startId, cols);
-                    const endPos = getNodePos(targetId, cols);
-                    const targetStatus = getStageStatus(targetId);
-                    
-                    let lineClass = 'line-empty';
-                    if (targetStatus === 'complete') lineClass = 'line-complete';
-                    else if (targetStatus === 'progress') lineClass = 'line-progress';
-                    else if (targetStatus === 'warning') lineClass = 'line-warning';
-                    
-                    return (
-                      <line
-                        key={targetId}
-                        x1={startPos.x}
-                        y1={startPos.y}
-                        x2={endPos.x}
-                        y2={endPos.y}
-                        className={`hud-connection-line ${lineClass}`}
-                      />
-                    );
-                  })}
-                </svg>
-
-                {/* Esferas / Nodes */}
+              <div className="space-hud-canvas">
                 {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map(id => {
                   const status = getStageStatus(id);
                   const percent = getStagePercent(id);
                   const name = getStageName(id);
-                  const pos = getNodePos(id, cols);
-                  const isFocused = focusedNode === id;
+                  const kpi = getStageKpi(id);
+                  const isExpanded = expandedStages[id];
                   
                   return (
-                    <div
-                      key={id}
-                      id={`op-node-${id}`}
-                      className={`hud-sphere status-${status} ${id === 1 ? 'center-node' : ''} ${isFocused ? 'active' : ''}`}
-                      style={{
-                        left: `${pos.x}%`,
-                        top: `${pos.y}%`
-                      }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleStageClick(id);
-                      }}
-                    >
-                      {/* Orbital rings */}
-                      <div className="hud-sphere-ring" />
-                      <div className="hud-sphere-ring outer-ring" />
+                    <div key={id} className="hud-pipeline-column">
                       
-                      {/* Icon */}
-                      <div className="hud-sphere-icon" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: id === 1 ? '4px' : '2px' }}>
-                        {getNodeIcon(id)}
+                      {/* Laser Connection Line between columns */}
+                      {id < 11 && (
+                        <div className="hud-pipeline-laser">
+                          <div className="hud-pipeline-laser-pulse" style={{ animationDelay: `${(id - 1) * 0.4}s` }} />
+                        </div>
+                      )}
+                      
+                      {/* Capsule Node */}
+                      <div
+                        id={`op-node-${id}`}
+                        className={`hud-node-capsule status-${status} ${focusedNode === id ? 'active' : ''}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleStageClick(id);
+                        }}
+                      >
+                        {/* Hover Tooltip Card */}
+                        <div className="hud-hover-info">
+                          <div style={{ fontWeight: '800', fontSize: '11px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '6px', marginBottom: '6px', color: '#00e676', fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '0.5px' }}>
+                            {name.toUpperCase()}
+                          </div>
+                          <div className="hud-hover-line">
+                            <span>Status:</span>
+                            <span>
+                              {status === 'complete' ? 'Concluído' : status === 'progress' ? 'Em Progresso' : status === 'warning' ? 'Atenção' : 'Não Iniciado'}
+                            </span>
+                          </div>
+                          <div className="hud-hover-line">
+                            <span>Progresso:</span>
+                            <span>{percent}%</span>
+                          </div>
+                          <div className="hud-hover-line">
+                            <span>Métrica:</span>
+                            <span>{kpi}</span>
+                          </div>
+                          <div style={{ marginTop: '8px', borderTop: '1px dashed rgba(255,255,255,0.08)', paddingTop: '6px' }}>
+                            <span style={{ fontSize: '9px', color: '#aaa', fontStyle: 'italic', display: 'block', width: '100%', whiteSpace: 'normal', lineHeight: '1.3' }}>
+                              {getStageDescription(id)}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Icon */}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#00e676' }}>
+                          {getNodeIcon(id)}
+                        </div>
+                        
+                        {/* Title */}
+                        <div className="hud-node-title">
+                          {name}
+                        </div>
+                        
+                        {/* KPI */}
+                        <div className="hud-node-kpi">
+                          {kpi}
+                        </div>
+                        
+                        {/* Expand Button */}
+                        <button 
+                          className="hud-expand-button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setExpandedStages(prev => ({ ...prev, [id]: !prev[id] }));
+                          }}
+                        >
+                          {isExpanded ? '▲' : '▼'}
+                        </button>
                       </div>
                       
-                      {/* Text */}
-                      <span style={{ fontSize: id === 1 ? '11.5px' : '9.5px', fontWeight: '800', textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                        {id === 1 ? "PROJETO" : name}
-                      </span>
-                      {id !== 1 && (
-                        <span style={{ fontSize: '8px', opacity: 0.6, marginTop: '2px', fontWeight: 'bold' }}>
-                          {percent}%
-                        </span>
+                      {/* Sub-tree nodes container when expanded */}
+                      {isExpanded && (
+                        <div className="hud-tree-container">
+                          {renderNestedTreeForStage(id)}
+                        </div>
                       )}
                     </div>
                   );
@@ -3487,7 +3798,7 @@ export const OfficeDashboard = () => {
                         fontSize: '11px', 
                         fontWeight: '800', 
                         textTransform: 'uppercase', 
-                        color: getStageStatus(focusedNode) === 'complete' ? '#00e676' : getStageStatus(focusedNode) === 'progress' ? '#00b0ff' : getStageStatus(focusedNode) === 'warning' ? '#ff1744' : 'var(--text-muted)' 
+                        color: getStageStatus(focusedNode) === 'complete' ? '#00e676' : getStageStatus(focusedNode) === 'progress' ? '#00ff66' : getStageStatus(focusedNode) === 'warning' ? '#00e676' : 'var(--text-muted)' 
                       }}>
                         {getStageStatus(focusedNode) === 'complete' ? 'Concluído' : getStageStatus(focusedNode) === 'progress' ? 'Em Progresso' : getStageStatus(focusedNode) === 'warning' ? 'Atenção' : 'Não Iniciado'}
                       </span>
@@ -3754,10 +4065,10 @@ export const OfficeDashboard = () => {
                 <img src="/logo.png" alt="Logo" style={{ width: '40px', height: '40px', filter: 'hue-rotate(180deg)' }} />
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <h1 style={{ color: '#00b0ff', fontSize: '18px', fontWeight: '900', margin: 0, letterSpacing: '1px' }}>LEAFTAG</h1>
+                    <h1 style={{ color: '#00e676', fontSize: '18px', fontWeight: '900', margin: 0, letterSpacing: '1px' }}>LEAFTAG</h1>
                     <span className="hud-badge pulse" style={{ background: 'rgba(0, 230, 118, 0.15)', color: '#00e676', fontSize: '8px', padding: '2px 6px', borderRadius: '4px', border: '1px solid #00e676', fontWeight: 'bold' }}>HUD</span>
                   </div>
-                  <span style={{ fontSize: '9px', color: '#00b0ff', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '2px', opacity: 0.8 }}>CENTRO DE OPERAÇÕES</span>
+                  <span style={{ fontSize: '9px', color: '#00e676', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '2px', opacity: 0.8 }}>CENTRO DE OPERAÇÕES</span>
                 </div>
               </div>
             </div>
@@ -3768,10 +4079,10 @@ export const OfficeDashboard = () => {
                 onClick={toggleInterfaceMode}
                 style={{
                   width: '100%',
-                  background: 'rgba(0, 176, 255, 0.04)',
-                  border: '1px dashed rgba(0, 176, 255, 0.4)',
+                  background: 'rgba(0, 230, 118, 0.04)',
+                  border: '1px dashed rgba(0, 230, 118, 0.4)',
                   borderRadius: '10px',
-                  color: '#00b0ff',
+                  color: '#00e676',
                   padding: '10px 14px',
                   fontSize: '11px',
                   fontWeight: 'bold',
@@ -3786,15 +4097,15 @@ export const OfficeDashboard = () => {
                   fontFamily: 'monospace'
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.background = 'rgba(0, 176, 255, 0.12)';
-                  e.currentTarget.style.border = '1px solid #00b0ff';
+                  e.currentTarget.style.background = 'rgba(0, 230, 118, 0.12)';
+                  e.currentTarget.style.border = '1px solid #00e676';
                   e.currentTarget.style.color = '#fff';
-                  e.currentTarget.style.boxShadow = '0 0 12px rgba(0, 176, 255, 0.2)';
+                  e.currentTarget.style.boxShadow = '0 0 12px rgba(0, 230, 118, 0.2)';
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'rgba(0, 176, 255, 0.04)';
-                  e.currentTarget.style.border = '1px dashed rgba(0, 176, 255, 0.4)';
-                  e.currentTarget.style.color = '#00b0ff';
+                  e.currentTarget.style.background = 'rgba(0, 230, 118, 0.04)';
+                  e.currentTarget.style.border = '1px dashed rgba(0, 230, 118, 0.4)';
+                  e.currentTarget.style.color = '#00e676';
                   e.currentTarget.style.boxShadow = 'none';
                 }}
               >
@@ -3807,7 +4118,7 @@ export const OfficeDashboard = () => {
 
             {/* Sector/Project Selector (Sci-Fi Theme) */}
             <div style={{ flex: 1, overflowY: 'auto', padding: '16px 24px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <span style={{ fontSize: '9px', color: '#00b0ff', textTransform: 'uppercase', fontWeight: '900', letterSpacing: '1.5px', display: 'block', fontFamily: 'monospace' }}>
+              <span style={{ fontSize: '9px', color: '#00e676', textTransform: 'uppercase', fontWeight: '900', letterSpacing: '1.5px', display: 'block', fontFamily: 'monospace' }}>
                 // TRABALHOS_DE_CAMPO.LOG
               </span>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -3824,17 +4135,17 @@ export const OfficeDashboard = () => {
                         padding: '12px 14px',
                         borderRadius: '8px',
                         cursor: 'pointer',
-                        background: isActive ? 'rgba(0, 176, 255, 0.08)' : 'rgba(255, 255, 255, 0.01)',
-                        border: isActive ? '1px solid rgba(0, 176, 255, 0.3)' : '1px solid rgba(255, 255, 255, 0.03)',
+                        background: isActive ? 'rgba(0, 230, 118, 0.08)' : 'rgba(255, 255, 255, 0.01)',
+                        border: isActive ? '1px solid rgba(0, 230, 118, 0.3)' : '1px solid rgba(255, 255, 255, 0.03)',
                         transition: 'all 0.2s ease',
                         position: 'relative'
                       }}
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <h4 style={{ fontSize: '12.5px', margin: 0, fontWeight: '700', color: isActive ? '#00b0ff' : '#eee', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '180px' }}>
+                        <h4 style={{ fontSize: '12.5px', margin: 0, fontWeight: '700', color: isActive ? '#00e676' : '#eee', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '180px' }}>
                           {fw.nome}
                         </h4>
-                        <span style={{ fontSize: '8px', fontFamily: 'monospace', color: isActive ? '#00b0ff' : 'var(--text-muted)' }}>
+                        <span style={{ fontSize: '8px', fontFamily: 'monospace', color: isActive ? '#00e676' : 'var(--text-muted)' }}>
                           SEC_{fw.id.substring(0, 4).toUpperCase()}
                         </span>
                       </div>
@@ -3848,11 +4159,11 @@ export const OfficeDashboard = () => {
             </div>
 
             {/* High-Tech System Diagnostic Summary */}
-            <div style={{ padding: '16px 24px', borderTop: '1px solid rgba(0, 176, 255, 0.1)', background: 'rgba(5, 12, 28, 0.45)', fontFamily: 'monospace' }}>
+            <div style={{ padding: '16px 24px', borderTop: '1px solid rgba(0, 230, 118, 0.15)', background: 'rgba(10, 24, 15, 0.45)', fontFamily: 'monospace' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
                   <span className="hud-pulse-dot" style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#00e676', display: 'inline-block', boxShadow: '0 0 8px #00e676' }} />
-                  <span style={{ fontSize: '9px', color: '#00b0ff', fontWeight: '900', letterSpacing: '1.2px' }}>TELEMETRIA_SISTEMA</span>
+                  <span style={{ fontSize: '9px', color: '#00e676', fontWeight: '900', letterSpacing: '1.2px' }}>TELEMETRIA_SISTEMA</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px' }}>
                   <span style={{ color: 'var(--text-muted)' }}>STATUS:</span>
@@ -3860,13 +4171,13 @@ export const OfficeDashboard = () => {
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px' }}>
                   <span style={{ color: 'var(--text-muted)' }}>SINCRONIA:</span>
-                  <span style={{ color: isSynced ? '#00e676' : '#ffb74d' }}>
+                  <span style={{ color: isSynced ? '#00e676' : 'rgba(255, 255, 255, 0.4)' }}>
                     {isSynced ? "SNC_OK" : "SYNC_PROG"}
                   </span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px' }}>
                   <span style={{ color: 'var(--text-muted)' }}>LATÊNCIA:</span>
-                  <span style={{ color: '#00b0ff' }}>38 ms</span>
+                  <span style={{ color: '#00e676' }}>38 ms</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px' }}>
                   <span style={{ color: 'var(--text-muted)' }}>PARCELAS:</span>
@@ -3874,11 +4185,11 @@ export const OfficeDashboard = () => {
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px' }}>
                   <span style={{ color: 'var(--text-muted)' }}>FUSTES:</span>
-                  <span style={{ color: '#4fc3f7' }}>{kpis.totalTrees}</span>
+                  <span style={{ color: '#fff' }}>{kpis.totalTrees}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px' }}>
                   <span style={{ color: 'var(--text-muted)' }}>BIOMASSA:</span>
-                  <span style={{ color: '#ba68c8' }}>{kpis.totalV.toFixed(1)} m³</span>
+                  <span style={{ color: '#fff' }}>{kpis.totalV.toFixed(1)} m³</span>
                 </div>
               </div>
             </div>
@@ -6452,7 +6763,7 @@ export const OfficeDashboard = () => {
       {showBatchProcessModal && activeFw && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100000, padding: '20px', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
           <div className="glass-card" style={{ width: '100%', maxWidth: '500px', margin: 0, maxHeight: '95vh', overflowY: 'auto', padding: '24px' }}>
-            <h3 style={{ margin: 0, fontSize: '18px', color: '#ffd54f', fontWeight: '800' }}>Processamento em Lote</h3>
+            <h3 style={{ margin: 0, fontSize: '18px', color: '#00e676', fontWeight: '800' }}>Processamento em Lote</h3>
             <p style={{ color: 'var(--text-muted)', fontSize: '12.5px', marginTop: '6px', marginBottom: '20px', lineHeight: '1.4' }}>
               Execute o processamento matemático em lote para estimar as alturas faltantes e os volumes de fustes em várias parcelas simultaneamente.
             </p>
@@ -6581,11 +6892,11 @@ export const OfficeDashboard = () => {
                 className="btn btn-primary" 
                 style={{ 
                   width: 'auto',
-                  background: 'linear-gradient(135deg, #ffd54f 0%, #fbc02d 100%)', 
+                  background: 'linear-gradient(135deg, #00e676 0%, #082815 100%)', 
                   border: 'none',
-                  color: '#000000',
+                  color: '#ffffff',
                   fontWeight: '800',
-                  boxShadow: '0 4px 14px rgba(251, 192, 45, 0.2)'
+                  boxShadow: '0 4px 14px rgba(0, 230, 118, 0.25)'
                 }}
                 onClick={handleBatchProcess}
                 disabled={isBatchProcessing}
