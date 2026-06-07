@@ -2891,23 +2891,32 @@ export const OfficeDashboard = () => {
   }, [activeTab, activeFwId]);
 
   const renderCentroOperacoes = () => {
-    const nextStep = getNextRecommendedStep();
-    const bottlenecks = getBottlenecks();
-    
-    let completedStagesCount = 0;
-    for (let i = 1; i <= 11; i++) {
-      if (getStageStatus(i) === 'complete') {
-        completedStagesCount++;
+    try {
+      const nextStep = getNextRecommendedStep();
+      const bottlenecks = getBottlenecks();
+      
+      let completedStagesCount = 0;
+      for (let i = 1; i <= 11; i++) {
+        if (getStageStatus(i) === 'complete') {
+          completedStagesCount++;
+        }
       }
-    }
-    const overallProgress = Math.round((completedStagesCount / 11) * 100);
+      const overallProgress = Math.round((completedStagesCount / 11) * 100);
 
-    const totalArea = activeTalhoes.reduce((acc, t) => acc + (t.area || 0), 0);
-    const completedParcelsCount = activeParcels.filter(p => p.status === 'Concluído').length;
-    const totalVolume = latestOfficialProcessing ? latestOfficialProcessing.volumeTotalEstimado : 0;
+      const totalArea = activeTalhoes.reduce((acc, t) => {
+        const aVal = t.area ? (typeof t.area === 'number' ? t.area : parseFloat(t.area as any) || 0) : 0;
+        return acc + aVal;
+      }, 0);
+      
+      const completedParcelsCount = activeParcels.filter(p => p.status === 'Concluído').length;
+      const totalVolume = latestOfficialProcessing 
+        ? (typeof latestOfficialProcessing.volumeTotalEstimado === 'number' 
+            ? latestOfficialProcessing.volumeTotalEstimado 
+            : parseFloat(latestOfficialProcessing.volumeTotalEstimado as any) || 0) 
+        : 0;
 
-    return (
-      <div className="operation-center" style={{ animation: 'fadeInUp 0.6s ease' }}>
+      return (
+        <div className="operation-center" style={{ animation: 'fadeInUp 0.6s ease' }}>
         {/* PANEL DE INDICADORES EXECUTIVOS */}
         <div className="glass-card" style={{ padding: '24px', border: '1px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.01)', borderRadius: '20px', marginBottom: 0 }}>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '24px', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -3075,6 +3084,20 @@ export const OfficeDashboard = () => {
         </div>
       </div>
     );
+    } catch (err: any) {
+      console.error("Erro ao renderizar o Centro de Operações:", err);
+      return (
+        <div className="glass-card" style={{ padding: '24px', border: '1px solid rgba(239,35,60,0.2)', background: 'rgba(239,35,60,0.05)', color: '#ff4d6d' }}>
+          <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '800' }}>Erro no Centro de Operações</h3>
+          <p style={{ fontSize: '13px', margin: '8px 0 0 0' }}>
+            Ocorreu um erro ao processar os dados do projeto para o mapa operacional:
+          </p>
+          <pre style={{ background: 'rgba(0,0,0,0.3)', padding: '12px', borderRadius: '8px', marginTop: '12px', fontSize: '12px', color: '#fff', overflowX: 'auto' }}>
+            {err.stack || err.message || String(err)}
+          </pre>
+        </div>
+      );
+    }
   };
 
   return (
@@ -3652,33 +3675,35 @@ export const OfficeDashboard = () => {
             </div>
 
             {/* KPI Cards Row */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '32px' }}>
-              
-              <div className="glass-card" style={{ padding: '20px', border: '1px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.01)', borderRadius: '16px', marginBottom: 0 }}>
-                <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Indivíduos Totais</span>
-                <h3 style={{ fontSize: '24px', fontWeight: '800', margin: '8px 0 0 0', color: '#4fc3f7' }}>{kpis.totalTrees}</h3>
-                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Árvores e Fustes Coletados</span>
-              </div>
+            {activeTab !== 'centro-operacoes' && (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '32px' }}>
+                
+                <div className="glass-card" style={{ padding: '20px', border: '1px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.01)', borderRadius: '16px', marginBottom: 0 }}>
+                  <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Indivíduos Totais</span>
+                  <h3 style={{ fontSize: '24px', fontWeight: '800', margin: '8px 0 0 0', color: '#4fc3f7' }}>{kpis.totalTrees}</h3>
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Árvores e Fustes Coletados</span>
+                </div>
 
-              <div className="glass-card" style={{ padding: '20px', border: '1px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.01)', borderRadius: '16px', marginBottom: 0 }}>
-                <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Riqueza (Espécies)</span>
-                <h3 style={{ fontSize: '24px', fontWeight: '800', margin: '8px 0 0 0', color: '#aed581' }}>{kpis.speciesCount}</h3>
-                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Espécies Mapeadas em Campo</span>
-              </div>
+                <div className="glass-card" style={{ padding: '20px', border: '1px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.01)', borderRadius: '16px', marginBottom: 0 }}>
+                  <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Riqueza (Espécies)</span>
+                  <h3 style={{ fontSize: '24px', fontWeight: '800', margin: '8px 0 0 0', color: '#aed581' }}>{kpis.speciesCount}</h3>
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Espécies Mapeadas em Campo</span>
+                </div>
 
-              <div className="glass-card" style={{ padding: '20px', border: '1px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.01)', borderRadius: '16px', marginBottom: 0 }}>
-                <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Biomassa Agregada</span>
-                <h3 style={{ fontSize: '24px', fontWeight: '800', margin: '8px 0 0 0', color: '#ba68c8' }}>{kpis.totalV.toFixed(2)} m³</h3>
-                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Volume Comercial Estimado</span>
-              </div>
+                <div className="glass-card" style={{ padding: '20px', border: '1px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.01)', borderRadius: '16px', marginBottom: 0 }}>
+                  <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Biomassa Agregada</span>
+                  <h3 style={{ fontSize: '24px', fontWeight: '800', margin: '8px 0 0 0', color: '#ba68c8' }}>{kpis.totalV.toFixed(2)} m³</h3>
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Volume Comercial Estimado</span>
+                </div>
 
-              <div className="glass-card" style={{ padding: '20px', border: '1px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.01)', borderRadius: '16px', marginBottom: 0 }}>
-                <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Diversidade Shannon</span>
-                <h3 style={{ fontSize: '24px', fontWeight: '800', margin: '8px 0 0 0', color: '#ffb74d' }}>{kpis.shannon.toFixed(3)}</h3>
-                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Índice de Diversidade Ecológica</span>
-              </div>
+                <div className="glass-card" style={{ padding: '20px', border: '1px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.01)', borderRadius: '16px', marginBottom: 0 }}>
+                  <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Diversidade Shannon</span>
+                  <h3 style={{ fontSize: '24px', fontWeight: '800', margin: '8px 0 0 0', color: '#ffb74d' }}>{kpis.shannon.toFixed(3)}</h3>
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Índice de Diversidade Ecológica</span>
+                </div>
 
-            </div>
+              </div>
+            )}
 
             {/* TAB CONTENT */}
             {activeTab === 'centro-operacoes' ? (
