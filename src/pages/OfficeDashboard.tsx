@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useInventory } from '../context/InventoryContext';
 import { useAuth } from '../context/AuthContext';
@@ -147,6 +147,7 @@ export const OfficeDashboard = () => {
   const [expandedStages, setExpandedStages] = useState<Record<number, boolean>>({ 2: true });
   const [expandedTalhoes, setExpandedTalhoes] = useState<Record<string, boolean>>({});
   const [expandedParcels, setExpandedParcels] = useState<Record<number, boolean>>({});
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [interfaceMode, setInterfaceMode] = useState<'hud' | 'classic'>(() => {
     return (localStorage.getItem('interface_mode') as 'hud' | 'classic') || 'hud';
   });
@@ -2739,6 +2740,12 @@ export const OfficeDashboard = () => {
 
   const handleStageClick = (stageId: number) => {
     setFocusedNode(stageId);
+    setTimeout(() => {
+      const element = document.getElementById(`op-node-${stageId}`);
+      if (element && canvasRef.current) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+      }
+    }, 100);
   };
 
   const getNextRecommendedStep = (): string => {
@@ -2842,6 +2849,7 @@ export const OfficeDashboard = () => {
   // Node orbital positioning helper
   const [cols, setCols] = useState<number>(4);
   const mapContainerRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLDivElement>(null);
 
   const getNodePos = (id: number, columns: number) => {
     if (columns === 1) {
@@ -3612,17 +3620,49 @@ export const OfficeDashboard = () => {
       }
       
       return (
-        <div className="operation-center" style={{ animation: 'fadeInUp 0.6s ease', height: '100%' }}>
+        <div className="operation-center" style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%', background: '#020503', animation: 'fadeInUp 0.6s ease', overflow: 'hidden' }}>
           
           {/* HUD Top bar */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
-            <div>
-              <h2 style={{ fontSize: '18px', fontWeight: '800', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ color: '#00e676' }}>🛰</span> {activeFw ? activeFw.nome : "Centro de Operações"}
-              </h2>
-              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                {activeFw ? `Fazenda/Local: ${activeFw.local} | Data Inicial: ${activeFw.dataInicio}` : "Missão de Inventário Florestal • LeafTag HUD"}
-              </span>
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center', 
+            padding: '16px 24px', 
+            borderBottom: '1px solid rgba(255,255,255,0.06)',
+            background: 'rgba(5, 13, 8, 0.25)',
+            backdropFilter: 'blur(20px)',
+            flexWrap: 'wrap', 
+            gap: '12px' 
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <button
+                className="hud-btn-floating"
+                onClick={() => setSidebarOpen(prev => !prev)}
+                style={{ 
+                  background: sidebarOpen ? 'rgba(0,230,118,0.15)' : 'rgba(255,255,255,0.02)', 
+                  color: sidebarOpen ? '#ffffff' : '#00e676', 
+                  borderColor: sidebarOpen ? '#00e676' : 'rgba(255,255,255,0.1)',
+                  padding: '8px 12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  fontFamily: 'monospace',
+                  fontSize: '11px',
+                  fontWeight: 'bold',
+                  letterSpacing: '0.5px'
+                }}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="9" y1="3" x2="9" y2="21"></line></svg>
+                {sidebarOpen ? "FECHAR PAINEL" : "ABRIR PAINEL"}
+              </button>
+              <div>
+                <h2 style={{ fontSize: '18px', fontWeight: '800', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ color: '#00e676' }}>🛰</span> {activeFw ? activeFw.nome : "Centro de Operações"}
+                </h2>
+                <span style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.45)' }}>
+                  {activeFw ? `Fazenda/Local: ${activeFw.local} | Data Inicial: ${activeFw.dataInicio}` : "Missão de Inventário Florestal • LeafTag HUD"}
+                </span>
+              </div>
             </div>
             
             <div style={{ display: 'flex', gap: '12px' }}>
@@ -3662,12 +3702,116 @@ export const OfficeDashboard = () => {
             </div>
           </div>
 
+          {/* Navigation Bar / Step Progress (Breadcrumbs) */}
+          {activeLayer === 'process' && (
+            <div style={{ padding: '12px 24px', background: 'rgba(5, 13, 8, 0.15)', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+              <div className="hud-step-progress-bar">
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map(id => {
+                  const status = getStageStatus(id);
+                  const name = getStageName(id);
+                  const isSelected = focusedNode === id;
+                  return (
+                    <React.Fragment key={id}>
+                      <div 
+                        className={`hud-step-item status-${status} ${isSelected ? 'active' : ''}`}
+                        onClick={() => handleStageClick(id)}
+                      >
+                        <span className="hud-step-dot" />
+                        <span className="hud-step-number">{String(id).padStart(2, '0')}</span>
+                        <span className="hud-step-name">{name}</span>
+                      </div>
+                      {id < 11 && <span className="hud-step-arrow">➔</span>}
+                    </React.Fragment>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Core HUD Canvas Container */}
-          <div className="space-hud-container" ref={mapContainerRef}>
+          <div 
+            className="space-hud-container" 
+            ref={mapContainerRef}
+            style={{ 
+              flex: 1, 
+              height: 'auto', 
+              border: 'none', 
+              borderRadius: '0px', 
+              boxShadow: 'none',
+              display: 'flex',
+              flexDirection: 'column'
+            }}
+          >
             
             {/* Stars background */}
             <div className="hud-stars" />
             
+            {/* Left and Right Scroll Navigation Assists */}
+            {activeLayer === 'process' && (
+              <>
+                <button 
+                  className="hud-scroll-arrow left-arrow"
+                  onClick={() => {
+                    if (canvasRef.current) {
+                      canvasRef.current.scrollBy({ left: -360, behavior: 'smooth' });
+                    }
+                  }}
+                  style={{
+                    position: 'absolute',
+                    left: '16px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    zIndex: 10,
+                    background: 'rgba(5, 10, 8, 0.85)',
+                    border: '1px solid rgba(0, 230, 118, 0.25)',
+                    color: '#00e676',
+                    borderRadius: '50%',
+                    width: '36px',
+                    height: '36px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.6)',
+                    transition: 'all 0.2s ease'
+                  }}
+                  title="Rolar para a esquerda"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                </button>
+                <button 
+                  className="hud-scroll-arrow right-arrow"
+                  onClick={() => {
+                    if (canvasRef.current) {
+                      canvasRef.current.scrollBy({ left: 360, behavior: 'smooth' });
+                    }
+                  }}
+                  style={{
+                    position: 'absolute',
+                    right: '16px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    zIndex: 10,
+                    background: 'rgba(5, 10, 8, 0.85)',
+                    border: '1px solid rgba(0, 230, 118, 0.25)',
+                    color: '#00e676',
+                    borderRadius: '50%',
+                    width: '36px',
+                    height: '36px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.6)',
+                    transition: 'all 0.2s ease'
+                  }}
+                  title="Rolar para a direita"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                </button>
+              </>
+            )}
+
             {/* GIS Layer Overlay */}
             {activeLayer === 'gis' && (
               <MapVisualization inventories={activeParcels} onClose={() => { setActiveLayer('process'); setFocusedNode(null); }} />
@@ -3680,7 +3824,7 @@ export const OfficeDashboard = () => {
 
             {/* Nodes Layer - Redesign V2 Horizontal Flow Pipeline with Nested Expandable Tree Nodes */}
             {activeLayer === 'process' && (
-              <div className="space-hud-canvas">
+              <div className="space-hud-canvas" ref={canvasRef}>
                 {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map(id => {
                   const status = getStageStatus(id);
                   const percent = getStagePercent(id);
@@ -3717,17 +3861,17 @@ export const OfficeDashboard = () => {
                           </div>
                           <div className="hud-hover-line">
                             <span>Status:</span>
-                            <span>
+                            <span style={{ color: status === 'complete' || status === 'progress' ? '#00ff66' : '#94a3b8', fontWeight: 'bold' }}>
                               {status === 'complete' ? 'Concluído' : status === 'progress' ? 'Em Progresso' : status === 'warning' ? 'Atenção' : 'Não Iniciado'}
                             </span>
                           </div>
                           <div className="hud-hover-line">
                             <span>Progresso:</span>
-                            <span>{percent}%</span>
+                            <span style={{ color: '#ffffff' }}>{percent}%</span>
                           </div>
                           <div className="hud-hover-line">
                             <span>Métrica:</span>
-                            <span>{kpi}</span>
+                            <span style={{ color: '#cbd5e1' }}>{kpi}</span>
                           </div>
                           <div style={{ marginTop: '8px', borderTop: '1px dashed rgba(255,255,255,0.08)', paddingTop: '6px' }}>
                             <span style={{ fontSize: '9px', color: '#aaa', fontStyle: 'italic', display: 'block', width: '100%', whiteSpace: 'normal', lineHeight: '1.3' }}>
@@ -4058,7 +4202,22 @@ export const OfficeDashboard = () => {
     <div className="office-dashboard-layout" style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg-color)', color: 'var(--text-main)', fontFamily: "'Plus Jakarta Sans', sans-serif", overflowX: 'hidden' }}>
       
       {/* Sidebar (List of projects) */}
-      <div className="office-sidebar" style={{ width: '320px', background: 'rgba(5, 13, 8, 0.4)', backdropFilter: 'blur(30px)', borderRight: '1px solid rgba(255, 255, 255, 0.05)', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
+      <div 
+        className="office-sidebar" 
+        style={{ 
+          width: !sidebarOpen && interfaceMode === 'hud' ? '0px' : '320px', 
+          minWidth: !sidebarOpen && interfaceMode === 'hud' ? '0px' : '320px',
+          background: 'rgba(5, 13, 8, 0.4)', 
+          backdropFilter: 'blur(30px)', 
+          borderRight: !sidebarOpen && interfaceMode === 'hud' ? 'none' : '1px solid rgba(255, 255, 255, 0.05)', 
+          display: 'flex', 
+          flexDirection: 'column', 
+          flexShrink: 0,
+          overflow: 'hidden',
+          transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+          opacity: !sidebarOpen && interfaceMode === 'hud' ? 0 : 1
+        }}
+      >
         
         {interfaceMode === 'hud' ? (
           <>
@@ -4573,9 +4732,32 @@ export const OfficeDashboard = () => {
       </div>
 
       {/* Main Content Area */}
-      <div className="office-content" style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100vh', overflowY: 'auto' }}>
+      <div 
+        className="office-content" 
+        style={{ 
+          flex: 1, 
+          display: 'flex', 
+          flexDirection: 'column', 
+          height: '100vh', 
+          overflowY: interfaceMode === 'hud' ? 'hidden' : 'auto' 
+        }}
+      >
         {activeFw ? (
-          <div style={{ padding: interfaceMode === 'hud' ? '24px' : '32px', boxSizing: 'border-box', width: '100%' }}>
+          <div 
+            style={interfaceMode === 'hud' ? { 
+              padding: '0px', 
+              boxSizing: 'border-box', 
+              width: '100%', 
+              height: '100%', 
+              display: 'flex', 
+              flexDirection: 'column', 
+              overflow: 'hidden' 
+            } : { 
+              padding: '32px', 
+              boxSizing: 'border-box', 
+              width: '100%' 
+            }}
+          >
             
             {/* Project Title and Header buttons */}
             {interfaceMode === 'classic' && (

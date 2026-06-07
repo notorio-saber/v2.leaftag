@@ -942,12 +942,12 @@ body.light-theme .office-tab-button.active {
 }
 
 .hud-node-kpi {
-  font-family: 'Share Tech Mono', monospace;
-  font-size: 9px;
-  color: #00e676;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 10px;
+  font-weight: 500;
+  color: #94a3b8; /* Cool slate gray instead of bright green */
   margin-top: 4px;
-  letter-spacing: 0.5px;
-  opacity: 0.85;
+  letter-spacing: 0.2px;
 }
 
 .status-blocked .hud-node-kpi {
@@ -968,9 +968,9 @@ body.light-theme .office-tab-button.active {
 /* Expand Collapse Button */
 .hud-expand-button {
   margin-top: 8px;
-  background: rgba(0, 230, 118, 0.04);
-  border: 1px solid rgba(0, 230, 118, 0.25);
-  color: #00e676;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #e2e8f0;
   border-radius: 50%;
   width: 22px;
   height: 22px;
@@ -985,19 +985,19 @@ body.light-theme .office-tab-button.active {
 }
 
 .hud-expand-button:hover {
-  background: rgba(0, 230, 118, 0.15);
+  background: rgba(0, 230, 118, 0.12);
   color: #fff;
   border-color: #00e676;
-  box-shadow: 0 0 10px rgba(0, 230, 118, 0.4);
+  box-shadow: 0 0 10px rgba(0, 230, 118, 0.3);
 }
 
 /* Nested vertical tree list container */
 .hud-tree-container {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   width: 100%;
-  margin-top: 24px;
+  margin-top: 20px;
   padding-left: 0;
   position: relative;
   align-items: stretch;
@@ -1011,59 +1011,61 @@ body.light-theme .office-tab-button.active {
   align-items: stretch;
 }
 
-/* Card item inside tree list */
+/* Card item inside tree list (Premium Sans-Serif and clean Dark styling) */
 .hud-tree-card {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 8px 12px;
-  border-radius: 10px;
-  background: rgba(14, 36, 23, 0.15);
-  border: 1px solid rgba(0, 230, 118, 0.1);
-  color: rgba(255, 255, 255, 0.85);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  color: #cbd5e1;
   font-size: 11px;
-  font-family: 'Share Tech Mono', monospace;
+  font-family: 'Plus Jakarta Sans', sans-serif;
   cursor: pointer;
   position: relative;
   transition: all 0.2s ease;
 }
 
 .hud-tree-card:hover {
-  background: rgba(0, 230, 118, 0.06);
-  border-color: rgba(0, 230, 118, 0.3);
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(0, 230, 118, 0.25);
   color: #fff;
-  box-shadow: 0 0 10px rgba(0, 230, 118, 0.15);
-  transform: translateX(2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  transform: translateY(-1px);
 }
 
 .hud-tree-card.active {
-  background: rgba(0, 230, 118, 0.1) !important;
-  border-color: rgba(0, 230, 118, 0.5) !important;
+  background: rgba(0, 230, 118, 0.08) !important;
+  border-color: rgba(0, 230, 118, 0.45) !important;
   color: #ffffff !important;
+  font-weight: 600;
   box-shadow: 
-    0 4px 12px rgba(0, 230, 118, 0.15),
-    inset 0 0 8px rgba(0, 230, 118, 0.1) !important;
+    0 4px 12px rgba(0, 230, 118, 0.12),
+    inset 0 0 8px rgba(0, 230, 118, 0.05) !important;
 }
 
 .hud-tree-card.leaf-node {
   background: rgba(255, 255, 255, 0.01);
   border-color: rgba(255, 255, 255, 0.03);
-  color: var(--text-muted);
+  color: #94a3b8;
 }
 
 .hud-tree-card.leaf-node:hover {
-  border-color: rgba(0, 230, 118, 0.2);
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.03);
   color: #fff;
 }
 
-/* Indented nested items container */
+/* Indented nested items container with light dashed line */
 .hud-tree-nested {
   display: flex;
   flex-direction: column;
   gap: 8px;
   padding-left: 16px;
   margin-top: 8px;
-  border-left: 1px dashed rgba(0, 230, 118, 0.15);
+  border-left: 1px dashed rgba(255, 255, 255, 0.1);
   margin-left: 8px;
 }
 
@@ -1315,7 +1317,143 @@ body.light-theme .office-tab-button.active {
   }
 }
 
+/* Active Node Hologram Focus Effect */
+.hud-node-sphere.active {
+  transform: scale(1.28) translateY(-4px);
+  border-color: #00ff66 !important;
+  box-shadow: 
+    0 15px 35px rgba(0, 0, 0, 0.95),
+    0 0 30px rgba(0, 230, 118, 0.75),
+    inset 0 0 20px rgba(0, 230, 118, 0.35) !important;
+  z-index: 10;
+}
 
+/* Rotating glowing ring when sphere is selected */
+.hud-node-sphere.active .hud-sphere-orbit {
+  border-color: #00ff66 !important;
+  border-style: solid;
+  border-width: 1.5px;
+  animation: hud-orbit-rotate 4s linear infinite; /* Spin faster */
+  opacity: 1;
+  box-shadow: 0 0 12px rgba(0, 230, 118, 0.4);
+}
 
+/* Scrollbar styling for a high-tech sleek track */
+.space-hud-canvas::-webkit-scrollbar {
+  height: 8px;
+  width: 8px;
+}
+.space-hud-canvas::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 4px;
+}
+.space-hud-canvas::-webkit-scrollbar-thumb {
+  background: linear-gradient(90deg, rgba(0, 230, 118, 0.15) 0%, rgba(0, 230, 118, 0.4) 50%, rgba(0, 230, 118, 0.15) 100%);
+  border: 1px solid rgba(0, 230, 118, 0.25);
+  border-radius: 4px;
+  box-shadow: 0 0 8px rgba(0, 230, 118, 0.2);
+}
+.space-hud-canvas::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(90deg, rgba(0, 230, 118, 0.3) 0%, rgba(0, 230, 118, 0.6) 50%, rgba(0, 230, 118, 0.3) 100%);
+  border-color: rgba(0, 230, 118, 0.5);
+  box-shadow: 0 0 12px rgba(0, 230, 118, 0.4);
+}
 
+/* Step navigation breadcrumb indicator bar styling */
+.hud-step-progress-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  overflow-x: auto;
+  padding: 6px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.015);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  scrollbar-width: none; /* Hide scrollbar for step bar */
+}
+.hud-step-progress-bar::-webkit-scrollbar {
+  display: none;
+}
 
+.hud-step-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  opacity: 0.5;
+  padding: 6px 10px;
+  border-radius: 6px;
+  user-select: none;
+}
+.hud-step-item:hover {
+  opacity: 0.85;
+  background: rgba(255, 255, 255, 0.03);
+}
+.hud-step-item.active {
+  opacity: 1;
+  background: rgba(0, 230, 118, 0.08);
+  border: 1px solid rgba(0, 230, 118, 0.2);
+  box-shadow: inset 0 0 10px rgba(0, 230, 118, 0.05);
+}
+
+.hud-step-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #475569;
+  transition: all 0.3s ease;
+}
+
+.hud-step-item.status-complete .hud-step-dot {
+  background: #00e676;
+  box-shadow: 0 0 8px #00e676;
+}
+.hud-step-item.status-progress .hud-step-dot {
+  background: #00ff66;
+  box-shadow: 0 0 10px #00ff66;
+  animation: hud-dot-pulse 1.5s infinite alternate;
+}
+.hud-step-item.status-warning .hud-step-dot {
+  background: #00e676;
+  box-shadow: 0 0 6px #00e676;
+}
+.hud-step-item.status-blocked .hud-step-dot,
+.hud-step-item.status-empty .hud-step-dot {
+  background: #1e293b;
+}
+
+.hud-step-number {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 10px;
+  font-weight: bold;
+  color: #94a3b8;
+}
+.hud-step-item.active .hud-step-number {
+  color: #00ff66;
+}
+
+.hud-step-name {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: #cbd5e1;
+}
+.hud-step-item.active .hud-step-name {
+  color: #ffffff;
+}
+
+.hud-step-arrow {
+  color: #334155;
+  font-size: 9px;
+  margin-left: 4px;
+}
+
+@keyframes hud-dot-pulse {
+  0% { opacity: 0.4; transform: scale(0.8); }
+  100% { opacity: 1; transform: scale(1.2); }
+}
