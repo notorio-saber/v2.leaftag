@@ -2855,6 +2855,7 @@ export const OfficeDashboard = () => {
 
   // Node center calculations for glowing connection lines
   const [nodeCoords, setNodeCoords] = useState<{ x: number; y: number }[]>([]);
+  const [cols, setCols] = useState<number>(4);
   const mapContainerRef = useRef<HTMLDivElement>(null);
 
   const calculateNodeCoords = () => {
@@ -2875,20 +2876,48 @@ export const OfficeDashboard = () => {
   };
 
   useEffect(() => {
-    if (activeTab === 'centro-operacoes') {
+    const handleResize = () => {
+      const w = window.innerWidth;
+      let newCols = 4;
+      if (w <= 550) {
+        newCols = 1;
+      } else if (w <= 850) {
+        newCols = 2;
+      } else if (w <= 1200) {
+        newCols = 3;
+      }
+      setCols(newCols);
       calculateNodeCoords();
+    };
+
+    if (activeTab === 'centro-operacoes') {
+      handleResize();
       const t1 = setTimeout(calculateNodeCoords, 100);
       const t2 = setTimeout(calculateNodeCoords, 400);
       const t3 = setTimeout(calculateNodeCoords, 800);
-      window.addEventListener('resize', calculateNodeCoords);
+      window.addEventListener('resize', handleResize);
       return () => {
-        window.removeEventListener('resize', calculateNodeCoords);
+        window.removeEventListener('resize', handleResize);
         clearTimeout(t1);
         clearTimeout(t2);
         clearTimeout(t3);
       };
     }
   }, [activeTab, activeFwId]);
+
+  useEffect(() => {
+    if (activeTab === 'centro-operacoes') {
+      calculateNodeCoords();
+      const t1 = setTimeout(calculateNodeCoords, 50);
+      const t2 = setTimeout(calculateNodeCoords, 150);
+      const t3 = setTimeout(calculateNodeCoords, 300);
+      return () => {
+        clearTimeout(t1);
+        clearTimeout(t2);
+        clearTimeout(t3);
+      };
+    }
+  }, [cols, activeTab]);
 
   const renderCentroOperacoes = () => {
     try {
@@ -3021,7 +3050,7 @@ export const OfficeDashboard = () => {
             </svg>
           )}
 
-          <div className="operation-map-grid">
+          <div className="operation-map-grid" style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}>
             {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map(id => {
               const status = getStageStatus(id);
               const percent = getStagePercent(id);
@@ -3035,12 +3064,22 @@ export const OfficeDashboard = () => {
               else if (status === 'progress') { statusLabel = 'Em Progresso'; statusColor = '#00b0ff'; }
               else if (status === 'warning') { statusLabel = 'Atenção'; statusColor = '#ff9800'; }
 
+              const idx = id - 1;
+              const rowIndex = Math.floor(idx / cols);
+              const colIndex = rowIndex % 2 === 0 
+                ? idx % cols 
+                : cols - 1 - (idx % cols);
+
               return (
                 <div
                   id={`op-node-${id}`}
                   key={id}
                   className={`operation-node status-${status}`}
                   onClick={() => handleStageClick(id)}
+                  style={{
+                    gridRow: rowIndex + 1,
+                    gridColumn: colIndex + 1
+                  }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
                     <span style={{ fontSize: '9.5px', fontWeight: '800', opacity: 0.5, letterSpacing: '0.5px' }}>ETAPA {String(id).padStart(2, '0')}</span>
