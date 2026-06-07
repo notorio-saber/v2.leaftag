@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import * as XLSX from 'xlsx';
 import { StatisticalDashboard } from '../components/StatisticalDashboard';
 import { SortimentoTab } from '../components/SortimentoTab';
+import { MapVisualization } from '../components/MapVisualization';
 import { db } from '../lib/firebase';
 import { doc, getDoc, updateDoc, setDoc, deleteDoc } from 'firebase/firestore';
 import { 
@@ -139,6 +140,22 @@ export const OfficeDashboard = () => {
   const [activeTab, setActiveTab] = useState<'centro-operacoes' | 'talhoes' | 'parcelas' | 'estratos' | 'cubagem' | 'extrapolacao' | 'processamentos' | 'sortimento'>('centro-operacoes');
   const [extraTab, setExtraTab] = useState<'parcelas' | 'talhoes' | 'estratos' | 'trabalho'>('parcelas');
   const [cubageSortOrder, setCubageSortOrder] = useState<'asc' | 'desc' | null>('desc');
+
+  // HUD states
+  const [activeLayer, setActiveLayer] = useState<'process' | 'gis' | 'stats'>('process');
+  const [focusedNode, setFocusedNode] = useState<number | null>(null);
+  const [interfaceMode, setInterfaceMode] = useState<'hud' | 'classic'>(() => {
+    return (localStorage.getItem('interface_mode') as 'hud' | 'classic') || 'hud';
+  });
+
+  const toggleInterfaceMode = () => {
+    const newMode = interfaceMode === 'hud' ? 'classic' : 'hud';
+    setInterfaceMode(newMode);
+    localStorage.setItem('interface_mode', newMode);
+    if (newMode === 'hud') {
+      setActiveTab('centro-operacoes');
+    }
+  };
   
   // Modals for the Operations Center
   const [showColetaModal, setShowColetaModal] = useState(false);
@@ -2718,41 +2735,7 @@ export const OfficeDashboard = () => {
   };
 
   const handleStageClick = (stageId: number) => {
-    switch (stageId) {
-      case 1:
-        if (activeFw) handleEditClick(activeFw);
-        break;
-      case 2:
-        setActiveTab('talhoes');
-        break;
-      case 3:
-        setActiveTab('estratos');
-        break;
-      case 4:
-        setActiveTab('parcelas');
-        break;
-      case 5:
-        setShowColetaModal(true);
-        break;
-      case 6:
-        setActiveTab('cubagem');
-        break;
-      case 7:
-        navigate('/modelos');
-        break;
-      case 8:
-        setActiveTab('processamentos');
-        break;
-      case 9:
-        setActiveTab('extrapolacao');
-        break;
-      case 10:
-        setActiveTab('sortimento');
-        break;
-      case 11:
-        setShowRelatorioModal(true);
-        break;
-    }
+    setFocusedNode(stageId);
   };
 
   const getNextRecommendedStep = (): string => {
@@ -2853,26 +2836,24 @@ export const OfficeDashboard = () => {
     return list;
   };
 
-  // Node center calculations for glowing connection lines
-  const [nodeCoords, setNodeCoords] = useState<{ x: number; y: number }[]>([]);
+  // Node orbital positioning helper
   const [cols, setCols] = useState<number>(4);
   const mapContainerRef = useRef<HTMLDivElement>(null);
 
-  const calculateNodeCoords = () => {
-    if (!mapContainerRef.current) return;
-    const containerRect = mapContainerRef.current.getBoundingClientRect();
-    const newCoords = [];
-    for (let i = 1; i <= 11; i++) {
-      const el = document.getElementById(`op-node-${i}`);
-      if (el) {
-        const rect = el.getBoundingClientRect();
-        newCoords.push({
-          x: rect.left - containerRect.left + rect.width / 2,
-          y: rect.top - containerRect.top + rect.height / 2
-        });
-      }
+  const getNodePos = (id: number, columns: number) => {
+    if (columns === 1) {
+      return {
+        x: 50,
+        y: (id - 1) * 8.5 + 7.5
+      };
     }
-    setNodeCoords(newCoords);
+    if (id === 1) return { x: 50, y: 50 };
+    const angle = -Math.PI / 2 + (id - 2) * (2 * Math.PI / 10);
+    const radius = 36;
+    return {
+      x: 50 + radius * Math.cos(angle),
+      y: 50 + radius * Math.sin(angle)
+    };
   };
 
   useEffect(() => {
@@ -2887,39 +2868,666 @@ export const OfficeDashboard = () => {
         newCols = 3;
       }
       setCols(newCols);
-      calculateNodeCoords();
     };
 
-    if (activeTab === 'centro-operacoes') {
-      handleResize();
-      const t1 = setTimeout(calculateNodeCoords, 100);
-      const t2 = setTimeout(calculateNodeCoords, 400);
-      const t3 = setTimeout(calculateNodeCoords, 800);
-      window.addEventListener('resize', handleResize);
-      return () => {
-        window.removeEventListener('resize', handleResize);
-        clearTimeout(t1);
-        clearTimeout(t2);
-        clearTimeout(t3);
-      };
-    }
-  }, [activeTab, activeFwId]);
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
 
-  useEffect(() => {
-    if (activeTab === 'centro-operacoes') {
-      calculateNodeCoords();
-      const t1 = setTimeout(calculateNodeCoords, 50);
-      const t2 = setTimeout(calculateNodeCoords, 150);
-      const t3 = setTimeout(calculateNodeCoords, 300);
-      return () => {
-        clearTimeout(t1);
-        clearTimeout(t2);
-        clearTimeout(t3);
-      };
+  const renderSidePanelContent = (id: number) => {
+    if (!activeFw) return null;
+    switch (id) {
+      case 1: // Projeto
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+              <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Nome do Projeto</span>
+              <div style={{ fontSize: '16px', fontWeight: '800', color: '#fff', marginTop: '4px' }}>{activeFw.nome}</div>
+            </div>
+            <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+              <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Local / Fazenda</span>
+              <div style={{ fontSize: '15px', fontWeight: '800', color: '#fff', marginTop: '4px' }}>{activeFw.local}</div>
+            </div>
+            
+            <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <button 
+                type="button" 
+                className="btn btn-secondary" 
+                style={{ width: '100%', margin: 0 }} 
+                onClick={() => setShowSheetsModal(true)}
+              >
+                {activeFw.googleSheetsUrl ? "Planilha Vinculada" : "Vincular Planilha Google"}
+              </button>
+              {activeFw.googleSheetsUrl && (
+                <button 
+                  type="button" 
+                  className="btn btn-primary" 
+                  style={{ width: '100%', background: 'linear-gradient(135deg, #00e676 0%, #00b0ff 100%)', border: 'none', margin: 0 }} 
+                  onClick={handleSyncGoogleSheets}
+                  disabled={isSyncingSheets}
+                >
+                  {isSyncingSheets ? "Sincronizando..." : "Sincronizar Planilha"}
+                </button>
+              )}
+              <button 
+                className="btn btn-secondary" 
+                style={{ width: '100%', margin: 0 }} 
+                onClick={() => handleEditClick(activeFw)}
+              >
+                Editar Metadados
+              </button>
+            </div>
+          </div>
+        );
+        
+      case 2: // Talhões
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button 
+                className="btn btn-primary" 
+                style={{ flex: 1, fontSize: '12px', margin: 0 }} 
+                onClick={() => {
+                  setEditingTalhao({ fieldWorkId: activeFwId });
+                  setEditTalhaoName('');
+                  setEditTalhaoArea('');
+                  setEditTalhaoObs('');
+                }}
+              >
+                + Novo Talhão
+              </button>
+              <button 
+                className="btn btn-secondary" 
+                style={{ flex: 1, fontSize: '12px', borderColor: '#00b0ff', color: '#00b0ff', margin: 0 }} 
+                onClick={() => setActiveLayer('gis')}
+              >
+                Camada GIS Map
+              </button>
+            </div>
+
+            <div style={{ maxHeight: '320px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px', paddingRight: '4px' }}>
+              {activeTalhoes.length === 0 ? (
+                <span style={{ fontSize: '12px', color: 'var(--text-muted)', textAlign: 'center', padding: '20px' }}>Nenhum talhão cadastrado.</span>
+              ) : (
+                activeTalhoes.map(t => {
+                  const talParcels = activeParcels.filter(p => p.talhaoId === t.id);
+                  return (
+                    <div key={t.id} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: '12px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontWeight: 'bold', color: '#fff', fontSize: '13.5px' }}>{t.nome}</span>
+                        <span style={{ color: '#00e676', fontWeight: 'bold', fontSize: '12px' }}>{t.area ? `${Number(t.area).toFixed(2)} ha` : 'S/ Área'}</span>
+                      </div>
+                      <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{talParcels.length} parcelas • {t.observacoes || 'Sem observações'}</span>
+                      <div style={{ display: 'flex', gap: '6px', marginTop: '6px' }}>
+                        <button 
+                          className="btn btn-secondary" 
+                          style={{ height: '24px', padding: '0 8px', fontSize: '10px', margin: 0 }} 
+                          onClick={() => {
+                            setEditingTalhao(t);
+                            setEditTalhaoName(t.nome);
+                            setEditTalhaoArea(t.area?.toString() || '');
+                            setEditTalhaoObs(t.observacoes || '');
+                          }}
+                        >
+                          Editar
+                        </button>
+                        <button 
+                          className="btn btn-danger" 
+                          style={{ height: '24px', padding: '0 8px', fontSize: '10px', margin: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }} 
+                          onClick={() => {
+                            if (confirm(`Excluir o talhão "${t.nome}" apagarão todas as parcelas associadas. Prosseguir?`)) {
+                              deleteTalhao(t.id);
+                            }
+                          }}
+                        >
+                          Excluir
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        );
+
+      case 3: // Estratos
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <button 
+              className="btn btn-primary" 
+              style={{ width: '100%', fontSize: '12px', margin: 0 }} 
+              onClick={() => setShowStratumModal(true)}
+            >
+              + Novo Estrato
+            </button>
+
+            <div style={{ maxHeight: '320px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px', paddingRight: '4px' }}>
+              {activeStrata.length === 0 ? (
+                <span style={{ fontSize: '12px', color: 'var(--text-muted)', textAlign: 'center', padding: '20px' }}>Nenhum estrato cadastrado.</span>
+              ) : (
+                activeStrata.map(s => {
+                  const stratParcels = activeParcels.filter(p => p.stratumId === s.id);
+                  return (
+                    <div key={s.id} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: '12px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontWeight: 'bold', color: '#fff', fontSize: '13.5px' }}>{s.nome}</span>
+                        <span style={{ color: '#00e676', fontWeight: 'bold', fontSize: '12px' }}>{s.area ? `${Number(s.area).toFixed(2)} ha` : 'S/ Área'}</span>
+                      </div>
+                      <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{stratParcels.length} parcelas • {s.descricao || 'Sem descrição'}</span>
+                      <div>
+                        <button 
+                          className="btn btn-danger" 
+                          style={{ height: '24px', padding: '0 8px', fontSize: '10px', margin: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }} 
+                          onClick={() => {
+                            if (confirm(`Deseja excluir o estrato "${s.nome}"?`)) {
+                              deleteStratum(s.id);
+                            }
+                          }}
+                        >
+                          Excluir
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        );
+
+      case 4: // Parcelas
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button 
+                className="btn btn-secondary" 
+                style={{ flex: 1, fontSize: '12px', borderColor: '#00b0ff', color: '#00b0ff', margin: 0 }} 
+                onClick={() => setActiveLayer('gis')}
+              >
+                Camada GIS Map
+              </button>
+            </div>
+
+            <div style={{ maxHeight: '350px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px', paddingRight: '4px' }}>
+              {activeParcels.length === 0 ? (
+                <span style={{ fontSize: '12px', color: 'var(--text-muted)', textAlign: 'center', padding: '20px' }}>Nenhuma parcela cadastrada.</span>
+              ) : (
+                activeParcels.map(p => (
+                  <div key={p.id} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: '12px', padding: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <span style={{ fontWeight: 'bold', color: '#fff', fontSize: '13.5px' }}>{p.nome}</span>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                        Área: {p.areaParcela} m² • {p.dados.length} árvores
+                      </div>
+                    </div>
+                    <span style={{ 
+                      fontSize: '10px', 
+                      padding: '2px 8px', 
+                      borderRadius: '10px', 
+                      background: 'rgba(255,255,255,0.03)', 
+                      color: p.status === 'Concluído' ? '#00e676' : p.status === 'Em andamento' ? '#00b0ff' : 'var(--text-muted)',
+                      fontWeight: '700' 
+                    }}>
+                      {p.status || 'Pendente'}
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        );
+
+      case 5: // Coleta de Campo
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <button 
+              className="btn btn-primary" 
+              style={{ width: '100%', fontSize: '12px', margin: 0 }} 
+              onClick={() => setShowColetaModal(true)}
+            >
+              Auditoria de Coletas
+            </button>
+
+            <div style={{ background: 'rgba(255,255,255,0.01)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.04)' }}>
+              <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Resumo de Coleta</span>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '12px' }}>
+                <div>
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Total Árvores</span>
+                  <div style={{ fontSize: '18px', fontWeight: '800', color: '#fff', marginTop: '2px' }}>{kpis.totalTrees}</div>
+                </div>
+                <div>
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Espécies</span>
+                  <div style={{ fontSize: '18px', fontWeight: '800', color: '#00e676', marginTop: '2px' }}>{kpis.speciesCount}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+
+      case 6: // Cubagem
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ background: 'rgba(255,255,255,0.01)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.04)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Fustes Cubados</span>
+                <div style={{ fontSize: '20px', fontWeight: '800', color: '#00b0ff', marginTop: '2px' }}>{allCubagedTrees.length}</div>
+              </div>
+              <button 
+                className="btn btn-secondary" 
+                style={{ width: 'auto', fontSize: '11px', margin: 0 }} 
+                onClick={() => {
+                  setActiveTab('cubagem');
+                  setInterfaceMode('classic');
+                }}
+              >
+                Gerenciar Fustes
+              </button>
+            </div>
+          </div>
+        );
+
+      case 7: // Modelos
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <label style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Modelo Hipsométrico</label>
+              <select 
+                className="input-field" 
+                style={{ marginBottom: 0, background: 'rgba(0,0,0,0.3)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }} 
+                value={selectedHeightModelId} 
+                onChange={async (e) => {
+                  setSelectedHeightModelId(e.target.value);
+                  if (activeFwId) {
+                    await updateDoc(doc(db, 'fieldWorks', activeFwId), {
+                      selectedHeightModelId: e.target.value
+                    });
+                  }
+                }}
+              >
+                <option value="none">Nenhum (Usar H Medida)</option>
+                {heightModels.map(m => (
+                  <option key={m.id} value={m.id}>{m.nome} ({m.tipoModelo})</option>
+                ))}
+              </select>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <label style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Modelo Volumétrico</label>
+              <select 
+                className="input-field" 
+                style={{ marginBottom: 0, background: 'rgba(0,0,0,0.3)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }} 
+                value={selectedVolumeModelId} 
+                onChange={async (e) => {
+                  setSelectedVolumeModelId(e.target.value);
+                  if (activeFwId) {
+                    await updateDoc(doc(db, 'fieldWorks', activeFwId), {
+                      selectedVolumeModelId: e.target.value
+                    });
+                  }
+                }}
+              >
+                <option value="legacy">Fator de Forma Clássico (Legacy)</option>
+                {volumeModels.map(m => (
+                  <option key={m.id} value={m.id}>{m.nome} ({m.tipoModelo})</option>
+                ))}
+              </select>
+            </div>
+
+            <button 
+              className="btn btn-secondary" 
+              style={{ width: '100%', marginTop: '12px', margin: 0 }} 
+              onClick={() => navigate('/modelos')}
+            >
+              Biblioteca de Equações
+            </button>
+          </div>
+        );
+
+      case 8: // Processamento
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button 
+                className="btn btn-primary" 
+                style={{ flex: 1, fontSize: '12px', margin: 0 }} 
+                onClick={() => {
+                  setBatchScope('total');
+                  setBatchTalhaoId('');
+                  setBatchParcelId(null);
+                  setShowBatchProcessModal(true);
+                }}
+              >
+                Processar em Lote
+              </button>
+              <button 
+                className="btn btn-secondary" 
+                style={{ flex: 1, fontSize: '12px', borderColor: '#00e676', color: '#00e676', margin: 0 }} 
+                onClick={() => setActiveLayer('stats')}
+              >
+                Sala Estatística
+              </button>
+            </div>
+
+            <div style={{ maxHeight: '250px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px', paddingRight: '4px' }}>
+              {activeProcessings.length === 0 ? (
+                <span style={{ fontSize: '12px', color: 'var(--text-muted)', textAlign: 'center', padding: '20px' }}>Nenhum snapshot oficializado.</span>
+              ) : (
+                activeProcessings.map(p => (
+                  <div key={p.id} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: '12px', padding: '12px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontWeight: 'bold', color: '#fff', fontSize: '13px' }}>{p.nomeProcessamento}</span>
+                      <button 
+                        className="btn btn-danger" 
+                        style={{ height: '20px', width: '20px', padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', margin: 0 }} 
+                        onClick={() => deleteProcessing(p.id)}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                      Data: {p.dataProcessamento} • Vol: {Math.round(p.volumeTotalEstimado || 0).toLocaleString()} m³
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        );
+
+      case 9: // Extrapolação
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <button 
+              className="btn btn-primary" 
+              style={{ width: '100%', fontSize: '12px', margin: 0 }} 
+              onClick={() => setActiveLayer('stats')}
+            >
+              Ver Fitossociologia e Estatísticas
+            </button>
+            {latestOfficialProcessing && (
+              <div style={{ background: 'rgba(255,255,255,0.01)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.04)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Snapshot Oficial</span>
+                <div>
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Erro de Amostragem %</span>
+                  <div style={{ fontSize: '18px', fontWeight: '800', color: '#fff', marginTop: '2px' }}>
+                    {stratifiedStats.errorRel !== undefined 
+                      ? `${stratifiedStats.errorRel.toFixed(2)}%`
+                      : 'N/D'}
+                  </div>
+                </div>
+                <div>
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Intervalo de Confiança</span>
+                  <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                    {stratifiedStats.meanSt !== undefined && stratifiedStats.errorAbs !== undefined
+                      ? `${Math.round(Math.max(0, stratifiedStats.meanSt - stratifiedStats.errorAbs))} a ${Math.round(stratifiedStats.meanSt + stratifiedStats.errorAbs)} m³/ha`
+                      : 'N/D'}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+
+      case 10: // Sortimento
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', height: '400px', overflowY: 'auto' }}>
+            <SortimentoTab activeFw={activeFw} inventories={inventories} activeTalhoes={activeTalhoes} />
+          </div>
+        );
+
+      case 11: // Relatório
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <button 
+                className="btn btn-primary" 
+                style={{ width: '100%', fontSize: '12px', margin: 0 }} 
+                onClick={() => setShowRelatorioModal(true)}
+              >
+                Baixar Relatórios Executivos
+              </button>
+              <button 
+                className="btn btn-secondary" 
+                style={{ width: '100%', fontSize: '12px', margin: 0 }} 
+                onClick={handleExportAll}
+              >
+                Exportar Excel Completo
+              </button>
+              {latestOfficialProcessing && (
+                <button 
+                  className="btn btn-secondary" 
+                  style={{ width: '100%', fontSize: '12px', borderColor: '#fbc02d', color: '#ffd54f', background: 'rgba(251,192,45,0.08)', margin: 0 }} 
+                  onClick={handleExportAllProcessed}
+                >
+                  Exportar Processamento (Excel)
+                </button>
+              )}
+            </div>
+          </div>
+        );
+
+      default:
+        return null;
     }
-  }, [cols, activeTab]);
+  };
+
+  const renderSpaceHud = () => {
+    try {
+      let completedStagesCount = 0;
+      for (let i = 1; i <= 11; i++) {
+        if (getStageStatus(i) === 'complete') {
+          completedStagesCount++;
+        }
+      }
+      
+      return (
+        <div className="operation-center" style={{ animation: 'fadeInUp 0.6s ease', height: '100%' }}>
+          
+          {/* HUD Top bar */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
+            <div>
+              <h2 style={{ fontSize: '18px', fontWeight: '800', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ color: '#00b0ff' }}>🛰</span> {activeFw ? activeFw.nome : "Centro de Operações"}
+              </h2>
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                {activeFw ? `Fazenda/Local: ${activeFw.local} | Data Inicial: ${activeFw.dataInicio}` : "Missão de Inventário Florestal • LeafTag HUD"}
+              </span>
+            </div>
+            
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button 
+                className="hud-btn-floating"
+                onClick={() => { setActiveLayer('process'); setFocusedNode(null); }}
+                style={{ background: activeLayer === 'process' ? 'rgba(0,176,255,0.2)' : 'rgba(255,255,255,0.02)', color: activeLayer === 'process' ? '#fff' : '#00b0ff' }}
+              >
+                Visão de Processo
+              </button>
+              <button 
+                className="hud-btn-floating"
+                onClick={() => { setActiveLayer('gis'); setFocusedNode(null); }}
+                style={{ background: activeLayer === 'gis' ? 'rgba(0,176,255,0.2)' : 'rgba(255,255,255,0.02)', color: activeLayer === 'gis' ? '#fff' : '#00b0ff' }}
+              >
+                Camada GIS (Territorial)
+              </button>
+              <button 
+                className="hud-btn-floating"
+                onClick={() => { setActiveLayer('stats'); setFocusedNode(null); }}
+                style={{ background: activeLayer === 'stats' ? 'rgba(0,176,255,0.2)' : 'rgba(255,255,255,0.02)', color: activeLayer === 'stats' ? '#fff' : '#00b0ff' }}
+              >
+                Sala Estatística
+              </button>
+            </div>
+          </div>
+
+          {/* Core HUD Canvas Container */}
+          <div className="space-hud-container" ref={mapContainerRef}>
+            
+            {/* Stars background */}
+            <div className="hud-stars" />
+            
+            {/* GIS Layer Overlay */}
+            {activeLayer === 'gis' && (
+              <MapVisualization inventories={activeParcels} onClose={() => { setActiveLayer('process'); setFocusedNode(null); }} />
+            )}
+
+            {/* Stats Layer Overlay */}
+            {activeLayer === 'stats' && (
+              <StatisticalDashboard inventories={activeParcels} onClose={() => { setActiveLayer('process'); setFocusedNode(null); }} />
+            )}
+
+            {/* Nodes and SVG connections Layer */}
+            {activeLayer === 'process' && (
+              <div 
+                className="hud-camera-viewport" 
+                style={
+                  focusedNode !== null
+                    ? { transform: `translate(${cols === 1 ? 50 - getNodePos(focusedNode, cols).x : 32 - getNodePos(focusedNode, cols).x}%, ${50 - getNodePos(focusedNode, cols).y}%) scale(${cols === 1 ? 1.6 : 2.2})` }
+                    : { transform: 'translate(0%, 0%) scale(1)' }
+                }
+              >
+                {/* SVG Connections */}
+                <svg className="hud-svg-overlay" viewBox="0 0 100 100" preserveAspectRatio="none">
+                  {[2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map(targetId => {
+                    const startId = targetId === 2 ? 1 : targetId - 1;
+                    const startPos = getNodePos(startId, cols);
+                    const endPos = getNodePos(targetId, cols);
+                    const targetStatus = getStageStatus(targetId);
+                    
+                    let lineClass = 'line-empty';
+                    if (targetStatus === 'complete') lineClass = 'line-complete';
+                    else if (targetStatus === 'progress') lineClass = 'line-progress';
+                    else if (targetStatus === 'warning') lineClass = 'line-warning';
+                    
+                    return (
+                      <line
+                        key={targetId}
+                        x1={startPos.x}
+                        y1={startPos.y}
+                        x2={endPos.x}
+                        y2={endPos.y}
+                        className={`hud-connection-line ${lineClass}`}
+                      />
+                    );
+                  })}
+                </svg>
+
+                {/* Esferas / Nodes */}
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map(id => {
+                  const status = getStageStatus(id);
+                  const percent = getStagePercent(id);
+                  const name = getStageName(id);
+                  const pos = getNodePos(id, cols);
+                  const isFocused = focusedNode === id;
+                  
+                  return (
+                    <div
+                      key={id}
+                      id={`op-node-${id}`}
+                      className={`hud-sphere status-${status} ${id === 1 ? 'center-node' : ''} ${isFocused ? 'active' : ''}`}
+                      style={{
+                        left: `${pos.x}%`,
+                        top: `${pos.y}%`
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleStageClick(id);
+                      }}
+                    >
+                      {/* Orbital rings */}
+                      <div className="hud-sphere-ring" />
+                      <div className="hud-sphere-ring outer-ring" />
+                      
+                      {/* Icon */}
+                      <div className="hud-sphere-icon" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: id === 1 ? '4px' : '2px' }}>
+                        {getNodeIcon(id)}
+                      </div>
+                      
+                      {/* Text */}
+                      <span style={{ fontSize: id === 1 ? '11.5px' : '9.5px', fontWeight: '800', textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                        {id === 1 ? "PROJETO" : name}
+                      </span>
+                      {id !== 1 && (
+                        <span style={{ fontSize: '8px', opacity: 0.6, marginTop: '2px', fontWeight: 'bold' }}>
+                          {percent}%
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            
+            {/* Sliding Control Side Panel */}
+            <div className={`glass-side-panel ${focusedNode !== null ? 'open' : ''}`}>
+              {focusedNode !== null && (
+                <>
+                  <div className="glass-side-panel-header">
+                    <div>
+                      <span style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: '800', letterSpacing: '1px' }}>ETAPA {String(focusedNode).padStart(2, '0')}</span>
+                      <h3 style={{ fontSize: '16px', fontWeight: '800', margin: '2px 0 0 0', color: '#fff' }}>{focusedNode === 1 ? "PROJETO" : getStageName(focusedNode)}</h3>
+                    </div>
+                    <button 
+                      className="btn btn-secondary" 
+                      style={{ width: 'auto', padding: '4px 10px', fontSize: '11px', margin: 0 }} 
+                      onClick={() => setFocusedNode(null)}
+                    >
+                      Fechar [X]
+                    </button>
+                  </div>
+                  
+                  <div className="glass-side-panel-body">
+                    {/* Status Alert */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '12px 16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                      <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Status da Etapa</span>
+                      <span style={{ 
+                        fontSize: '11px', 
+                        fontWeight: '800', 
+                        textTransform: 'uppercase', 
+                        color: getStageStatus(focusedNode) === 'complete' ? '#00e676' : getStageStatus(focusedNode) === 'progress' ? '#00b0ff' : getStageStatus(focusedNode) === 'warning' ? '#ff1744' : 'var(--text-muted)' 
+                      }}>
+                        {getStageStatus(focusedNode) === 'complete' ? 'Concluído' : getStageStatus(focusedNode) === 'progress' ? 'Em Progresso' : getStageStatus(focusedNode) === 'warning' ? 'Atenção' : 'Não Iniciado'}
+                      </span>
+                    </div>
+
+                    {/* Stage description */}
+                    <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: 0, lineHeight: '1.4' }}>
+                      {getStageDescription(focusedNode)}
+                    </p>
+
+                    <div style={{ height: '1px', background: 'rgba(255,255,255,0.08)', margin: '4px 0' }} />
+                    
+                    {/* Render Node Specific Subviews */}
+                    {renderSidePanelContent(focusedNode)}
+                  </div>
+                </>
+              )}
+            </div>
+
+          </div>
+        </div>
+      );
+    } catch (err: any) {
+      console.error("Erro ao renderizar o Space HUD:", err);
+      return (
+        <div className="glass-card" style={{ padding: '24px', border: '1px solid rgba(239,35,60,0.2)', background: 'rgba(239,35,60,0.05)', color: '#ff4d6d' }}>
+          <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '800' }}>Erro no Space HUD</h3>
+          <pre style={{ background: 'rgba(0,0,0,0.3)', padding: '12px', borderRadius: '8px', marginTop: '12px', fontSize: '12px', color: '#fff', overflowX: 'auto' }}>
+            {err.stack || err.message || String(err)}
+          </pre>
+        </div>
+      );
+    }
+  };
 
   const renderCentroOperacoes = () => {
+    if (interfaceMode === 'hud') {
+      return renderSpaceHud();
+    }
+
     try {
       const nextStep = getNextRecommendedStep();
       const bottlenecks = getBottlenecks();
@@ -3018,37 +3626,30 @@ export const OfficeDashboard = () => {
 
         {/* MAPA OPERACIONAL COM SVG CONNECTOR */}
         <div className="operation-map-container" ref={mapContainerRef}>
-          {nodeCoords.length > 0 && (
-            <svg className="operation-svg-overlay">
-              <defs>
-                <filter id="line-glow" x="-20%" y="-20%" width="140%" height="140%">
-                  <feGaussianBlur stdDeviation="3" result="blur" />
-                  <feComposite in="SourceGraphic" in2="blur" operator="over" />
-                </filter>
-              </defs>
-              {nodeCoords.map((start, idx) => {
-                if (idx === nodeCoords.length - 1) return null;
-                const end = nodeCoords[idx + 1];
-                const targetStatus = getStageStatus(idx + 2);
-                let lineClass = 'line-empty';
-                if (targetStatus === 'complete') lineClass = 'line-complete';
-                else if (targetStatus === 'progress') lineClass = 'line-progress';
-                else if (targetStatus === 'warning') lineClass = 'line-warning';
-                
-                return (
-                  <line
-                    key={idx}
-                    x1={start.x}
-                    y1={start.y}
-                    x2={end.x}
-                    y2={end.y}
-                    className={`operation-link ${lineClass}`}
-                    style={{ filter: lineClass !== 'line-empty' ? 'url(#line-glow)' : 'none' }}
-                  />
-                );
-              })}
-            </svg>
-          )}
+          <svg className="operation-svg-overlay" viewBox="0 0 100 100" preserveAspectRatio="none">
+            {[2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map(targetId => {
+              const startId = targetId === 2 ? 1 : targetId - 1;
+              const startPos = getNodePos(startId, cols);
+              const endPos = getNodePos(targetId, cols);
+              const targetStatus = getStageStatus(targetId);
+              
+              let lineClass = 'line-empty';
+              if (targetStatus === 'complete') lineClass = 'line-complete';
+              else if (targetStatus === 'progress') lineClass = 'line-progress';
+              else if (targetStatus === 'warning') lineClass = 'line-warning';
+              
+              return (
+                <line
+                  key={targetId}
+                  x1={startPos.x}
+                  y1={startPos.y}
+                  x2={endPos.x}
+                  y2={endPos.y}
+                  className={`hud-connection-line ${lineClass}`}
+                />
+              );
+            })}
+          </svg>
 
           <div className="operation-map-grid" style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}>
             {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map(id => {
@@ -3145,347 +3746,525 @@ export const OfficeDashboard = () => {
       {/* Sidebar (List of projects) */}
       <div className="office-sidebar" style={{ width: '320px', background: 'rgba(5, 13, 8, 0.4)', backdropFilter: 'blur(30px)', borderRight: '1px solid rgba(255, 255, 255, 0.05)', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
         
-        {/* Brand Header */}
-        <div style={{ padding: '24px 24px 16px', display: 'flex', flexDirection: 'column', gap: '12px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <img src="/logo.png" alt="Logo" style={{ width: '40px', height: '40px' }} />
-            <div style={{ flex: 1 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <h1 style={{ color: 'var(--primary-color)', fontSize: '18px', fontWeight: '800', margin: 0, letterSpacing: '0.5px' }}>LeafTag</h1>
-                
-                {/* Cloud Sync Icon */}
-                <div 
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: isSynced ? '#81c784' : '#ffb74d',
-                    transition: 'all 0.3s ease',
-                    cursor: 'default'
-                  }}
-                  title={isSynced ? "Dados 100% Sincronizados" : "Sincronizando com a Nuvem..."}
-                >
-                  <svg 
-                    xmlns="http://www.w3.org/2000/svg" 
-                    width="10" 
-                    height="10" 
-                    viewBox="0 0 24 24" 
-                    fill="none" 
-                    stroke="currentColor" 
-                    strokeWidth="2.5" 
-                    strokeLinecap="round" 
-                    strokeLinejoin="round"
-                    className={isSynced ? "" : "spin-icon"}
-                  >
-                    <path d="M17.5 19A3.5 3.5 0 0 0 21 15.5c0-2.79-2.54-4.5-5-4.5-.47-.47-1.15-.78-2-.78-2 0-3.5 1.5-3.5 3.5v.78c-2.3 0-4 1.7-4 4A3.5 3.5 0 0 0 10 22h7.5" />
-                    {isSynced && <path d="M9 16l2 2 4-4" />}
-                  </svg>
+        {interfaceMode === 'hud' ? (
+          <>
+            {/* HUD Brand Header */}
+            <div style={{ padding: '24px 24px 16px', display: 'flex', flexDirection: 'column', gap: '8px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <img src="/logo.png" alt="Logo" style={{ width: '40px', height: '40px', filter: 'hue-rotate(180deg)' }} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <h1 style={{ color: '#00b0ff', fontSize: '18px', fontWeight: '900', margin: 0, letterSpacing: '1px' }}>LEAFTAG</h1>
+                    <span className="hud-badge pulse" style={{ background: 'rgba(0, 230, 118, 0.15)', color: '#00e676', fontSize: '8px', padding: '2px 6px', borderRadius: '4px', border: '1px solid #00e676', fontWeight: 'bold' }}>HUD</span>
+                  </div>
+                  <span style={{ fontSize: '9px', color: '#00b0ff', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '2px', opacity: 0.8 }}>CENTRO DE OPERAÇÕES</span>
                 </div>
               </div>
-              <span style={{ fontSize: '11px', color: '#00e676', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '1px' }}>Painel Escritório</span>
             </div>
-          </div>
-          <div>
-            <button 
-              onClick={() => {
-                localStorage.setItem('preferredMode', 'field');
-                navigate('/');
-              }}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                color: 'var(--text-muted)',
-                fontSize: '11px',
-                cursor: 'pointer',
-                padding: '4px 0',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                textDecoration: 'none',
-                transition: 'all 0.2s',
-                fontFamily: 'inherit',
-                fontWeight: '600'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.color = '#00e676';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.color = 'var(--text-muted)';
-              }}
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
-              Ir para Modo Campo
-            </button>
-          </div>
-        </div>
 
-        {/* Biblioteca de Modelos Button */}
-        <div style={{ padding: '12px 24px 4px' }}>
-          <button 
-            onClick={() => navigate('/modelos')}
-            style={{
-              width: '100%',
-              background: 'linear-gradient(135deg, rgba(0, 230, 118, 0.15) 0%, rgba(0, 176, 255, 0.15) 100%)',
-              border: '1px solid rgba(0, 230, 118, 0.35)',
-              borderRadius: '12px',
-              color: '#ffffff',
-              padding: '12px 16px',
-              fontSize: '13px',
-              fontWeight: '700',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '10px',
-              transition: 'all 0.2s ease',
-              boxShadow: '0 4px 12px rgba(0, 230, 118, 0.05)'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.border = '1px solid #00e676';
-              e.currentTarget.style.transform = 'translateY(-1px)';
-              e.currentTarget.style.boxShadow = '0 6px 16px rgba(0, 230, 118, 0.15)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.border = '1px solid rgba(0, 230, 118, 0.35)';
-              e.currentTarget.style.transform = 'none';
-              e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 230, 118, 0.05)';
-            }}
-          >
-            <span>Biblioteca de Equações</span>
-          </button>
-        </div>
-
-        {/* Project search */}
-        <div style={{ padding: '8px 24px' }}>
-          <div style={{ position: 'relative' }}>
-            <input 
-              type="text" 
-              className="input-field" 
-              placeholder="Pesquisar projetos..."
-              style={{ background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '10px', fontSize: '13px', paddingLeft: '34px', marginBottom: 0 }}
-              value={searchProjectQuery}
-              onChange={e => setSearchProjectQuery(e.target.value)}
-            />
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }}>
-              <circle cx="11" cy="11" r="8"></circle>
-              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-            </svg>
-          </div>
-        </div>
-
-        {/* Project list items */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '12px 24px' }}>
-          <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '0.8px', display: 'block', marginBottom: '8px' }}>
-            Trabalhos de Campo ({filteredFieldWorks.length})
-          </span>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {filteredFieldWorks.map(fw => {
-              const countTalhoes = talhoes.filter(t => t.fieldWorkId === fw.id).length;
-              const countParcelas = inventories.filter(i => i.fieldWorkId === fw.id && i.template !== 'cubagem').length;
-              const countArvores = inventories
-                .filter(i => i.fieldWorkId === fw.id)
-                .reduce((acc, curr) => acc + (curr.dados ? curr.dados.length : 0), 0);
-              const isActive = fw.id === activeFwId;
-              return (
-                <div 
-                  key={fw.id} 
-                  onClick={() => setActiveFwId(fw.id)}
-                  style={{
-                    padding: '12px 16px',
-                    borderRadius: '12px',
-                    cursor: 'pointer',
-                    background: isActive ? 'rgba(0, 230, 118, 0.08)' : 'rgba(255, 255, 255, 0.01)',
-                    border: isActive ? '1px solid rgba(0, 230, 118, 0.3)' : '1px solid rgba(255, 255, 255, 0.04)',
-                    transition: 'all 0.2s ease',
-                    position: 'relative',
-                    overflow: 'visible'
-                  }}
-                >
-                  {isActive && (
-                    <div style={{ position: 'absolute', left: '0', top: '50%', transform: 'translateY(-50%)', width: '3px', height: '20px', background: 'var(--primary-color)', borderRadius: '0 4px 4px 0' }} />
-                  )}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <h4 style={{ fontSize: '13.5px', margin: 0, fontWeight: '700', color: isActive ? 'var(--primary-hover)' : '#fff', flex: 1, paddingRight: '8px' }}>{fw.nome}</h4>
-                    <div style={{ position: 'relative' }}>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setActiveMenuFwId(activeMenuFwId === fw.id ? null : fw.id);
-                        }}
-                        style={{
-                          background: 'transparent',
-                          border: 'none',
-                          color: 'var(--text-muted)',
-                          fontSize: '18px',
-                          cursor: 'pointer',
-                          padding: '0 4px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          transition: 'color 0.2s',
-                          lineHeight: 1
-                        }}
-                        onMouseEnter={(e) => { e.currentTarget.style.color = '#fff'; }}
-                        onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; }}
-                      >
-                        •••
-                      </button>
-                      
-                      {activeMenuFwId === fw.id && (
-                        <div 
-                          style={{
-                            position: 'absolute',
-                            top: '24px',
-                            right: '0',
-                            background: '#1a1a1a',
-                            border: '1px solid rgba(255, 255, 255, 0.08)',
-                            borderRadius: '12px',
-                            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)',
-                            zIndex: 100,
-                            minWidth: '130px',
-                            overflow: 'hidden',
-                            backdropFilter: 'blur(16px)',
-                            WebkitBackdropFilter: 'blur(16px)',
-                          }}
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleEditClick(fw);
-                            }}
-                            style={{
-                              width: '100%',
-                              padding: '10px 16px',
-                              background: 'transparent',
-                              border: 'none',
-                              color: '#fff',
-                              fontSize: '13px',
-                              textAlign: 'left',
-                              cursor: 'pointer',
-                              transition: 'background-color 0.2s',
-                              borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
-                              display: 'block',
-                            }}
-                            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)'; }}
-                            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
-                          >
-                            Editar
-                          </button>
-                          <button
-                            type="button"
-                            onClick={async (e) => {
-                              e.stopPropagation();
-                              setActiveMenuFwId(null);
-                              if (confirm(`Deseja duplicar o trabalho de campo "${fw.nome}"?`)) {
-                                try {
-                                  await duplicateFieldWork(fw.id);
-                                  alert("Trabalho de campo duplicado com sucesso.");
-                                } catch (err: any) {
-                                  alert("Erro ao duplicar: " + err.message);
-                                }
-                              }
-                            }}
-                            style={{
-                              width: '100%',
-                              padding: '10px 16px',
-                              background: 'transparent',
-                              border: 'none',
-                              color: '#fff',
-                              fontSize: '13px',
-                              textAlign: 'left',
-                              cursor: 'pointer',
-                              transition: 'background-color 0.2s',
-                              borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
-                              display: 'block',
-                            }}
-                            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)'; }}
-                            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
-                          >
-                            Duplicar
-                          </button>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setActiveMenuFwId(null);
-                              handleExportFieldWork(fw);
-                            }}
-                            style={{
-                              width: '100%',
-                              padding: '10px 16px',
-                              background: 'transparent',
-                              border: 'none',
-                              color: '#fff',
-                              fontSize: '13px',
-                              textAlign: 'left',
-                              cursor: 'pointer',
-                              transition: 'background-color 0.2s',
-                              display: 'block',
-                            }}
-                            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)'; }}
-                            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
-                          >
-                            Exportar
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginTop: '4px' }}>
-                    Local: {fw.local}
-                  </span>
-                  <span style={{ fontSize: '10.5px', color: 'var(--text-muted)', display: 'block', marginTop: '2px', opacity: 0.8 }}>
-                    {countTalhoes} {countTalhoes === 1 ? 'talhão' : 'talhões'} • {countParcelas} {countParcelas === 1 ? 'parcela' : 'parcelas'} • {countArvores} {countArvores === 1 ? 'árvore' : 'árvores'}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Profile Footer */}
-        <div style={{ padding: '16px 20px', borderTop: '1px solid rgba(255,255,255,0.05)', background: 'rgba(0,0,0,0.15)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-            <div style={{ minWidth: 0, flex: 1 }}>
-              <span style={{ fontSize: '12.5px', color: '#fff', fontWeight: 'bold', display: 'block', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{currentUser?.displayName || 'Escritório'}</span>
-              <span style={{ fontSize: '10.5px', color: 'var(--text-muted)', display: 'block', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{currentUser?.email}</span>
-            </div>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexShrink: 0 }}>
+            {/* Toggle Button Bezel */}
+            <div style={{ padding: '16px 24px 8px', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
               <button 
-                onClick={() => setShowSettingsModal(true)}
-                style={{ 
-                  background: 'transparent', 
-                  border: 'none', 
-                  color: 'var(--text-muted)', 
-                  cursor: 'pointer', 
-                  display: 'flex', 
-                  alignItems: 'center', 
+                onClick={toggleInterfaceMode}
+                style={{
+                  width: '100%',
+                  background: 'rgba(0, 176, 255, 0.04)',
+                  border: '1px dashed rgba(0, 176, 255, 0.4)',
+                  borderRadius: '10px',
+                  color: '#00b0ff',
+                  padding: '10px 14px',
+                  fontSize: '11px',
+                  fontWeight: 'bold',
+                  letterSpacing: '1px',
+                  textTransform: 'uppercase',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  display: 'flex',
+                  alignItems: 'center',
                   justifyContent: 'center',
-                  padding: '4px'
+                  gap: '8px',
+                  fontFamily: 'monospace'
                 }}
-                title="Configurações"
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(0, 176, 255, 0.12)';
+                  e.currentTarget.style.border = '1px solid #00b0ff';
+                  e.currentTarget.style.color = '#fff';
+                  e.currentTarget.style.boxShadow = '0 0 12px rgba(0, 176, 255, 0.2)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'rgba(0, 176, 255, 0.04)';
+                  e.currentTarget.style.border = '1px dashed rgba(0, 176, 255, 0.4)';
+                  e.currentTarget.style.color = '#00b0ff';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
               >
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="3"></circle>
-                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
                 </svg>
+                Alternar p/ Modo Clássico
               </button>
             </div>
-          </div>
-        </div>
+
+            {/* Sector/Project Selector (Sci-Fi Theme) */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '16px 24px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <span style={{ fontSize: '9px', color: '#00b0ff', textTransform: 'uppercase', fontWeight: '900', letterSpacing: '1.5px', display: 'block', fontFamily: 'monospace' }}>
+                // TRABALHOS_DE_CAMPO.LOG
+              </span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {filteredFieldWorks.map(fw => {
+                  const isActive = fw.id === activeFwId;
+                  const countTalhoes = talhoes.filter(t => t.fieldWorkId === fw.id).length;
+                  const countParcelas = inventories.filter(i => i.fieldWorkId === fw.id && i.template !== 'cubagem').length;
+                  return (
+                    <div 
+                      key={fw.id} 
+                      onClick={() => setActiveFwId(fw.id)}
+                      style={{
+                        padding: '10px 14px',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        background: isActive ? 'rgba(0, 176, 255, 0.08)' : 'rgba(255, 255, 255, 0.01)',
+                        border: isActive ? '1px solid rgba(0, 176, 255, 0.3)' : '1px solid rgba(255, 255, 255, 0.03)',
+                        transition: 'all 0.2s ease',
+                        position: 'relative'
+                      }}
+                    >
+                      {isActive && (
+                        <div style={{ position: 'absolute', left: '0', top: '20%', bottom: '20%', width: '2px', background: '#00b0ff', borderRadius: '0 2px 2px 0' }} />
+                      )}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <h4 style={{ fontSize: '12.5px', margin: 0, fontWeight: '700', color: isActive ? '#00b0ff' : '#eee', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '180px' }}>
+                          {fw.nome}
+                        </h4>
+                        <span style={{ fontSize: '8px', fontFamily: 'monospace', color: isActive ? '#00b0ff' : 'var(--text-muted)' }}>
+                          SEC_{fw.id.substring(0, 4).toUpperCase()}
+                        </span>
+                      </div>
+                      <span style={{ fontSize: '9px', color: 'var(--text-muted)', display: 'block', marginTop: '2px', fontFamily: 'monospace' }}>
+                        TALHÕES: {countTalhoes} | PARCELAS: {countParcelas}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* High-Tech System Diagnostic Summary */}
+            <div style={{ padding: '16px 24px', borderTop: '1px solid rgba(255,255,255,0.05)', background: 'rgba(0,0,0,0.25)', fontFamily: 'monospace' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <span style={{ fontSize: '9px', color: '#00b0ff', fontWeight: '900', letterSpacing: '1px' }}>⚡ TELEMETRIA_SISTEMA</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px' }}>
+                  <span style={{ color: 'var(--text-muted)' }}>STATUS:</span>
+                  <span style={{ color: '#00e676', fontWeight: 'bold' }}>ONLINE // ATIVO</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px' }}>
+                  <span style={{ color: 'var(--text-muted)' }}>SINCRONIA:</span>
+                  <span style={{ color: isSynced ? '#00e676' : '#ffb74d' }}>
+                    {isSynced ? "SNC_OK" : "SYNC_PROG"}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px' }}>
+                  <span style={{ color: 'var(--text-muted)' }}>LATÊNCIA:</span>
+                  <span style={{ color: '#00b0ff' }}>38 ms</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px' }}>
+                  <span style={{ color: 'var(--text-muted)' }}>PARCELAS:</span>
+                  <span style={{ color: '#fff' }}>{activeParcels.length}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px' }}>
+                  <span style={{ color: 'var(--text-muted)' }}>FUSTES:</span>
+                  <span style={{ color: '#4fc3f7' }}>{kpis.totalTrees}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px' }}>
+                  <span style={{ color: 'var(--text-muted)' }}>BIOMASSA:</span>
+                  <span style={{ color: '#ba68c8' }}>{kpis.totalV.toFixed(1)} m³</span>
+                </div>
+              </div>
+            </div>
+          </>
+        ) : (
+          <>
+            {/* Brand Header */}
+            <div style={{ padding: '24px 24px 16px', display: 'flex', flexDirection: 'column', gap: '12px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <img src="/logo.png" alt="Logo" style={{ width: '40px', height: '40px' }} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <h1 style={{ color: 'var(--primary-color)', fontSize: '18px', fontWeight: '800', margin: 0, letterSpacing: '0.5px' }}>LeafTag</h1>
+                    <div 
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: isSynced ? '#81c784' : '#ffb74d',
+                        transition: 'all 0.3s ease',
+                        cursor: 'default'
+                      }}
+                      title={isSynced ? "Dados 100% Sincronizados" : "Sincronizando com a Nuvem..."}
+                    >
+                      <svg 
+                        xmlns="http://www.w3.org/2000/svg" 
+                        width="10" 
+                        height="10" 
+                        viewBox="0 0 24 24" 
+                        fill="none" 
+                        stroke="currentColor" 
+                        strokeWidth="2.5" 
+                        strokeLinecap="round" 
+                        strokeLinejoin="round"
+                        className={isSynced ? "" : "spin-icon"}
+                      >
+                        <path d="M17.5 19A3.5 3.5 0 0 0 21 15.5c0-2.79-2.54-4.5-5-4.5-.47-.47-1.15-.78-2-.78-2 0-3.5 1.5-3.5 3.5v.78c-2.3 0-4 1.7-4 4A3.5 3.5 0 0 0 10 22h7.5" />
+                        {isSynced && <path d="M9 16l2 2 4-4" />}
+                      </svg>
+                    </div>
+                  </div>
+                  <span style={{ fontSize: '11px', color: '#00e676', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '1px' }}>Painel Escritório</span>
+                </div>
+              </div>
+              <div>
+                <button 
+                  onClick={() => {
+                    localStorage.setItem('preferredMode', 'field');
+                    navigate('/');
+                  }}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: 'var(--text-muted)',
+                    fontSize: '11px',
+                    cursor: 'pointer',
+                    padding: '4px 0',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    textDecoration: 'none',
+                    transition: 'all 0.2s',
+                    fontFamily: 'inherit',
+                    fontWeight: '600'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.color = '#00e676';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.color = 'var(--text-muted)';
+                  }}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
+                  Ir para Modo Campo
+                </button>
+              </div>
+            </div>
+
+            {/* Toggle HUD Mode Button */}
+            <div style={{ padding: '12px 24px 4px' }}>
+              <button 
+                onClick={toggleInterfaceMode}
+                style={{
+                  width: '100%',
+                  background: 'linear-gradient(135deg, rgba(0, 176, 255, 0.1) 0%, rgba(0, 230, 118, 0.1) 100%)',
+                  border: '1px solid rgba(0, 176, 255, 0.3)',
+                  borderRadius: '12px',
+                  color: '#ffffff',
+                  padding: '12px 16px',
+                  fontSize: '13px',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '10px',
+                  transition: 'all 0.2s ease',
+                  boxShadow: '0 4px 12px rgba(0, 176, 255, 0.05)'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.border = '1px solid #00b0ff';
+                  e.currentTarget.style.transform = 'translateY(-1px)';
+                  e.currentTarget.style.boxShadow = '0 6px 16px rgba(0, 176, 255, 0.15)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.border = '1px solid rgba(0, 176, 255, 0.3)';
+                  e.currentTarget.style.transform = 'none';
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 176, 255, 0.05)';
+                }}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                </svg>
+                <span>Ativar Space HUD</span>
+              </button>
+            </div>
+
+            {/* Biblioteca de Modelos Button */}
+            <div style={{ padding: '12px 24px 4px' }}>
+              <button 
+                onClick={() => navigate('/modelos')}
+                style={{
+                  width: '100%',
+                  background: 'linear-gradient(135deg, rgba(0, 230, 118, 0.15) 0%, rgba(0, 176, 255, 0.15) 100%)',
+                  border: '1px solid rgba(0, 230, 118, 0.35)',
+                  borderRadius: '12px',
+                  color: '#ffffff',
+                  padding: '12px 16px',
+                  fontSize: '13px',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '10px',
+                  transition: 'all 0.2s ease',
+                  boxShadow: '0 4px 12px rgba(0, 230, 118, 0.05)'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.border = '1px solid #00e676';
+                  e.currentTarget.style.transform = 'translateY(-1px)';
+                  e.currentTarget.style.boxShadow = '0 6px 16px rgba(0, 230, 118, 0.15)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.border = '1px solid rgba(0, 230, 118, 0.35)';
+                  e.currentTarget.style.transform = 'none';
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 230, 118, 0.05)';
+                }}
+              >
+                <span>Biblioteca de Equações</span>
+              </button>
+            </div>
+
+            {/* Project search */}
+            <div style={{ padding: '8px 24px' }}>
+              <div style={{ position: 'relative' }}>
+                <input 
+                  type="text" 
+                  className="input-field" 
+                  placeholder="Pesquisar projetos..."
+                  style={{ background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '10px', fontSize: '13px', paddingLeft: '34px', marginBottom: 0 }}
+                  value={searchProjectQuery}
+                  onChange={e => setSearchProjectQuery(e.target.value)}
+                />
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }}>
+                  <circle cx="11" cy="11" r="8"></circle>
+                  <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+              </div>
+            </div>
+
+            {/* Project list items */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '12px 24px' }}>
+              <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '0.8px', display: 'block', marginBottom: '8px' }}>
+                Trabalhos de Campo ({filteredFieldWorks.length})
+              </span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {filteredFieldWorks.map(fw => {
+                  const countTalhoes = talhoes.filter(t => t.fieldWorkId === fw.id).length;
+                  const countParcelas = inventories.filter(i => i.fieldWorkId === fw.id && i.template !== 'cubagem').length;
+                  const countArvores = inventories
+                    .filter(i => i.fieldWorkId === fw.id)
+                    .reduce((acc, curr) => acc + (curr.dados ? curr.dados.length : 0), 0);
+                  const isActive = fw.id === activeFwId;
+                  return (
+                    <div 
+                      key={fw.id} 
+                      onClick={() => setActiveFwId(fw.id)}
+                      style={{
+                        padding: '12px 16px',
+                        borderRadius: '12px',
+                        cursor: 'pointer',
+                        background: isActive ? 'rgba(0, 230, 118, 0.08)' : 'rgba(255, 255, 255, 0.01)',
+                        border: isActive ? '1px solid rgba(0, 230, 118, 0.3)' : '1px solid rgba(255, 255, 255, 0.04)',
+                        transition: 'all 0.2s ease',
+                        position: 'relative',
+                        overflow: 'visible'
+                      }}
+                    >
+                      {isActive && (
+                        <div style={{ position: 'absolute', left: '0', top: '50%', transform: 'translateY(-50%)', width: '3px', height: '20px', background: 'var(--primary-color)', borderRadius: '0 4px 4px 0' }} />
+                      )}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <h4 style={{ fontSize: '13.5px', margin: 0, fontWeight: '700', color: isActive ? 'var(--primary-hover)' : '#fff', flex: 1, paddingRight: '8px' }}>{fw.nome}</h4>
+                        <div style={{ position: 'relative' }}>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActiveMenuFwId(activeMenuFwId === fw.id ? null : fw.id);
+                            }}
+                            style={{
+                              background: 'transparent',
+                              border: 'none',
+                              color: 'var(--text-muted)',
+                              fontSize: '18px',
+                              cursor: 'pointer',
+                              padding: '0 4px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              transition: 'color 0.2s',
+                              lineHeight: 1
+                            }}
+                            onMouseEnter={(e) => { e.currentTarget.style.color = '#fff'; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; }}
+                          >
+                            •••
+                          </button>
+                          
+                          {activeMenuFwId === fw.id && (
+                            <div 
+                              style={{
+                                position: 'absolute',
+                                top: '24px',
+                                right: '0',
+                                background: '#1a1a1a',
+                                border: '1px solid rgba(255, 255, 255, 0.08)',
+                                borderRadius: '12px',
+                                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)',
+                                zIndex: 100,
+                                minWidth: '130px',
+                                overflow: 'hidden',
+                                backdropFilter: 'blur(16px)',
+                                WebkitBackdropFilter: 'blur(16px)',
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleEditClick(fw);
+                                }}
+                                style={{
+                                  width: '100%',
+                                  padding: '10px 16px',
+                                  background: 'transparent',
+                                  border: 'none',
+                                  color: '#fff',
+                                  fontSize: '13px',
+                                  textAlign: 'left',
+                                  cursor: 'pointer',
+                                  transition: 'background-color 0.2s',
+                                  borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+                                  display: 'block',
+                                }}
+                                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)'; }}
+                                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+                              >
+                                Editar
+                              </button>
+                              <button
+                                type="button"
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  setActiveMenuFwId(null);
+                                  if (confirm(`Deseja duplicar o trabalho de campo "${fw.nome}"?`)) {
+                                    try {
+                                      await duplicateFieldWork(fw.id);
+                                      alert("Trabalho de campo duplicado com sucesso.");
+                                    } catch (err: any) {
+                                      alert("Erro ao duplicar: " + err.message);
+                                    }
+                                  }
+                                }}
+                                style={{
+                                  width: '100%',
+                                  padding: '10px 16px',
+                                  background: 'transparent',
+                                  border: 'none',
+                                  color: '#fff',
+                                  fontSize: '13px',
+                                  textAlign: 'left',
+                                  cursor: 'pointer',
+                                  transition: 'background-color 0.2s',
+                                  borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+                                  display: 'block',
+                                }}
+                                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)'; }}
+                                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+                              >
+                                Duplicar
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setActiveMenuFwId(null);
+                                  handleExportFieldWork(fw);
+                                }}
+                                style={{
+                                  width: '100%',
+                                  padding: '10px 16px',
+                                  background: 'transparent',
+                                  border: 'none',
+                                  color: '#fff',
+                                  fontSize: '13px',
+                                  textAlign: 'left',
+                                  cursor: 'pointer',
+                                  transition: 'background-color 0.2s',
+                                  display: 'block',
+                                }}
+                                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)'; }}
+                                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+                              >
+                                Exportar
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginTop: '4px' }}>
+                        Local: {fw.local}
+                      </span>
+                      <span style={{ fontSize: '10.5px', color: 'var(--text-muted)', display: 'block', marginTop: '2px', opacity: 0.8 }}>
+                        {countTalhoes} {countTalhoes === 1 ? 'talhão' : 'talhões'} • {countParcelas} {countParcelas === 1 ? 'parcela' : 'parcelas'} • {countArvores} {countArvores === 1 ? 'árvore' : 'árvores'}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Profile Footer */}
+            <div style={{ padding: '16px 20px', borderTop: '1px solid rgba(255,255,255,0.05)', background: 'rgba(0,0,0,0.15)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <span style={{ fontSize: '12.5px', color: '#fff', fontWeight: 'bold', display: 'block', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{currentUser?.displayName || 'Escritório'}</span>
+                  <span style={{ fontSize: '10.5px', color: 'var(--text-muted)', display: 'block', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{currentUser?.email}</span>
+                </div>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexShrink: 0 }}>
+                  <button 
+                    onClick={() => setShowSettingsModal(true)}
+                    style={{ 
+                      background: 'transparent', 
+                      border: 'none', 
+                      color: 'var(--text-muted)', 
+                      cursor: 'pointer', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center',
+                      padding: '4px'
+                    }}
+                    title="Configurações"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="3"></circle>
+                      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
 
       </div>
 
       {/* Main Content Area */}
       <div className="office-content" style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100vh', overflowY: 'auto' }}>
         {activeFw ? (
-          <div style={{ padding: '32px', boxSizing: 'border-box', width: '100%' }}>
+          <div style={{ padding: interfaceMode === 'hud' ? '24px' : '32px', boxSizing: 'border-box', width: '100%' }}>
             
             {/* Project Title and Header buttons */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '20px', marginBottom: '28px' }}>
+            {interfaceMode === 'classic' && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '20px', marginBottom: '28px' }}>
               <div>
                 <span style={{ fontSize: '11px', color: 'var(--primary-hover)', textTransform: 'uppercase', fontWeight: '800', letterSpacing: '1px' }}>Projeto Selecionado</span>
                 <h2 style={{ fontSize: '24px', fontWeight: '800', color: '#fff', margin: '4px 0 0 0' }}>{activeFw.nome}</h2>
@@ -3592,9 +4371,11 @@ export const OfficeDashboard = () => {
                 </div>
               )}
             </div>
+            )}
 
             {/* Abas layout for Talões / Parcelas / Estratos */}
-            <div className="office-tab-bar">
+            {interfaceMode === 'classic' && (
+              <div className="office-tab-bar">
               <button 
                 onClick={() => setActiveTab('centro-operacoes')}
                 className={`office-tab-button ${activeTab === 'centro-operacoes' ? 'active' : ''}`}
@@ -3712,6 +4493,7 @@ export const OfficeDashboard = () => {
                 </div>
               </button>
             </div>
+            )}
 
             {/* KPI Cards Row */}
             {activeTab !== 'centro-operacoes' && (
