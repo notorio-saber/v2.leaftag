@@ -3368,7 +3368,7 @@ export const OfficeDashboard = () => {
                 }}
               >
                 <span>🌳 {t.nome}</span>
-                <span>{t.area} ha</span>
+                <span>{t.area ? `${t.area} ha` : 'S/ Área'}</span>
               </div>
               {isTalhaoExpanded && (
                 <div className="hud-tree-nested">
@@ -3698,15 +3698,18 @@ export const OfficeDashboard = () => {
                         </div>
                       )}
                       
-                      {/* Capsule Node */}
+                      {/* Sphere Node (Circular tech-grade bezel) */}
                       <div
                         id={`op-node-${id}`}
-                        className={`hud-node-capsule status-${status} ${focusedNode === id ? 'active' : ''}`}
+                        className={`hud-node-sphere status-${status} ${focusedNode === id ? 'active' : ''}`}
                         onClick={(e) => {
                           e.stopPropagation();
                           handleStageClick(id);
                         }}
                       >
+                        {/* Orbit decorative dash ring */}
+                        <div className="hud-sphere-orbit" />
+
                         {/* Hover Tooltip Card */}
                         <div className="hud-hover-info">
                           <div style={{ fontWeight: '800', fontSize: '11px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '6px', marginBottom: '6px', color: '#00e676', fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '0.5px' }}>
@@ -3734,16 +3737,16 @@ export const OfficeDashboard = () => {
                         </div>
 
                         {/* Icon */}
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#00e676' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                           {getNodeIcon(id)}
                         </div>
-                        
-                        {/* Title */}
+                      </div>
+
+                      {/* Info labels placed below the sphere */}
+                      <div className="hud-node-info-wrapper">
                         <div className="hud-node-title">
                           {name}
                         </div>
-                        
-                        {/* KPI */}
                         <div className="hud-node-kpi">
                           {kpi}
                         </div>
