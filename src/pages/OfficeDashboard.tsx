@@ -3702,32 +3702,6 @@ export const OfficeDashboard = () => {
             </div>
           </div>
 
-          {/* Navigation Bar / Step Progress (Breadcrumbs) */}
-          {activeLayer === 'process' && (
-            <div style={{ padding: '12px 24px', background: 'rgba(5, 13, 8, 0.15)', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-              <div className="hud-step-progress-bar">
-                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map(id => {
-                  const status = getStageStatus(id);
-                  const name = getStageName(id);
-                  const isSelected = focusedNode === id;
-                  return (
-                    <React.Fragment key={id}>
-                      <div 
-                        className={`hud-step-item status-${status} ${isSelected ? 'active' : ''}`}
-                        onClick={() => handleStageClick(id)}
-                      >
-                        <span className="hud-step-dot" />
-                        <span className="hud-step-number">{String(id).padStart(2, '0')}</span>
-                        <span className="hud-step-name">{name}</span>
-                      </div>
-                      {id < 11 && <span className="hud-step-arrow">➔</span>}
-                    </React.Fragment>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
           {/* Core HUD Canvas Container */}
           <div 
             className="space-hud-container" 
