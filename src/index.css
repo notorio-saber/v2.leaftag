@@ -695,6 +695,237 @@ body.light-theme .office-tab-button.active {
   }
 }
 
+/* ==========================================================================
+   CENTRO DE OPERAÇÕES (OPERATIONS CENTER)
+   ========================================================================== */
+
+.operation-center {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  width: 100%;
+}
+
+.operation-center-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+/* Operational Map Layout */
+.operation-map-container {
+  position: relative;
+  width: 100%;
+  padding: 40px 24px;
+  background: rgba(10, 15, 25, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: 24px;
+  overflow: hidden;
+}
+
+body.light-theme .operation-map-container {
+  background: rgba(0, 0, 0, 0.02);
+  border-color: rgba(0, 0, 0, 0.05);
+}
+
+.operation-map-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 56px 36px;
+  position: relative;
+  z-index: 2;
+}
+
+.operation-node {
+  display: flex;
+  flex-direction: column;
+  background: rgba(10, 15, 28, 0.6);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 20px;
+  padding: 22px;
+  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  cursor: pointer;
+  position: relative;
+  z-index: 3;
+}
+
+body.light-theme .operation-node {
+  background: rgba(255, 255, 255, 0.75);
+  border-color: rgba(0, 0, 0, 0.08);
+}
+
+.operation-node:hover {
+  transform: translateY(-5px) scale(1.02);
+  border-color: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.45);
+}
+
+body.light-theme .operation-node:hover {
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.06);
+  border-color: rgba(0, 0, 0, 0.15);
+}
+
+/* Status colors and glows (Dark Theme) */
+.operation-node.status-complete {
+  border-color: rgba(0, 230, 118, 0.35) !important;
+  box-shadow: 0 0 20px rgba(0, 230, 118, 0.06), inset 0 0 12px rgba(0, 230, 118, 0.01) !important;
+}
+.operation-node.status-complete:hover {
+  border-color: #00e676 !important;
+  box-shadow: 0 0 30px rgba(0, 230, 118, 0.2), 0 16px 36px rgba(0, 0, 0, 0.45) !important;
+}
+
+.operation-node.status-progress {
+  border-color: rgba(0, 176, 255, 0.35) !important;
+  box-shadow: 0 0 20px rgba(0, 176, 255, 0.06) !important;
+  animation: pulse-progress-glow 3s infinite alternate;
+}
+.operation-node.status-progress:hover {
+  border-color: #00b0ff !important;
+  box-shadow: 0 0 30px rgba(0, 176, 255, 0.2), 0 16px 36px rgba(0, 0, 0, 0.45) !important;
+}
+
+.operation-node.status-warning {
+  border-color: rgba(255, 152, 0, 0.35) !important;
+  box-shadow: 0 0 20px rgba(255, 152, 0, 0.06) !important;
+}
+.operation-node.status-warning:hover {
+  border-color: #ff9800 !important;
+  box-shadow: 0 0 30px rgba(255, 152, 0, 0.2), 0 16px 36px rgba(0, 0, 0, 0.45) !important;
+}
+
+.operation-node.status-empty {
+  border-color: rgba(255, 255, 255, 0.03) !important;
+  opacity: 0.65;
+}
+.operation-node.status-empty:hover {
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  opacity: 1;
+}
+
+/* Status colors and glows (Light Theme) */
+body.light-theme .operation-node.status-complete {
+  border-color: rgba(46, 125, 50, 0.3) !important;
+  box-shadow: 0 0 15px rgba(46, 125, 50, 0.04) !important;
+}
+body.light-theme .operation-node.status-complete:hover {
+  border-color: #2e7d32 !important;
+  box-shadow: 0 0 20px rgba(46, 125, 50, 0.12), 0 16px 36px rgba(0, 0, 0, 0.06) !important;
+}
+
+body.light-theme .operation-node.status-progress {
+  border-color: rgba(0, 176, 255, 0.3) !important;
+  box-shadow: 0 0 15px rgba(0, 176, 255, 0.04) !important;
+}
+body.light-theme .operation-node.status-progress:hover {
+  border-color: #00b0ff !important;
+  box-shadow: 0 0 20px rgba(0, 176, 255, 0.12), 0 16px 36px rgba(0, 0, 0, 0.06) !important;
+}
+
+body.light-theme .operation-node.status-warning {
+  border-color: rgba(255, 152, 0, 0.3) !important;
+  box-shadow: 0 0 15px rgba(255, 152, 0, 0.04) !important;
+}
+body.light-theme .operation-node.status-warning:hover {
+  border-color: #ff9800 !important;
+  box-shadow: 0 0 20px rgba(255, 152, 0, 0.12), 0 16px 36px rgba(0, 0, 0, 0.06) !important;
+}
+
+/* Connectors & SVG Overlay */
+.operation-svg-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.operation-link {
+  fill: none;
+  stroke-width: 3.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: all 0.5s ease;
+}
+
+/* Line states (Dark Theme) */
+.operation-link.line-complete {
+  stroke: rgba(0, 230, 118, 0.35);
+}
+.operation-link.line-progress {
+  stroke: #00b0ff;
+  stroke-width: 4;
+  stroke-dasharray: 10 6;
+  animation: stroke-flow 1.5s linear infinite;
+  filter: drop-shadow(0 0 5px rgba(0, 176, 255, 0.6));
+}
+.operation-link.line-warning {
+  stroke: rgba(255, 152, 0, 0.35);
+}
+.operation-link.line-empty {
+  stroke: rgba(255, 255, 255, 0.05);
+}
+
+/* Line states (Light Theme) */
+body.light-theme .operation-link.line-complete {
+  stroke: rgba(46, 125, 50, 0.25);
+}
+body.light-theme .operation-link.line-progress {
+  stroke: #00b0ff;
+  stroke-width: 4;
+  stroke-dasharray: 10 6;
+  animation: stroke-flow 1.5s linear infinite;
+  filter: drop-shadow(0 0 3px rgba(0, 176, 255, 0.4));
+}
+body.light-theme .operation-link.line-warning {
+  stroke: rgba(255, 152, 0, 0.25);
+}
+body.light-theme .operation-link.line-empty {
+  stroke: rgba(0, 0, 0, 0.05);
+}
+
+/* Animations */
+@keyframes stroke-flow {
+  to {
+    stroke-dashoffset: -32;
+  }
+}
+
+@keyframes pulse-progress-glow {
+  0% {
+    box-shadow: 0 0 15px rgba(0, 176, 255, 0.04);
+  }
+  100% {
+    box-shadow: 0 0 25px rgba(0, 176, 255, 0.22);
+  }
+}
+
+/* Responsiveness Media Queries for Grid Layout */
+@media (max-width: 1200px) {
+  .operation-map-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 48px 30px;
+  }
+}
+
+@media (max-width: 850px) {
+  .operation-map-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 40px 24px;
+  }
+}
+
+@media (max-width: 550px) {
+  .operation-map-grid {
+    grid-template-columns: 1fr;
+    gap: 32px;
+  }
+}
+
 
 
 

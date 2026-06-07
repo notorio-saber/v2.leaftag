@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useInventory } from '../context/InventoryContext';
 import { useAuth } from '../context/AuthContext';
@@ -46,7 +46,9 @@ export const OfficeDashboard = () => {
     duplicateFieldWork,
     processings,
     saveProcessing,
-    deleteProcessing
+    deleteProcessing,
+    sortimentRules,
+    sortimentResults
   } = useInventory();
   const { currentUser, signOut, status, uidToUse, theme, toggleTheme } = useAuth();
   const isLight = theme === 'light';
@@ -134,9 +136,22 @@ export const OfficeDashboard = () => {
 
   const [activeFwId, setActiveFwId] = useState<string>('');
   const [searchProjectQuery, setSearchProjectQuery] = useState('');
-  const [activeTab, setActiveTab] = useState<'talhoes' | 'parcelas' | 'estratos' | 'cubagem' | 'extrapolacao' | 'processamentos' | 'sortimento'>('talhoes');
+  const [activeTab, setActiveTab] = useState<'centro-operacoes' | 'talhoes' | 'parcelas' | 'estratos' | 'cubagem' | 'extrapolacao' | 'processamentos' | 'sortimento'>('centro-operacoes');
   const [extraTab, setExtraTab] = useState<'parcelas' | 'talhoes' | 'estratos' | 'trabalho'>('parcelas');
   const [cubageSortOrder, setCubageSortOrder] = useState<'asc' | 'desc' | null>('desc');
+  
+  // Modals for the Operations Center
+  const [showColetaModal, setShowColetaModal] = useState(false);
+  const [showRelatorioModal, setShowRelatorioModal] = useState(false);
+  const [reportGenerated, setReportGenerated] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (activeFwId) {
+      setReportGenerated(localStorage.getItem(`report_generated_${activeFwId}`) === 'true');
+    } else {
+      setReportGenerated(false);
+    }
+  }, [activeFwId]);
   
   // States for sub-dashboards and audits
   const [auditParcelId, setAuditParcelId] = useState<number | null>(null);
@@ -707,6 +722,20 @@ export const OfficeDashboard = () => {
   const activeStrata = useMemo(() => {
     return strata.filter(s => s.fieldWorkId === activeFwId);
   }, [strata, activeFwId]);
+
+  const activeSortimentResults = useMemo(() => {
+    return sortimentResults ? sortimentResults.filter(r => r.fieldWorkId === activeFwId) : [];
+  }, [sortimentResults, activeFwId]);
+
+  const latestOfficialProcessing = useMemo(() => {
+    if (!processings) return null;
+    const fwProcessings = processings.filter(p => p.fieldWorkId === activeFwId);
+    const official = fwProcessings.filter(p => p.status === 'Oficial');
+    if (official.length > 0) {
+      return [...official].sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+    }
+    return null;
+  }, [processings, activeFwId]);
 
   const extrapolationData = useMemo(() => {
     if (!activeFw) return null;
@@ -2468,6 +2497,586 @@ export const OfficeDashboard = () => {
     );
   };
 
+  // ==========================================================================
+  // CÁLCULOS E HELPER MÉTODOS DO CENTRO DE OPERAÇÕES
+  // ==========================================================================
+  
+  const getStageStatus = (stageId: number): 'complete' | 'progress' | 'warning' | 'empty' => {
+    if (!activeFwId) return 'empty';
+    switch (stageId) {
+      case 1: // Projeto
+        return activeFw ? 'complete' : 'empty';
+      case 2: // Talhões
+        if (activeTalhoes.length === 0) return 'empty';
+        if (activeTalhoes.some(t => !t.area || t.area <= 0)) return 'warning';
+        return 'complete';
+      case 3: // Estratos
+        return activeStrata.length > 0 ? 'complete' : 'empty';
+      case 4: // Parcelas
+        if (activeParcels.length === 0) return 'empty';
+        if (activeParcels.some(p => !p.areaParcela || p.areaParcela <= 0)) return 'warning';
+        if (activeParcels.some(p => p.status !== 'Concluído')) return 'progress';
+        return 'complete';
+      case 5: // Coleta de Campo
+        if (activeParcels.length === 0) return 'empty';
+        let totalTrees = 0;
+        let missingDapCap = 0;
+        activeParcels.forEach(p => {
+          if (p.dados) {
+            totalTrees += p.dados.length;
+            p.dados.forEach(t => {
+              const dap = getDapOfTreeOrStem(t);
+              if (dap <= 0) missingDapCap++;
+            });
+          }
+        });
+        if (totalTrees > 0 && (missingDapCap / totalTrees) > 0.05) return 'warning';
+        if (activeParcels.some(p => !p.dados || p.dados.length === 0 || p.status !== 'Concluído')) return 'progress';
+        return 'complete';
+      case 6: // Cubagem
+        if (activeCubageSessions.length === 0) return 'empty';
+        if (activeCubageSessions.some(s => !s.dados || s.dados.length === 0 || s.dados.some(t => !((t.volumeTotal || 0) > 0)))) {
+          return 'progress';
+        }
+        return 'complete';
+      case 7: // Modelos
+        const hasHeight = selectedHeightModelId !== 'none';
+        const hasVolume = selectedVolumeModelId !== 'legacy';
+        if (hasHeight && hasVolume) return 'complete';
+        if (!hasHeight && !hasVolume) return 'warning';
+        return 'progress';
+      case 8: // Processamento
+        if (latestOfficialProcessing !== null) return 'complete';
+        const hasProcessedTrees = activeParcels.some(p => p.dados && p.dados.length > 0 && p.dados.some(t => t.volumeCalculado !== undefined && t.volumeCalculado > 0));
+        if (hasProcessedTrees) return 'progress';
+        return 'empty';
+      case 9: // Extrapolação
+        if (latestOfficialProcessing === null) return 'empty';
+        const hasTalhaoOrStrataMissingArea = activeTalhoes.some(t => !t.area || t.area <= 0) || activeStrata.some(s => !s.area || s.area <= 0);
+        if (hasTalhaoOrStrataMissingArea) return 'warning';
+        return 'complete';
+      case 10: // Sortimento
+        if (activeSortimentResults.length > 0) return 'complete';
+        if (sortimentRules.length > 0) return 'progress';
+        return 'empty';
+      case 11: // Relatório Final
+        if (reportGenerated) return 'complete';
+        if (latestOfficialProcessing !== null) return 'progress';
+        return 'empty';
+      default:
+        return 'empty';
+    }
+  };
+
+  const getStagePercent = (stageId: number): number => {
+    if (!activeFwId) return 0;
+    switch (stageId) {
+      case 1: return activeFw ? 100 : 0;
+      case 2: {
+        if (activeTalhoes.length === 0) return 0;
+        const withArea = activeTalhoes.filter(t => t.area && t.area > 0).length;
+        return Math.round((withArea / activeTalhoes.length) * 100);
+      }
+      case 3: return activeStrata.length > 0 ? 100 : 0;
+      case 4: {
+        if (activeParcels.length === 0) return 0;
+        const done = activeParcels.filter(p => p.status === 'Concluído').length;
+        return Math.round((done / activeParcels.length) * 100);
+      }
+      case 5: {
+        if (activeParcels.length === 0) return 0;
+        const collected = activeParcels.filter(p => p.dados && p.dados.length > 0).length;
+        return Math.round((collected / activeParcels.length) * 100);
+      }
+      case 6: {
+        if (activeCubageSessions.length === 0) return 0;
+        const finishedSessions = activeCubageSessions.filter(s => s.dados && s.dados.length > 0 && s.dados.every(t => (t.volumeTotal || 0) > 0)).length;
+        return Math.round((finishedSessions / activeCubageSessions.length) * 100);
+      }
+      case 7: {
+        let p = 0;
+        if (selectedHeightModelId !== 'none') p += 50;
+        if (selectedVolumeModelId !== 'legacy') p += 50;
+        return p;
+      }
+      case 8: return latestOfficialProcessing ? 100 : (activeParcels.some(p => p.dados && p.dados.length > 0 && p.dados.some(t => t.volumeCalculado !== undefined)) ? 50 : 0);
+      case 9: return latestOfficialProcessing ? 100 : 0;
+      case 10: return activeSortimentResults.length > 0 ? 100 : (sortimentRules.length > 0 ? 50 : 0);
+      case 11: return reportGenerated ? 100 : 0;
+      default: return 0;
+    }
+  };
+
+  const getStageKpi = (stageId: number): string => {
+    if (!activeFwId) return '-';
+    switch (stageId) {
+      case 1: return activeFw ? activeFw.nome : '-';
+      case 2: return `${activeTalhoes.length} talhões`;
+      case 3: return `${activeStrata.length} estratos`;
+      case 4: return `${activeParcels.length} parcelas`;
+      case 5: {
+        const total = activeParcels.reduce((acc, p) => acc + (p.dados ? p.dados.length : 0), 0);
+        return `${total} árvores`;
+      }
+      case 6: return `${allCubagedTrees.length} árvores`;
+      case 7: {
+        const hName = selectedHeightModelId !== 'none' ? heightModels.find(m => m.id === selectedHeightModelId)?.nome || 'Definido' : 'Medida / Sem Modelo';
+        const vName = selectedVolumeModelId !== 'legacy' ? volumeModels.find(m => m.id === selectedVolumeModelId)?.nome || 'Definido' : `Forma: ${processingFatorForma}`;
+        return `${hName} | ${vName}`;
+      }
+      case 8: return latestOfficialProcessing ? latestOfficialProcessing.nomeProcessamento : 'Pendente';
+      case 9: return latestOfficialProcessing ? 'Consolidação salva' : 'Pendente';
+      case 10: return `${activeSortimentResults.length} resultados`;
+      case 11: return reportGenerated ? 'Exportado' : 'Pendente';
+      default: return '-';
+    }
+  };
+
+  const getStageDescription = (stageId: number): string => {
+    switch (stageId) {
+      case 1: return 'Configurações e metadados do projeto';
+      case 2: return 'Divisão territorial com área produtiva';
+      case 3: return 'Agrupamentos homogêneos de tipologia florestal';
+      case 4: return 'Instalação das parcelas amostrais';
+      case 5: return 'Coleta de DAP e Altura em campo';
+      case 6: return 'Cubagem rigorosa para calibração de modelos';
+      case 7: return 'Seleção e ajuste de equações matemáticas';
+      case 8: return 'Processamento estatístico e volume';
+      case 9: return 'Expansão de médias e totais para a área total';
+      case 10: return 'Divisão volumétrica por classes comerciais';
+      case 11: return 'Geração do relatório executivo final';
+      default: return '';
+    }
+  };
+
+  const getStageName = (stageId: number): string => {
+    switch (stageId) {
+      case 1: return 'Projeto';
+      case 2: return 'Talhões';
+      case 3: return 'Estratos';
+      case 4: return 'Parcelas';
+      case 5: return 'Coleta de Campo';
+      case 6: return 'Cubagem';
+      case 7: return 'Modelos';
+      case 8: return 'Processamento';
+      case 9: return 'Extrapolação';
+      case 10: return 'Sortimento';
+      case 11: return 'Relatório Final';
+      default: return '';
+    }
+  };
+
+  const getNodeIcon = (stageId: number): React.ReactNode => {
+    switch (stageId) {
+      case 1:
+        return (
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+        );
+      case 2:
+        return (
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+        );
+      case 3:
+        return (
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
+        );
+      case 4:
+        return (
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="22" y1="12" x2="18" y2="12"></line><line x1="6" y1="12" x2="2" y2="12"></line><line x1="12" y1="6" x2="12" y2="2"></line><line x1="12" y1="22" x2="12" y2="18"></line></svg>
+        );
+      case 5:
+        return (
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+        );
+      case 6:
+        return (
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line><line x1="2" y1="20" x2="22" y2="20"></line></svg>
+        );
+      case 7:
+        return (
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg>
+        );
+      case 8:
+        return (
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+        );
+      case 9:
+        return (
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path><path d="M22 12A10 10 0 0 0 12 2v10z"></path></svg>
+        );
+      case 10:
+        return (
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+        );
+      case 11:
+        return (
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+        );
+      default:
+        return null;
+    }
+  };
+
+  const handleStageClick = (stageId: number) => {
+    switch (stageId) {
+      case 1:
+        if (activeFw) handleEditClick(activeFw);
+        break;
+      case 2:
+        setActiveTab('talhoes');
+        break;
+      case 3:
+        setActiveTab('estratos');
+        break;
+      case 4:
+        setActiveTab('parcelas');
+        break;
+      case 5:
+        setShowColetaModal(true);
+        break;
+      case 6:
+        setActiveTab('cubagem');
+        break;
+      case 7:
+        navigate('/modelos');
+        break;
+      case 8:
+        setActiveTab('processamentos');
+        break;
+      case 9:
+        setActiveTab('extrapolacao');
+        break;
+      case 10:
+        setActiveTab('sortimento');
+        break;
+      case 11:
+        setShowRelatorioModal(true);
+        break;
+    }
+  };
+
+  const getNextRecommendedStep = (): string => {
+    if (!activeFwId) return "Selecione um projeto de campo.";
+    if (activeTalhoes.length === 0) {
+      return "Cadastre os talhões do projeto.";
+    }
+    if (activeParcels.length === 0) {
+      return "Crie as parcelas amostrais.";
+    }
+    if (activeParcels.some(p => !p.dados || p.dados.length === 0)) {
+      return "Conclua a coleta de campo.";
+    }
+    if (selectedHeightModelId === 'none' && selectedVolumeModelId === 'legacy') {
+      return "Cadastre ou selecione modelos hipsométricos e volumétricos.";
+    }
+    if (latestOfficialProcessing === null) {
+      return "Execute o processamento oficial.";
+    }
+    if (activeSortimentResults.length === 0) {
+      return "Configure regras de sortimento ou finalize o relatório.";
+    }
+    return "Gerar relatório final.";
+  };
+
+  const getBottlenecks = (): string[] => {
+    const list: string[] = [];
+    if (!activeFwId) return list;
+    
+    if (activeTalhoes.some(t => !t.area || t.area <= 0)) {
+      list.push("Talhões sem área");
+    }
+    if (activeParcels.some(p => !p.areaParcela || p.areaParcela <= 0)) {
+      list.push("Parcelas sem área");
+    }
+    if (activeParcels.some(p => !p.dados || p.dados.length === 0)) {
+      list.push("Parcelas sem árvores");
+    }
+    
+    // Check missing values
+    let missingDapCapCount = 0;
+    let missingHeightCount = 0;
+    activeParcels.forEach(p => {
+      if (p.dados) {
+        p.dados.forEach(t => {
+          const dap = getDapOfTreeOrStem(t);
+          if (dap <= 0) missingDapCapCount++;
+          
+          if (t.multipleStems && t.stems) {
+            if (t.stems.some((s: any) => !s.altura || parseFloat(s.altura) <= 0)) {
+              missingHeightCount++;
+            }
+          } else {
+            if (!t.ht || parseFloat(t.ht) <= 0) {
+              missingHeightCount++;
+            }
+          }
+        });
+      }
+    });
+    
+    if (missingDapCapCount > 0) {
+      list.push(`${missingDapCapCount} árvores sem DAP/CAP`);
+    }
+    if (missingHeightCount > 0) {
+      list.push(`${missingHeightCount} árvores sem altura`);
+    }
+    
+    if (selectedHeightModelId === 'none') {
+      list.push("Modelos Hipsométricos não definidos");
+    }
+    if (selectedVolumeModelId === 'legacy') {
+      list.push("Modelos Volumétricos não definidos");
+    }
+    if (latestOfficialProcessing === null) {
+      list.push("Processamento não oficializado");
+    }
+    
+    let cubagemSemVolumeCount = 0;
+    activeCubageSessions.forEach(s => {
+      if (s.dados) {
+        s.dados.forEach(t => {
+          if (!((t.volumeTotal || 0) > 0)) cubagemSemVolumeCount++;
+        });
+      }
+    });
+    if (cubagemSemVolumeCount > 0) {
+      list.push("Cubagem sem volume");
+    }
+    
+    if (sortimentRules.length === 0) {
+      list.push("Sortimento sem regras");
+    }
+    if (!reportGenerated) {
+      list.push("Relatório não gerado");
+    }
+    
+    return list;
+  };
+
+  // Node center calculations for glowing connection lines
+  const [nodeCoords, setNodeCoords] = useState<{ x: number; y: number }[]>([]);
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+
+  const calculateNodeCoords = () => {
+    if (!mapContainerRef.current) return;
+    const containerRect = mapContainerRef.current.getBoundingClientRect();
+    const newCoords = [];
+    for (let i = 1; i <= 11; i++) {
+      const el = document.getElementById(`op-node-${i}`);
+      if (el) {
+        const rect = el.getBoundingClientRect();
+        newCoords.push({
+          x: rect.left - containerRect.left + rect.width / 2,
+          y: rect.top - containerRect.top + rect.height / 2
+        });
+      }
+    }
+    setNodeCoords(newCoords);
+  };
+
+  useEffect(() => {
+    if (activeTab === 'centro-operacoes') {
+      calculateNodeCoords();
+      const t1 = setTimeout(calculateNodeCoords, 100);
+      const t2 = setTimeout(calculateNodeCoords, 400);
+      const t3 = setTimeout(calculateNodeCoords, 800);
+      window.addEventListener('resize', calculateNodeCoords);
+      return () => {
+        window.removeEventListener('resize', calculateNodeCoords);
+        clearTimeout(t1);
+        clearTimeout(t2);
+        clearTimeout(t3);
+      };
+    }
+  }, [activeTab, activeFwId]);
+
+  const renderCentroOperacoes = () => {
+    const nextStep = getNextRecommendedStep();
+    const bottlenecks = getBottlenecks();
+    
+    let completedStagesCount = 0;
+    for (let i = 1; i <= 11; i++) {
+      if (getStageStatus(i) === 'complete') {
+        completedStagesCount++;
+      }
+    }
+    const overallProgress = Math.round((completedStagesCount / 11) * 100);
+
+    const totalArea = activeTalhoes.reduce((acc, t) => acc + (t.area || 0), 0);
+    const completedParcelsCount = activeParcels.filter(p => p.status === 'Concluído').length;
+    const totalVolume = latestOfficialProcessing ? latestOfficialProcessing.volumeTotalEstimado : 0;
+
+    return (
+      <div className="operation-center" style={{ animation: 'fadeInUp 0.6s ease' }}>
+        {/* PANEL DE INDICADORES EXECUTIVOS */}
+        <div className="glass-card" style={{ padding: '24px', border: '1px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.01)', borderRadius: '20px', marginBottom: 0 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '24px', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <h2 style={{ fontSize: '20px', fontWeight: '800', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--primary-hover)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon></svg>
+                <span>Centro de Operações LeafTag</span>
+              </h2>
+              <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: '4px 0 0 0' }}>
+                Mapa operacional do inventário florestal
+              </p>
+            </div>
+            
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <div style={{ textAlign: 'right' }}>
+                <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: '700', letterSpacing: '0.5px' }}>Progresso do Projeto</span>
+                <div style={{ fontSize: '22px', fontWeight: '800', color: '#00e676', marginTop: '2px' }}>{overallProgress}%</div>
+              </div>
+              <div style={{ width: '130px', height: '10px', background: 'rgba(255,255,255,0.05)', borderRadius: '5px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.03)' }}>
+                <div style={{ width: `${overallProgress}%`, height: '100%', background: 'linear-gradient(90deg, #2e7d32, #00e676)', borderRadius: '5px' }} />
+              </div>
+            </div>
+          </div>
+          
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '20px', marginTop: '24px', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '20px' }}>
+            {/* Próximo Passo */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: '700', letterSpacing: '0.5px' }}>Próximo Passo Recomendado</span>
+              <div style={{ fontSize: '13.5px', fontWeight: '700', color: '#00b0ff', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                {nextStep}
+              </div>
+            </div>
+
+            {/* Gargalos */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: '700', letterSpacing: '0.5px' }}>Gargalos Detectados</span>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', maxHeight: '54px', overflowY: 'auto', paddingRight: '4px' }}>
+                {bottlenecks.length === 0 ? (
+                  <span style={{ fontSize: '13px', color: '#00e676', fontWeight: 'bold' }}>✓ Nenhum gargalo crítico detectado</span>
+                ) : (
+                  bottlenecks.map((b, idx) => (
+                    <span key={idx} style={{ fontSize: '10px', padding: '3px 8px', borderRadius: '6px', background: 'rgba(239, 35, 60, 0.08)', color: '#ff4d6d', border: '1px solid rgba(239, 35, 60, 0.15)', fontWeight: '600' }}>
+                      ⚠ {b}
+                    </span>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Outros KPIs rápidos */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
+              <div style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.03)', padding: '10px', borderRadius: '10px' }}>
+                <span style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: '700', letterSpacing: '0.3px' }}>Área Total</span>
+                <div style={{ fontSize: '15px', fontWeight: '800', marginTop: '2px' }}>{totalArea.toFixed(2)} ha</div>
+              </div>
+              <div style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.03)', padding: '10px', borderRadius: '10px' }}>
+                <span style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: '700', letterSpacing: '0.3px' }}>Parcelas Col.</span>
+                <div style={{ fontSize: '15px', fontWeight: '800', marginTop: '2px', color: '#00b0ff' }}>{completedParcelsCount} / {activeParcels.length}</div>
+              </div>
+              <div style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.03)', padding: '10px', borderRadius: '10px' }}>
+                <span style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: '700', letterSpacing: '0.3px' }}>Volume CC Est.</span>
+                <div style={{ fontSize: '15px', fontWeight: '800', color: '#00e676', marginTop: '2px' }}>
+                  {totalVolume > 0 ? `${Math.round(totalVolume).toLocaleString('pt-BR')} m³` : '-'}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* MAPA OPERACIONAL COM SVG CONNECTOR */}
+        <div className="operation-map-container" ref={mapContainerRef}>
+          {nodeCoords.length > 0 && (
+            <svg className="operation-svg-overlay">
+              <defs>
+                <filter id="line-glow" x="-20%" y="-20%" width="140%" height="140%">
+                  <feGaussianBlur stdDeviation="3" result="blur" />
+                  <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                </filter>
+              </defs>
+              {nodeCoords.map((start, idx) => {
+                if (idx === nodeCoords.length - 1) return null;
+                const end = nodeCoords[idx + 1];
+                const targetStatus = getStageStatus(idx + 2);
+                let lineClass = 'line-empty';
+                if (targetStatus === 'complete') lineClass = 'line-complete';
+                else if (targetStatus === 'progress') lineClass = 'line-progress';
+                else if (targetStatus === 'warning') lineClass = 'line-warning';
+                
+                return (
+                  <line
+                    key={idx}
+                    x1={start.x}
+                    y1={start.y}
+                    x2={end.x}
+                    y2={end.y}
+                    className={`operation-link ${lineClass}`}
+                    style={{ filter: lineClass !== 'line-empty' ? 'url(#line-glow)' : 'none' }}
+                  />
+                );
+              })}
+            </svg>
+          )}
+
+          <div className="operation-map-grid">
+            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map(id => {
+              const status = getStageStatus(id);
+              const percent = getStagePercent(id);
+              const kpi = getStageKpi(id);
+              const desc = getStageDescription(id);
+              const name = getStageName(id);
+              
+              let statusLabel = 'Não Iniciado';
+              let statusColor = 'var(--text-muted)';
+              if (status === 'complete') { statusLabel = 'Concluído'; statusColor = '#00e676'; }
+              else if (status === 'progress') { statusLabel = 'Em Progresso'; statusColor = '#00b0ff'; }
+              else if (status === 'warning') { statusLabel = 'Atenção'; statusColor = '#ff9800'; }
+
+              return (
+                <div
+                  id={`op-node-${id}`}
+                  key={id}
+                  className={`operation-node status-${status}`}
+                  onClick={() => handleStageClick(id)}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                    <span style={{ fontSize: '9.5px', fontWeight: '800', opacity: 0.5, letterSpacing: '0.5px' }}>ETAPA {String(id).padStart(2, '0')}</span>
+                    <span style={{ fontSize: '9px', padding: '2px 8px', borderRadius: '10px', background: 'rgba(255,255,255,0.03)', color: statusColor, fontWeight: '700', border: `1px solid rgba(255,255,255,0.01)` }}>
+                      {statusLabel}
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '38px', height: '38px', borderRadius: '10px', background: 'rgba(255,255,255,0.03)', color: statusColor }}>
+                      {getNodeIcon(id)}
+                    </div>
+                    <div>
+                      <h3 style={{ fontSize: '14.5px', fontWeight: '800', margin: 0 }}>{name}</h3>
+                      <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 'bold' }}>{percent}% concluído</span>
+                    </div>
+                  </div>
+
+                  <p style={{ fontSize: '11px', color: 'var(--text-muted)', margin: '4px 0 14px 0', minHeight: '34px', lineHeight: '1.4' }}>
+                    {desc}
+                  </p>
+
+                  <div style={{ height: '1px', background: 'rgba(255,255,255,0.06)', margin: '8px 0' }} />
+
+                  <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <span style={{ fontSize: '8.5px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: '700', letterSpacing: '0.3px' }}>KPI Principal</span>
+                      <div style={{ fontSize: '12.5px', fontWeight: '700', color: '#fff', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={kpi}>
+                        {kpi}
+                      </div>
+                    </div>
+                    
+                    <div style={{ opacity: 0.4, display: 'flex', alignItems: 'center', flexShrink: 0, marginLeft: '8px' }}>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="office-dashboard-layout" style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg-color)', color: 'var(--text-main)', fontFamily: "'Plus Jakarta Sans', sans-serif", overflowX: 'hidden' }}>
       
@@ -2925,6 +3534,19 @@ export const OfficeDashboard = () => {
             {/* Abas layout for Talões / Parcelas / Estratos */}
             <div className="office-tab-bar">
               <button 
+                onClick={() => setActiveTab('centro-operacoes')}
+                className={`office-tab-button ${activeTab === 'centro-operacoes' ? 'active' : ''}`}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: '8px' }}>
+                  <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                </svg>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                  <span style={{ fontSize: '13.5px', fontWeight: 'bold' }}>Centro de Operações</span>
+                  <span style={{ fontSize: '10.5px', opacity: 0.7, marginTop: '2px' }}>Mapa de Processo</span>
+                </div>
+              </button>
+
+              <button 
                 onClick={() => setActiveTab('talhoes')}
                 className={`office-tab-button ${activeTab === 'talhoes' ? 'active' : ''}`}
               >
@@ -3059,7 +3681,9 @@ export const OfficeDashboard = () => {
             </div>
 
             {/* TAB CONTENT */}
-            {activeTab === 'talhoes' ? (
+            {activeTab === 'centro-operacoes' ? (
+              renderCentroOperacoes()
+            ) : activeTab === 'talhoes' ? (
               <div className="glass-card" style={{ padding: 0, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.05)' }}>
                 {activeTalhoes.length === 0 ? (
                   <div style={{ padding: '48px', textAlign: 'center', color: 'var(--text-muted)' }}>
@@ -5768,6 +6392,198 @@ export const OfficeDashboard = () => {
                 <button className="btn btn-primary" onClick={handleUpdateFw}>Salvar</button>
               </div>
            </div>
+        </div>
+      )}
+
+      {/* COLETA MODAL: LISTA DE PARCELAS */}
+      {showColetaModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100000, padding: '20px', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
+          <div className="glass-card" style={{ width: '100%', maxWidth: '800px', background: '#0e1511', border: '1px solid rgba(255, 255, 255, 0.12)', boxShadow: '0 20px 40px rgba(0,0,0,0.6)', borderRadius: '24px', padding: '28px', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '16px', marginBottom: '20px' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '20px', color: 'var(--primary-hover)', fontWeight: '800' }}>Status de Coleta por Parcela</h3>
+                <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: 'var(--text-muted)' }}>Lista de parcelas instaladas no campo</p>
+              </div>
+              <button 
+                onClick={() => setShowColetaModal(false)} 
+                style={{ background: 'rgba(255,255,255,0.05)', color: 'white', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '18px' }}
+              >
+                &times;
+              </button>
+            </div>
+
+            {/* List and search */}
+            <div style={{ overflowY: 'auto', flex: 1, paddingRight: '4px' }}>
+              {activeParcels.length === 0 ? (
+                <div style={{ padding: '48px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                  Nenhuma parcela cadastrada neste projeto.
+                </div>
+              ) : (
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+                      <th>Parcela</th>
+                      <th>Status</th>
+                      <th style={{ textAlign: 'center' }}>Árvores Coletadas</th>
+                      <th>Coordenadas</th>
+                      <th style={{ textAlign: 'center' }}>Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {activeParcels.map(p => {
+                      let statusColor = '#a1a1aa';
+                      if (p.status === 'Concluído') statusColor = '#00e676';
+                      else if (p.status === 'Em Andamento') statusColor = '#00b0ff';
+                      else if (p.status === 'Aberto') statusColor = '#ff9800';
+
+                      return (
+                        <tr key={p.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                          <td style={{ fontWeight: 'bold' }}>{p.nome}</td>
+                          <td>
+                            <span style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '10px', background: 'rgba(255,255,255,0.05)', color: statusColor, border: '1px solid rgba(255,255,255,0.02)', fontWeight: 'bold' }}>
+                              {p.status || 'Aberto'}
+                            </span>
+                          </td>
+                          <td style={{ textAlign: 'center', fontWeight: '700' }}>{p.dados ? p.dados.length : 0}</td>
+                          <td style={{ color: 'var(--text-muted)', fontSize: '12px' }}>{p.coordenadas || 'Sem GPS'}</td>
+                          <td style={{ textAlign: 'center' }}>
+                            <button
+                              className="btn btn-secondary"
+                              style={{ width: 'auto', padding: '6px 12px', fontSize: '11px', height: '30px' }}
+                              onClick={() => {
+                                setShowColetaModal(false);
+                                setActiveTab('parcelas');
+                              }}
+                            >
+                              Ver Parcela
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid rgba(255, 255, 255, 0.08)', paddingTop: '16px', marginTop: '20px' }}>
+              <button className="btn btn-secondary" style={{ width: 'auto', padding: '10px 24px' }} onClick={() => setShowColetaModal(false)}>Fechar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* RELATÓRIO MODAL: EXPORTAÇÃO E DOWNLOADS */}
+      {showRelatorioModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100000, padding: '20px', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
+          <div className="glass-card" style={{ width: '100%', maxWidth: '550px', background: '#0e1511', border: '1px solid rgba(255, 255, 255, 0.12)', boxShadow: '0 20px 40px rgba(0,0,0,0.6)', borderRadius: '24px', padding: '28px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '16px', marginBottom: '20px' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '20px', color: 'var(--primary-hover)', fontWeight: '800' }}>Relatórios e Exportações</h3>
+                <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: 'var(--text-muted)' }}>Gere os entregáveis finais do inventário</p>
+              </div>
+              <button 
+                onClick={() => setShowRelatorioModal(false)} 
+                style={{ background: 'rgba(255,255,255,0.05)', color: 'white', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '18px' }}
+              >
+                &times;
+              </button>
+            </div>
+
+            {latestOfficialProcessing ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div style={{ padding: '16px', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: '12px' }}>
+                  <h4 style={{ fontSize: '14px', margin: '0 0 8px 0', color: 'var(--primary-hover)' }}>Processamento Oficial Ativo</h4>
+                  <div style={{ fontSize: '13px', color: 'var(--text-muted)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 16px' }}>
+                    <div>Nome: <strong style={{ color: '#fff' }}>{latestOfficialProcessing.nomeProcessamento}</strong></div>
+                    <div>Data: <strong style={{ color: '#fff' }}>{latestOfficialProcessing.dataProcessamento}</strong></div>
+                    <div>Fator Casca: <strong style={{ color: '#fff' }}>{latestOfficialProcessing.fatorCasca}</strong></div>
+                    <div>Volume Total: <strong style={{ color: '#fff' }}>{Math.round(latestOfficialProcessing.volumeTotalEstimado).toLocaleString()} m³</strong></div>
+                  </div>
+                </div>
+
+                <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: 0 }}>
+                  Escolha o formato de relatório para download:
+                </p>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <button 
+                    className="btn btn-primary" 
+                    style={{ justifyContent: 'flex-start', padding: '12px 16px' }}
+                    onClick={() => {
+                      handleExportAdvancedXLSX(latestOfficialProcessing);
+                      localStorage.setItem(`report_generated_${activeFwId}`, 'true');
+                      setReportGenerated(true);
+                      setShowRelatorioModal(false);
+                    }}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '8px' }}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                    Exportar Planilha Avançada Consolidada
+                  </button>
+
+                  <button 
+                    className="btn btn-secondary" 
+                    style={{ justifyContent: 'flex-start', padding: '12px 16px' }}
+                    onClick={() => {
+                      handleExportAllProcessed();
+                      localStorage.setItem(`report_generated_${activeFwId}`, 'true');
+                      setReportGenerated(true);
+                      setShowRelatorioModal(false);
+                    }}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '8px' }}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                    Exportar Processamento Geral (XLSX)
+                  </button>
+
+                  <button 
+                    className="btn btn-secondary" 
+                    style={{ justifyContent: 'flex-start', padding: '12px 16px' }}
+                    onClick={() => {
+                      if (activeFw) {
+                        handleExportFieldWork(activeFw);
+                        localStorage.setItem(`report_generated_${activeFwId}`, 'true');
+                        setReportGenerated(true);
+                        setShowRelatorioModal(false);
+                      }
+                    }}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '8px' }}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                    Exportar Dados Brutos de Campo (XLSX)
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', textAlign: 'center' }}>
+                <div style={{ padding: '24px', background: 'rgba(239, 35, 60, 0.08)', border: '1px solid rgba(239, 35, 60, 0.2)', borderRadius: '16px', color: '#ff4d6d' }}>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: '12px' }}><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                  <h4 style={{ fontSize: '15px', fontWeight: 'bold', margin: '0 0 6px 0' }}>Processamento Oficial Pendente</h4>
+                  <p style={{ fontSize: '12.5px', margin: 0, opacity: 0.85, lineHeight: '1.4' }}>
+                    Não existe nenhum processamento oficial salvo para este projeto. O relatório avançado consolidado exige a oficialização prévia.
+                  </p>
+                </div>
+
+                <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
+                  <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setShowRelatorioModal(false)}>Fechar</button>
+                  <button 
+                    className="btn btn-primary" 
+                    style={{ flex: 1 }} 
+                    onClick={() => {
+                      setShowRelatorioModal(false);
+                      setActiveTab('processamentos');
+                    }}
+                  >
+                    Ir para Processamentos
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {latestOfficialProcessing && (
+              <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid rgba(255, 255, 255, 0.08)', paddingTop: '16px', marginTop: '20px' }}>
+                <button className="btn btn-secondary" style={{ width: 'auto', padding: '10px 24px' }} onClick={() => setShowRelatorioModal(false)}>Fechar</button>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
