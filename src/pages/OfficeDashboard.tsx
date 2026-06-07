@@ -3819,8 +3819,9 @@ export const OfficeDashboard = () => {
                     <div 
                       key={fw.id} 
                       onClick={() => setActiveFwId(fw.id)}
+                      className={`hud-project-card ${isActive ? 'active' : ''}`}
                       style={{
-                        padding: '10px 14px',
+                        padding: '12px 14px',
                         borderRadius: '8px',
                         cursor: 'pointer',
                         background: isActive ? 'rgba(0, 176, 255, 0.08)' : 'rgba(255, 255, 255, 0.01)',
@@ -3829,9 +3830,6 @@ export const OfficeDashboard = () => {
                         position: 'relative'
                       }}
                     >
-                      {isActive && (
-                        <div style={{ position: 'absolute', left: '0', top: '20%', bottom: '20%', width: '2px', background: '#00b0ff', borderRadius: '0 2px 2px 0' }} />
-                      )}
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <h4 style={{ fontSize: '12.5px', margin: 0, fontWeight: '700', color: isActive ? '#00b0ff' : '#eee', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '180px' }}>
                           {fw.nome}
@@ -3850,9 +3848,12 @@ export const OfficeDashboard = () => {
             </div>
 
             {/* High-Tech System Diagnostic Summary */}
-            <div style={{ padding: '16px 24px', borderTop: '1px solid rgba(255,255,255,0.05)', background: 'rgba(0,0,0,0.25)', fontFamily: 'monospace' }}>
+            <div style={{ padding: '16px 24px', borderTop: '1px solid rgba(0, 176, 255, 0.1)', background: 'rgba(5, 12, 28, 0.45)', fontFamily: 'monospace' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <span style={{ fontSize: '9px', color: '#00b0ff', fontWeight: '900', letterSpacing: '1px' }}>⚡ TELEMETRIA_SISTEMA</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                  <span className="hud-pulse-dot" style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#00e676', display: 'inline-block', boxShadow: '0 0 8px #00e676' }} />
+                  <span style={{ fontSize: '9px', color: '#00b0ff', fontWeight: '900', letterSpacing: '1.2px' }}>TELEMETRIA_SISTEMA</span>
+                </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px' }}>
                   <span style={{ color: 'var(--text-muted)' }}>STATUS:</span>
                   <span style={{ color: '#00e676', fontWeight: 'bold' }}>ONLINE // ATIVO</span>
