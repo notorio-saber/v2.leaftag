@@ -1,4 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+
+const accentMap: Record<string, string[]> = {
+  'a': ['á', 'à', 'ã', 'â'],
+  'e': ['é', 'ê'],
+  'i': ['í'],
+  'o': ['ó', 'ô', 'õ'],
+  'u': ['ú'],
+  'c': ['ç'],
+  'n': ['ñ']
+};
 
 interface TextKeyboardModalProps {
   value: string;
@@ -71,9 +81,9 @@ export const TextKeyboardModal: React.FC<TextKeyboardModalProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [value, onChange]);
 
-  const row1 = isSymbols ? ['á', 'ã', 'â', 'é', 'ê', 'í', 'ó', 'ô', 'õ', 'ú'] : ['q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p'];
-  const row2 = isSymbols ? ['ç', '-', '/', '.', ',', ':', ';', '(', ')'] : ['a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l'];
-  const row3 = isSymbols ? ['@', '#', '&', '*', '+', '=', '!', '?'] : ['z', 'x', 'c', 'v', 'b', 'n', 'm'];
+  const row1 = isSymbols ? ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'] : ['q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p'];
+  const row2 = isSymbols ? ['-', '/', ':', ';', '(', ')', '$', '&', '@', '"'] : ['a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l'];
+  const row3 = isSymbols ? ['.', ',', '?', '!', "'", '%', '=', '+', '*'] : ['z', 'x', 'c', 'v', 'b', 'n', 'm'];
 
   return (
     <div style={{
@@ -102,9 +112,13 @@ export const TextKeyboardModal: React.FC<TextKeyboardModalProps> = ({
         {/* Row 1 */}
         <div style={rowStyle}>
           {row1.map(char => (
-            <button key={char} type="button" className="keyboard-key" style={keyStyle} onClick={() => handleKeyPress(char)}>
-              {isUppercase ? char.toUpperCase() : char.toLowerCase()}
-            </button>
+            <LongPressButton 
+              key={char} 
+              char={char} 
+              isUppercase={isUppercase && !isSymbols} 
+              onPress={handleKeyPress} 
+              variants={!isSymbols ? accentMap[char] : undefined} 
+            />
           ))}
         </div>
 
@@ -112,9 +126,13 @@ export const TextKeyboardModal: React.FC<TextKeyboardModalProps> = ({
         <div style={rowStyle}>
           <div style={{ width: '1.5%' }} />
           {row2.map(char => (
-            <button key={char} type="button" className="keyboard-key" style={keyStyle} onClick={() => handleKeyPress(char)}>
-              {isUppercase ? char.toUpperCase() : char.toLowerCase()}
-            </button>
+            <LongPressButton 
+              key={char} 
+              char={char} 
+              isUppercase={isUppercase && !isSymbols} 
+              onPress={handleKeyPress} 
+              variants={!isSymbols ? accentMap[char] : undefined} 
+            />
           ))}
           <div style={{ width: '1.5%' }} />
         </div>
@@ -131,9 +149,13 @@ export const TextKeyboardModal: React.FC<TextKeyboardModalProps> = ({
             {isSymbols ? 'ABC' : 'Caps'}
           </button>
           {row3.map(char => (
-            <button key={char} type="button" className="keyboard-key" style={keyStyle} onClick={() => handleKeyPress(char)}>
-              {isUppercase && !isSymbols ? char.toUpperCase() : char}
-            </button>
+            <LongPressButton 
+              key={char} 
+              char={char} 
+              isUppercase={isUppercase && !isSymbols} 
+              onPress={handleKeyPress} 
+              variants={!isSymbols ? accentMap[char] : undefined} 
+            />
           ))}
           <button type="button" className="keyboard-key" style={actionKeyStyle()} onClick={handleBackspace}>
             Apagar
@@ -149,6 +171,111 @@ export const TextKeyboardModal: React.FC<TextKeyboardModalProps> = ({
           <button type="button" className="keyboard-key" style={{ ...keyStyle, flex: 4, background: 'var(--border-color)' }} onClick={handleSpace}>Espaço</button>
         </div>
       </div>
+    </div>
+  );
+};
+
+const LongPressButton: React.FC<{
+  char: string;
+  isUppercase: boolean;
+  onPress: (char: string) => void;
+  variants?: string[];
+}> = ({ char, isUppercase, onPress, variants }) => {
+  const [showPopup, setShowPopup] = useState(false);
+  const pressTimer = useRef<NodeJS.Timeout | null>(null);
+
+  const startPress = (e: React.TouchEvent | React.MouseEvent) => {
+    e.preventDefault();
+    if (variants && variants.length > 0) {
+      pressTimer.current = setTimeout(() => {
+        setShowPopup(true);
+      }, 400); // 400ms delay to show popup
+    }
+  };
+
+  const endPress = (e: React.TouchEvent | React.MouseEvent) => {
+    e.preventDefault();
+    if (pressTimer.current) clearTimeout(pressTimer.current);
+    if (!showPopup) {
+      onPress(isUppercase ? char.toUpperCase() : char);
+    }
+    // Don't close popup on touch end if it was just opened
+  };
+
+  const handleVariantPress = (v: string, e: React.MouseEvent | React.TouchEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    onPress(isUppercase ? v.toUpperCase() : v);
+    setShowPopup(false);
+  };
+
+  useEffect(() => {
+    const handleClickOutside = () => setShowPopup(false);
+    if (showPopup) {
+      document.addEventListener('click', handleClickOutside);
+      document.addEventListener('touchstart', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('click', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
+  }, [showPopup]);
+
+  const displayChar = isUppercase ? char.toUpperCase() : char;
+
+  return (
+    <div style={{ position: 'relative', flex: 1, display: 'flex' }}>
+      <button 
+        type="button" 
+        className="keyboard-key" 
+        style={keyStyle} 
+        onMouseDown={startPress}
+        onMouseUp={endPress}
+        onMouseLeave={() => {
+           if (pressTimer.current) clearTimeout(pressTimer.current);
+        }}
+        onTouchStart={startPress}
+        onTouchEnd={endPress}
+      >
+        {displayChar}
+      </button>
+
+      {showPopup && variants && (
+        <div style={{
+          position: 'absolute',
+          bottom: '120%',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          background: 'var(--card-bg)',
+          border: '1px solid var(--primary-hover)',
+          borderRadius: '8px',
+          display: 'flex',
+          gap: '6px',
+          padding: '8px',
+          zIndex: 9999,
+          boxShadow: '0 8px 24px rgba(0,0,0,0.8)'
+        }}>
+          {variants.map(v => {
+            const vDisplay = isUppercase ? v.toUpperCase() : v;
+            return (
+              <button 
+                key={v} 
+                onClick={(e) => handleVariantPress(v, e)}
+                onTouchEnd={(e) => handleVariantPress(v, e)}
+                style={{
+                  ...keyStyle,
+                  flex: 'none',
+                  width: '45px',
+                  height: '45px',
+                  fontSize: '20px'
+                }}
+              >
+                {vDisplay}
+              </button>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 };

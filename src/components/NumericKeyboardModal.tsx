@@ -17,8 +17,8 @@ export const NumericKeyboardModal: React.FC<NumericKeyboardModalProps> = ({
 }) => {
   const handleKeyPress = (key: string) => {
     if (key === '.' || key === ',') {
-      if (!value.includes('.')) {
-        onChange(value === '' ? '0.' : value + '.');
+      if (!value.includes('.') && !value.includes(',')) {
+        onChange(value === '' ? '0' + key : value + key);
       }
     } else if (key === '⌫' || key === 'Apagar') {
       onChange(value.slice(0, -1));

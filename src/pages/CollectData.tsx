@@ -324,7 +324,7 @@ export const CollectData = () => {
       numeroIndividuo: currentIdx,
       timestamp: new Date().toLocaleString('pt-BR'),
       multipleStems: multiStems,
-      ...(multiStems && { stems: stems.map((s: any) => ({id: s.id, cap: parseFloat(s.cap||'0'), alturaComercial: parseFloat(s.alturaComercial||'0'), alturaTotal: parseFloat(s.alturaTotal||'0')})) }),
+      ...(multiStems && { stems: stems.map((s: any) => ({id: s.id, cap: parseFloat((s.cap||'0').toString().replace(',', '.')), alturaComercial: parseFloat((s.alturaComercial||'0').toString().replace(',', '.')), alturaTotal: parseFloat((s.alturaTotal||'0').toString().replace(',', '.'))})) }),
       ...processedFormData
     };
     
@@ -599,14 +599,14 @@ export const CollectData = () => {
                 {isNumActive ? (
                   formData[currentCol.id] ? (
                     <>
-                      {formData[currentCol.id].toString().replace('.', ',')}
+                      {formData[currentCol.id].toString()}
                       <span className="blinking-cursor" />
                     </>
                   ) : (
                     <span className="blinking-cursor" />
                   )
                 ) : (
-                  formData[currentCol.id]?.toString().replace('.', ',') || 'Tocar para digitar...'
+                  formData[currentCol.id]?.toString() || 'Tocar para digitar...'
                 )}
               </div>
             ) : currentCol.tipo === 'select' ? (
@@ -773,14 +773,14 @@ export const CollectData = () => {
                             {isCapActive ? (
                               stem.cap ? (
                                 <>
-                                  {stem.cap.toString().replace('.', ',')}
+                                  {stem.cap.toString()}
                                   <span className="blinking-cursor" />
                                 </>
                               ) : (
                                 <span className="blinking-cursor" />
                               )
                             ) : (
-                              stem.cap ? stem.cap.toString().replace('.', ',') : <span style={{ color: 'rgba(255,255,255,0.15)' }}>CAP</span>
+                              stem.cap ? stem.cap.toString() : <span style={{ color: 'rgba(255,255,255,0.15)' }}>CAP</span>
                             )}
                           </div>
 
@@ -816,14 +816,14 @@ export const CollectData = () => {
                             {isAltComercialActive ? (
                               stem.alturaComercial ? (
                                 <>
-                                  {stem.alturaComercial.toString().replace('.', ',')}
+                                  {stem.alturaComercial.toString()}
                                   <span className="blinking-cursor" />
                                 </>
                               ) : (
                                 <span className="blinking-cursor" />
                               )
                             ) : (
-                              stem.alturaComercial ? stem.alturaComercial.toString().replace('.', ',') : <span style={{ color: 'rgba(255,255,255,0.15)' }}>Alt. Com</span>
+                              stem.alturaComercial ? stem.alturaComercial.toString() : <span style={{ color: 'rgba(255,255,255,0.15)' }}>Alt. Com</span>
                             )}
                           </div>
 
@@ -859,14 +859,14 @@ export const CollectData = () => {
                             {isAltTotalActive ? (
                               stem.alturaTotal ? (
                                 <>
-                                  {stem.alturaTotal.toString().replace('.', ',')}
+                                  {stem.alturaTotal.toString()}
                                   <span className="blinking-cursor" />
                                 </>
                               ) : (
                                 <span className="blinking-cursor" />
                               )
                             ) : (
-                              stem.alturaTotal ? stem.alturaTotal.toString().replace('.', ',') : <span style={{ color: 'rgba(255,255,255,0.15)' }}>Alt. Tot</span>
+                              stem.alturaTotal ? stem.alturaTotal.toString() : <span style={{ color: 'rgba(255,255,255,0.15)' }}>Alt. Tot</span>
                             )}
                           </div>
                           
@@ -1188,8 +1188,8 @@ export const CollectData = () => {
                           border: '1px solid rgba(255,255,255,0.03)',
                           fontSize: '14px' 
                         }}>
-                          <div><strong style={{ color: 'var(--text-muted)' }}>CAP:</strong> {stem.cap?.toString().replace('.', ',') || '-'}</div>
-                          <div><strong style={{ color: 'var(--text-muted)' }}>Altura:</strong> {stem.altura?.toString().replace('.', ',') || '-'}m</div>
+                          <div><strong style={{ color: 'var(--text-muted)' }}>CAP:</strong> {stem.cap?.toString() || '-'}</div>
+                          <div><strong style={{ color: 'var(--text-muted)' }}>Altura:</strong> {stem.altura?.toString() || '-'}m</div>
                         </div>
                       )}
                     </div>
