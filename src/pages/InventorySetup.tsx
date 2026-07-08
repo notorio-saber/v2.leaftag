@@ -23,7 +23,9 @@ const getNewCustomCol = () => ({ id: '', nome: '', tipo: 'text', checked: true, 
 export const InventorySetup = () => {
   const navigate = useNavigate();
   const { fieldWorkId, talhaoId } = useParams();
-  const { setCurrentInventory, saveInventory, strata, inventories } = useInventory();
+  const { setCurrentInventory, saveInventory, strata, inventories, fieldWorks } = useInventory();
+  const currentFw = fieldWorks.find(f => f.id === fieldWorkId);
+  const isCenso = currentFw?.modoInventario === 'censo';
   const activeStrata = strata.filter(s => s.fieldWorkId === fieldWorkId);
   
   // Find the last inventory in this fieldwork to inherit settings
@@ -58,7 +60,11 @@ export const InventorySetup = () => {
   // Inherit configuration from last inventory of the same fieldwork once loaded
   useEffect(() => {
     if (lastInventory && !hasInitialized) {
-      setArea(lastInventory.areaParcela?.toString() || '');
+      if (isCenso) {
+        setArea(lastInventory.areaParcela ? (lastInventory.areaParcela / 10000).toString() : '');
+      } else {
+        setArea(lastInventory.areaParcela?.toString() || '');
+      }
       setStratumId(lastInventory.stratumId || '');
       setFormatoParcela((lastInventory.formatoParcela as 'retangular' | 'circular') || 'retangular');
       setSelectedTemplate(lastInventory.template || 'custom');
@@ -127,7 +133,7 @@ export const InventorySetup = () => {
       return;
     }
     if (!nome || !area) {
-      alert('Por favor, preencha o Nome e a Área da Parcela.');
+      alert(`Por favor, preencha o Nome e a Área ${isCenso ? 'do Censo' : 'da Parcela'}.`);
       return;
     }
     const finalCols: InventoryColumn[] = [
@@ -153,9 +159,9 @@ export const InventorySetup = () => {
       talhaoId,
       stratumId: stratumId || undefined,
       nome,
-      formatoParcela,
-      areaParcela: parseFloat(area) || 0,
-      fatorExpansao: parseFloat(area) > 0 ? 10000 / parseFloat(area) : 1,
+      formatoParcela: isCenso ? 'retangular' : formatoParcela,
+      areaParcela: isCenso ? (parseFloat(area) || 0) * 10000 : (parseFloat(area) || 0),
+      fatorExpansao: isCenso ? 1 : (parseFloat(area) > 0 ? 10000 / parseFloat(area) : 1),
       dataInicio: new Date().toLocaleDateString('pt-BR'),
       ultimaColeta: new Date().toLocaleDateString('pt-BR'),
       status: 'Novo',
@@ -176,14 +182,14 @@ export const InventorySetup = () => {
       {/* Header */}
       <div className="app-header" style={{ marginBottom: '20px' }}>
         <div>
-          <h2 style={{ color: 'var(--primary-hover)', fontSize: '22px', fontWeight: '800' }}>Configurar Parcela</h2>
-          <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Defina as colunas e os parâmetros da nova parcela florestal.</span>
+          <h2 style={{ color: 'var(--primary-hover)', fontSize: '22px', fontWeight: '800' }}>{isCenso ? 'Configurar Área de Censo' : 'Configurar Parcela'}</h2>
+          <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{isCenso ? 'Defina as colunas e os parâmetros da sua área total de censo.' : 'Defina as colunas e os parâmetros da nova parcela florestal.'}</span>
         </div>
       </div>
 
       <div className="glass-card" style={{ marginTop: '8px' }}>
-        <label className="input-label">Nome ou Número da Parcela</label>
-        <input className="input-field" value={nome} onChange={e => setNome(e.target.value)} placeholder="Ex: Parcela 01, P-04" />
+        <label className="input-label">{isCenso ? 'Nome ou Identificador da Área' : 'Nome ou Número da Parcela'}</label>
+        <input className="input-field" value={nome} onChange={e => setNome(e.target.value)} placeholder={isCenso ? "Ex: Área Total 1, Bloco A" : "Ex: Parcela 01, P-04"} />
 
         {activeStrata.length > 0 && (
           <>
@@ -206,50 +212,62 @@ export const InventorySetup = () => {
           </>
         )}
 
-        <label className="input-label" style={{ marginTop: '12px' }}>Formato da Parcela</label>
-        <div style={{ display: 'flex', gap: '12px', marginBottom: '20px' }}>
-          <button
-            type="button"
-            className="btn"
-            onClick={() => {
-              setFormatoParcela('retangular');
-            }}
-            style={{
-              flex: 1,
-              background: formatoParcela === 'retangular' ? 'rgba(46, 125, 50, 0.2)' : 'rgba(255,255,255,0.02)',
-              border: formatoParcela === 'retangular' ? '1px solid var(--primary-hover)' : '1px solid rgba(255,255,255,0.1)',
-              color: formatoParcela === 'retangular' ? 'var(--primary-hover)' : 'white'
-            }}
-          >
-            Retangular
-          </button>
-          <button
-            type="button"
-            className="btn"
-            onClick={() => {
-              setFormatoParcela('circular');
-            }}
-            style={{
-              flex: 1,
-              background: formatoParcela === 'circular' ? 'rgba(46, 125, 50, 0.2)' : 'rgba(255,255,255,0.02)',
-              border: formatoParcela === 'circular' ? '1px solid var(--primary-hover)' : '1px solid rgba(255,255,255,0.1)',
-              color: formatoParcela === 'circular' ? 'var(--primary-hover)' : 'white'
-            }}
-          >
-            Circular
-          </button>
-        </div>
+            </select>
+          </>
+        )}
+
+        {!isCenso && (
+          <>
+            <label className="input-label" style={{ marginTop: '12px' }}>Formato da Parcela</label>
+            <div style={{ display: 'flex', gap: '12px', marginBottom: '20px' }}>
+              <button
+                type="button"
+                className="btn"
+                onClick={() => {
+                  setFormatoParcela('retangular');
+                }}
+                style={{
+                  flex: 1,
+                  background: formatoParcela === 'retangular' ? 'rgba(46, 125, 50, 0.2)' : 'rgba(255,255,255,0.02)',
+                  border: formatoParcela === 'retangular' ? '1px solid var(--primary-hover)' : '1px solid rgba(255,255,255,0.1)',
+                  color: formatoParcela === 'retangular' ? 'var(--primary-hover)' : 'white'
+                }}
+              >
+                Retangular
+              </button>
+              <button
+                type="button"
+                className="btn"
+                onClick={() => {
+                  setFormatoParcela('circular');
+                }}
+                style={{
+                  flex: 1,
+                  background: formatoParcela === 'circular' ? 'rgba(46, 125, 50, 0.2)' : 'rgba(255,255,255,0.02)',
+                  border: formatoParcela === 'circular' ? '1px solid var(--primary-hover)' : '1px solid rgba(255,255,255,0.1)',
+                  color: formatoParcela === 'circular' ? 'var(--primary-hover)' : 'white'
+                }}
+              >
+                Circular
+              </button>
+            </div>
+          </>
+        )}
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-          <label className="input-label" style={{ marginBottom: 0 }}>Área da Parcela (m²)</label>
-          <button 
-            type="button" 
-            className="btn btn-secondary" 
-            style={{ padding: '4px 12px', fontSize: '10px', width: 'auto' }}
-            onClick={() => setShowCalc(!showCalc)}
-          >
-            {showCalc ? 'Ocultar Calculadora' : 'Calcular Área'}
-          </button>
+          <label className="input-label" style={{ marginBottom: 0 }}>
+            {isCenso ? 'Área Total Estimada (hectares)' : 'Área da Parcela (m²)'}
+          </label>
+          {!isCenso && (
+            <button 
+              type="button" 
+              className="btn btn-secondary" 
+              style={{ padding: '4px 12px', fontSize: '10px', width: 'auto' }}
+              onClick={() => setShowCalc(!showCalc)}
+            >
+              {showCalc ? 'Ocultar Calculadora' : 'Calcular Área'}
+            </button>
+          )}
         </div>
         
         {showCalc && (
@@ -318,7 +336,7 @@ export const InventorySetup = () => {
           onChange={e => {
             const aVal = e.target.value;
             setArea(aVal);
-            if (formatoParcela === 'circular') {
+            if (!isCenso && formatoParcela === 'circular') {
               const a = parseFloat(aVal);
               if (a > 0) {
                 const r = Math.sqrt(a / Math.PI);
@@ -328,10 +346,10 @@ export const InventorySetup = () => {
               }
             }
           }} 
-          placeholder="Área em m² (Ex: 400)" 
+          placeholder={isCenso ? "Área em ha (Ex: 15.5)" : "Área em m² (Ex: 400)"} 
         />
 
-        <label className="input-label" style={{ marginTop: '12px' }}>Coordenadas GPS da Parcela (Opcional)</label>
+        <label className="input-label" style={{ marginTop: '12px' }}>Coordenadas GPS da {isCenso ? 'Área' : 'Parcela'} (Opcional)</label>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '12px' }}>
           <input 
             className="input-field" 
@@ -351,7 +369,7 @@ export const InventorySetup = () => {
           </button>
         </div>
 
-        <label className="input-label">Observações da Parcela (Opcional)</label>
+        <label className="input-label">Observações da {isCenso ? 'Área' : 'Parcela'} (Opcional)</label>
         <textarea 
           className="input-field" 
           placeholder="Ex: Parcela próxima à estrada, relevo inclinado..." 
@@ -360,7 +378,7 @@ export const InventorySetup = () => {
           style={{ minHeight: '80px', fontFamily: 'inherit' }}
         />
 
-        <h3 style={{ margin: '20px 0 10px', color: 'var(--primary-hover)', fontSize: '16px', fontWeight: '800' }}>Modelo de Parcela</h3>
+        <h3 style={{ margin: '20px 0 10px', color: 'var(--primary-hover)', fontSize: '16px', fontWeight: '800' }}>Modelo de {isCenso ? 'Dados' : 'Parcela'}</h3>
         <select 
           className="input-field" 
           value={selectedTemplate} 

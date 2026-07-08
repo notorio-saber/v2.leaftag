@@ -241,19 +241,22 @@ const LongPressButton: React.FC<{
       </button>
 
       {showPopup && variants && (
-        <div style={{
+        <div 
+          onPointerDown={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
+          style={{
           position: 'absolute',
           bottom: '120%',
           left: '50%',
           transform: 'translateX(-50%)',
-          background: 'var(--card-bg)',
+          background: '#1a1a1a', // Solid non-transparent background
           border: '1px solid var(--primary-hover)',
           borderRadius: '8px',
           display: 'flex',
           gap: '6px',
           padding: '8px',
-          zIndex: 9999,
-          boxShadow: '0 8px 24px rgba(0,0,0,0.8)'
+          zIndex: 99999, // Very high z-index
+          boxShadow: '0 8px 24px rgba(0,0,0,0.9)'
         }}>
           {variants.map(v => {
             const vDisplay = isUppercase ? v.toUpperCase() : v;
