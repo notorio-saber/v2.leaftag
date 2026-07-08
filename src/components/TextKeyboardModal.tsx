@@ -98,7 +98,9 @@ export const TextKeyboardModal: React.FC<TextKeyboardModalProps> = ({
       display: 'flex',
       flexDirection: 'column',
       gap: '4px',
-      boxSizing: 'border-box'
+      boxSizing: 'border-box',
+      userSelect: 'none',
+      WebkitUserSelect: 'none'
     }}>
       {/* Keyboard Keypad Layout */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '100%' }}>
@@ -336,6 +338,9 @@ const keyStyle: React.CSSProperties = {
   alignItems: 'center',
   justifyContent: 'center',
   userSelect: 'none',
+  WebkitUserSelect: 'none',
+  WebkitTouchCallout: 'none',
+  touchAction: 'none',
   outline: 'none',
   fontFamily: "'Plus Jakarta Sans', sans-serif",
   transition: 'all 0.2s ease'
