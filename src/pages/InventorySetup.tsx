@@ -212,9 +212,7 @@ export const InventorySetup = () => {
           </>
         )}
 
-            </select>
-          </>
-        )}
+
 
         {!isCenso && (
           <>
