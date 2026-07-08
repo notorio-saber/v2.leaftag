@@ -4,8 +4,6 @@ import { useInventory } from '../context/InventoryContext';
 import { useAuth } from '../context/AuthContext';
 import * as XLSX from 'xlsx';
 import { StatisticalDashboard } from '../components/StatisticalDashboard';
-import { SortimentoTab } from '../components/SortimentoTab';
-import { MapVisualization } from '../components/MapVisualization';
 import { db } from '../lib/firebase';
 import { doc, getDoc, updateDoc, setDoc, deleteDoc } from 'firebase/firestore';
 import { 
@@ -23,6 +21,14 @@ import type {
   StratumConsolidation, 
   TrabalhoConsolidation 
 } from '../types';
+
+import { ProjectSelectionView } from '../components/office/ProjectSelectionView';
+import { ClassicOfficeDashboard } from '../components/office/ClassicOfficeDashboard';
+import { HUDOfficeDashboard } from '../components/office/HUDOfficeDashboard';
+import { SettingsModal } from '../components/office/modals/SettingsModal';
+import { TeamModal } from '../components/office/modals/TeamModal';
+import { GoogleSheetsModal } from '../components/office/modals/GoogleSheetsModal';
+import { BatchProcessModal } from '../components/office/modals/BatchProcessModal';
 
 const PONTOS_RELATIVOS = [
   'Base', '10%', '20%', '30%', '40%', '50%', '60%', '70%', '80%', '90%', 'Topo'
@@ -57,8 +63,6 @@ export const OfficeDashboard = () => {
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showTeamModal, setShowTeamModal] = useState(false);
   const [collaborators, setCollaborators] = useState<string[]>([]);
-  const [newEmail, setNewEmail] = useState('');
-  const [isTeamLoading, setIsTeamLoading] = useState(false);
   const isOwner = currentUser && currentUser.uid === uidToUse && (status === 'active' || status === 'admin');
 
   useEffect(() => {
@@ -79,62 +83,6 @@ export const OfficeDashboard = () => {
     loadCollaborators();
   }, [currentUser, showTeamModal, uidToUse, status]);
 
-  const handleAddCollaborator = async () => {
-    if (!currentUser) return;
-    const emailToTrim = newEmail.trim().toLowerCase();
-    if (!emailToTrim) return alert("Digite um e-mail válido.");
-    
-    if (collaborators.includes(emailToTrim)) {
-      return alert("Este e-mail já faz parte do seu time.");
-    }
-    
-    if (status !== 'admin' && collaborators.length >= 2) {
-      return alert("Você atingiu o limite máximo de 2 colaboradores no seu time.");
-    }
-
-    setIsTeamLoading(true);
-    const updatedCollaborators = [...collaborators, emailToTrim];
-    try {
-      const docRef = doc(db, 'users', currentUser.uid);
-      await updateDoc(docRef, { collaborators: updatedCollaborators });
-      
-      // Salva mapeamento para login robusto
-      await setDoc(doc(db, 'collaborators_mapping', emailToTrim), { ownerUid: currentUser.uid });
-
-      setCollaborators(updatedCollaborators);
-      setNewEmail('');
-      alert("Colaborador adicionado com sucesso!");
-    } catch (e) {
-      console.error(e);
-      alert("Erro ao adicionar colaborador. Tente novamente.");
-    } finally {
-      setIsTeamLoading(false);
-    }
-  };
-
-  const handleRemoveCollaborator = async (emailToRemove: string) => {
-    if (!currentUser) return;
-    if (!confirm(`Deseja realmente remover o e-mail ${emailToRemove} do seu time?`)) return;
-
-    setIsTeamLoading(true);
-    const updatedCollaborators = collaborators.filter(email => email !== emailToRemove);
-    try {
-      const docRef = doc(db, 'users', currentUser.uid);
-      await updateDoc(docRef, { collaborators: updatedCollaborators });
-      
-      // Remove o mapeamento do banco
-      await deleteDoc(doc(db, 'collaborators_mapping', emailToRemove));
-
-      setCollaborators(updatedCollaborators);
-      alert("Colaborador removido com sucesso!");
-    } catch (e) {
-      console.error(e);
-      alert("Erro ao remover colaborador. Tente novamente.");
-    } finally {
-      setIsTeamLoading(false);
-    }
-  };
-
   const [activeFwId, setActiveFwId] = useState<string>('');
   const [searchProjectQuery, setSearchProjectQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'centro-operacoes' | 'talhoes' | 'parcelas' | 'estratos' | 'cubagem' | 'extrapolacao' | 'processamentos' | 'sortimento'>('centro-operacoes');
@@ -145,6 +93,31 @@ export const OfficeDashboard = () => {
   const [activeLayer, setActiveLayer] = useState<'process' | 'gis' | 'stats'>('process');
   const [focusedNode, setFocusedNode] = useState<number | null>(null);
   const [expandedStages, setExpandedStages] = useState<Record<number, boolean>>({ 2: true });
+
+  // Tier Simulator states
+  const [activeTier, setActiveTier] = useState<'field' | 'inventory' | 'forest'>('forest');
+  const [showUpgradeModal, setShowUpgradeModal] = useState<{ requiredTier: 'inventory' | 'forest'; featureName: string } | null>(null);
+
+  const isStageLocked = (stageId: number): boolean => {
+    if (activeTier === 'field') {
+      return ![1, 4, 5].includes(stageId);
+    }
+    return false;
+  };
+
+  useEffect(() => {
+    if (focusedNode !== null) {
+      const isLocked = activeTier === 'field' && ![1, 4, 5].includes(focusedNode);
+      if (isLocked) {
+        setFocusedNode(null);
+      }
+    }
+    if (activeTier === 'field') {
+      setActiveLayer('process');
+    } else if (activeTier === 'inventory' && activeLayer === 'gis') {
+      setActiveLayer('process');
+    }
+  }, [activeTier, focusedNode, activeLayer]);
   const [expandedTalhoes, setExpandedTalhoes] = useState<Record<string, boolean>>({});
   const [expandedParcels, setExpandedParcels] = useState<Record<number, boolean>>({});
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -2888,1822 +2861,200 @@ export const OfficeDashboard = () => {
     };
   }, []);
 
-  const renderSidePanelContent = (id: number) => {
-    if (!activeFw) return null;
-    switch (id) {
-      case 1: // Projeto
-        return (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-              <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Nome do Projeto</span>
-              <div style={{ fontSize: '16px', fontWeight: '800', color: '#fff', marginTop: '4px' }}>{activeFw.nome}</div>
-            </div>
-            <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-              <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Local / Fazenda</span>
-              <div style={{ fontSize: '15px', fontWeight: '800', color: '#fff', marginTop: '4px' }}>{activeFw.local}</div>
-            </div>
-            
-            <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <button 
-                type="button" 
-                className="btn btn-secondary" 
-                style={{ width: '100%', margin: 0 }} 
-                onClick={() => setShowSheetsModal(true)}
-              >
-                {activeFw.googleSheetsUrl ? "Planilha Vinculada" : "Vincular Planilha Google"}
-              </button>
-              {activeFw.googleSheetsUrl && (
-                <button 
-                  type="button" 
-                  className="btn btn-primary" 
-                  style={{ width: '100%', background: 'linear-gradient(135deg, #00e676 0%, #00b0ff 100%)', border: 'none', margin: 0 }} 
-                  onClick={handleSyncGoogleSheets}
-                  disabled={isSyncingSheets}
-                >
-                  {isSyncingSheets ? "Sincronizando..." : "Sincronizar Planilha"}
-                </button>
-              )}
-              <button 
-                className="btn btn-secondary" 
-                style={{ width: '100%', margin: 0 }} 
-                onClick={() => handleEditClick(activeFw)}
-              >
-                Editar Metadados
-              </button>
-            </div>
-          </div>
-        );
-        
-      case 2: // Talhões
-        return (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <button 
-                className="btn btn-primary" 
-                style={{ flex: 1, fontSize: '12px', margin: 0 }} 
-                onClick={() => {
-                  setEditingTalhao({ fieldWorkId: activeFwId });
-                  setEditTalhaoName('');
-                  setEditTalhaoArea('');
-                  setEditTalhaoObs('');
-                }}
-              >
-                + Novo Talhão
-              </button>
-              <button 
-                className="btn btn-secondary" 
-                style={{ flex: 1, fontSize: '12px', borderColor: '#00b0ff', color: '#00b0ff', margin: 0 }} 
-                onClick={() => setActiveLayer('gis')}
-              >
-                Camada GIS Map
-              </button>
-            </div>
 
-            <div style={{ maxHeight: '320px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px', paddingRight: '4px' }}>
-              {activeTalhoes.length === 0 ? (
-                <span style={{ fontSize: '12px', color: 'var(--text-muted)', textAlign: 'center', padding: '20px' }}>Nenhum talhão cadastrado.</span>
-              ) : (
-                activeTalhoes.map(t => {
-                  const talParcels = activeParcels.filter(p => p.talhaoId === t.id);
-                  return (
-                    <div key={t.id} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: '12px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontWeight: 'bold', color: '#fff', fontSize: '13.5px' }}>{t.nome}</span>
-                        <span style={{ color: '#00e676', fontWeight: 'bold', fontSize: '12px' }}>{t.area ? `${Number(t.area).toFixed(2)} ha` : 'S/ Área'}</span>
-                      </div>
-                      <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{talParcels.length} parcelas • {t.observacoes || 'Sem observações'}</span>
-                      <div style={{ display: 'flex', gap: '6px', marginTop: '6px' }}>
-                        <button 
-                          className="btn btn-secondary" 
-                          style={{ height: '24px', padding: '0 8px', fontSize: '10px', margin: 0 }} 
-                          onClick={() => {
-                            setEditingTalhao(t);
-                            setEditTalhaoName(t.nome);
-                            setEditTalhaoArea(t.area?.toString() || '');
-                            setEditTalhaoObs(t.observacoes || '');
-                          }}
-                        >
-                          Editar
-                        </button>
-                        <button 
-                          className="btn btn-danger" 
-                          style={{ height: '24px', padding: '0 8px', fontSize: '10px', margin: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }} 
-                          onClick={() => {
-                            if (confirm(`Excluir o talhão "${t.nome}" apagarão todas as parcelas associadas. Prosseguir?`)) {
-                              deleteTalhao(t.id);
-                            }
-                          }}
-                        >
-                          Excluir
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
-        );
-
-      case 3: // Estratos
-        return (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <button 
-              className="btn btn-primary" 
-              style={{ width: '100%', fontSize: '12px', margin: 0 }} 
-              onClick={() => setShowStratumModal(true)}
-            >
-              + Novo Estrato
-            </button>
-
-            <div style={{ maxHeight: '320px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px', paddingRight: '4px' }}>
-              {activeStrata.length === 0 ? (
-                <span style={{ fontSize: '12px', color: 'var(--text-muted)', textAlign: 'center', padding: '20px' }}>Nenhum estrato cadastrado.</span>
-              ) : (
-                activeStrata.map(s => {
-                  const stratParcels = activeParcels.filter(p => p.stratumId === s.id);
-                  return (
-                    <div key={s.id} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: '12px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontWeight: 'bold', color: '#fff', fontSize: '13.5px' }}>{s.nome}</span>
-                        <span style={{ color: '#00e676', fontWeight: 'bold', fontSize: '12px' }}>{s.area ? `${Number(s.area).toFixed(2)} ha` : 'S/ Área'}</span>
-                      </div>
-                      <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{stratParcels.length} parcelas • {s.descricao || 'Sem descrição'}</span>
-                      <div>
-                        <button 
-                          className="btn btn-danger" 
-                          style={{ height: '24px', padding: '0 8px', fontSize: '10px', margin: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }} 
-                          onClick={() => {
-                            if (confirm(`Deseja excluir o estrato "${s.nome}"?`)) {
-                              deleteStratum(s.id);
-                            }
-                          }}
-                        >
-                          Excluir
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
-        );
-
-      case 4: // Parcelas
-        return (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <button 
-                className="btn btn-secondary" 
-                style={{ flex: 1, fontSize: '12px', borderColor: '#00b0ff', color: '#00b0ff', margin: 0 }} 
-                onClick={() => setActiveLayer('gis')}
-              >
-                Camada GIS Map
-              </button>
-            </div>
-
-            <div style={{ maxHeight: '350px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px', paddingRight: '4px' }}>
-              {activeParcels.length === 0 ? (
-                <span style={{ fontSize: '12px', color: 'var(--text-muted)', textAlign: 'center', padding: '20px' }}>Nenhuma parcela cadastrada.</span>
-              ) : (
-                activeParcels.map(p => (
-                  <div key={p.id} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: '12px', padding: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                      <span style={{ fontWeight: 'bold', color: '#fff', fontSize: '13.5px' }}>{p.nome}</span>
-                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                        Área: {p.areaParcela} m² • {p.dados.length} árvores
-                      </div>
-                    </div>
-                    <span style={{ 
-                      fontSize: '10px', 
-                      padding: '2px 8px', 
-                      borderRadius: '10px', 
-                      background: 'rgba(255,255,255,0.03)', 
-                      color: p.status === 'Concluído' ? '#00e676' : p.status === 'Em andamento' ? '#00b0ff' : 'var(--text-muted)',
-                      fontWeight: '700' 
-                    }}>
-                      {p.status || 'Pendente'}
-                    </span>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        );
-
-      case 5: // Coleta de Campo
-        return (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <button 
-              className="btn btn-primary" 
-              style={{ width: '100%', fontSize: '12px', margin: 0 }} 
-              onClick={() => setShowColetaModal(true)}
-            >
-              Auditoria de Coletas
-            </button>
-
-            <div style={{ background: 'rgba(255,255,255,0.01)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.04)' }}>
-              <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Resumo de Coleta</span>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '12px' }}>
-                <div>
-                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Total Árvores</span>
-                  <div style={{ fontSize: '18px', fontWeight: '800', color: '#fff', marginTop: '2px' }}>{kpis.totalTrees}</div>
-                </div>
-                <div>
-                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Espécies</span>
-                  <div style={{ fontSize: '18px', fontWeight: '800', color: '#00e676', marginTop: '2px' }}>{kpis.speciesCount}</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        );
-
-      case 6: // Cubagem
-        return (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div style={{ background: 'rgba(255,255,255,0.01)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.04)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Fustes Cubados</span>
-                <div style={{ fontSize: '20px', fontWeight: '800', color: '#00b0ff', marginTop: '2px' }}>{allCubagedTrees.length}</div>
-              </div>
-              <button 
-                className="btn btn-secondary" 
-                style={{ width: 'auto', fontSize: '11px', margin: 0 }} 
-                onClick={() => {
-                  setActiveTab('cubagem');
-                  setInterfaceMode('classic');
-                }}
-              >
-                Gerenciar Fustes
-              </button>
-            </div>
-          </div>
-        );
-
-      case 7: // Modelos
-        return (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <label style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Modelo Hipsométrico</label>
-              <select 
-                className="input-field" 
-                style={{ marginBottom: 0, background: 'rgba(0,0,0,0.3)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }} 
-                value={selectedHeightModelId} 
-                onChange={async (e) => {
-                  setSelectedHeightModelId(e.target.value);
-                  if (activeFwId) {
-                    await updateDoc(doc(db, 'fieldWorks', activeFwId), {
-                      selectedHeightModelId: e.target.value
-                    });
-                  }
-                }}
-              >
-                <option value="none">Nenhum (Usar H Medida)</option>
-                {heightModels.map(m => (
-                  <option key={m.id} value={m.id}>{m.nome} ({m.tipoModelo})</option>
-                ))}
-              </select>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <label style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Modelo Volumétrico</label>
-              <select 
-                className="input-field" 
-                style={{ marginBottom: 0, background: 'rgba(0,0,0,0.3)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }} 
-                value={selectedVolumeModelId} 
-                onChange={async (e) => {
-                  setSelectedVolumeModelId(e.target.value);
-                  if (activeFwId) {
-                    await updateDoc(doc(db, 'fieldWorks', activeFwId), {
-                      selectedVolumeModelId: e.target.value
-                    });
-                  }
-                }}
-              >
-                <option value="legacy">Fator de Forma Clássico (Legacy)</option>
-                {volumeModels.map(m => (
-                  <option key={m.id} value={m.id}>{m.nome} ({m.tipoModelo})</option>
-                ))}
-              </select>
-            </div>
-
-            <button 
-              className="btn btn-secondary" 
-              style={{ width: '100%', marginTop: '12px', margin: 0 }} 
-              onClick={() => navigate('/modelos')}
-            >
-              Biblioteca de Equações
-            </button>
-          </div>
-        );
-
-      case 8: // Processamento
-        return (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <button 
-                className="btn btn-primary" 
-                style={{ flex: 1, fontSize: '12px', margin: 0 }} 
-                onClick={() => {
-                  setBatchScope('total');
-                  setBatchTalhaoId('');
-                  setBatchParcelId(null);
-                  setShowBatchProcessModal(true);
-                }}
-              >
-                Processar em Lote
-              </button>
-              <button 
-                className="btn btn-secondary" 
-                style={{ flex: 1, fontSize: '12px', borderColor: '#00e676', color: '#00e676', margin: 0 }} 
-                onClick={() => setActiveLayer('stats')}
-              >
-                Sala Estatística
-              </button>
-            </div>
-
-            <div style={{ maxHeight: '250px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px', paddingRight: '4px' }}>
-              {activeProcessings.length === 0 ? (
-                <span style={{ fontSize: '12px', color: 'var(--text-muted)', textAlign: 'center', padding: '20px' }}>Nenhum snapshot oficializado.</span>
-              ) : (
-                activeProcessings.map(p => (
-                  <div key={p.id} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: '12px', padding: '12px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontWeight: 'bold', color: '#fff', fontSize: '13px' }}>{p.nomeProcessamento}</span>
-                      <button 
-                        className="btn btn-danger" 
-                        style={{ height: '20px', width: '20px', padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', margin: 0 }} 
-                        onClick={() => deleteProcessing(p.id)}
-                      >
-                        ✕
-                      </button>
-                    </div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                      Data: {p.dataProcessamento} • Vol: {Math.round(p.volumeTotalEstimado || 0).toLocaleString()} m³
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        );
-
-      case 9: // Extrapolação
-        return (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <button 
-              className="btn btn-primary" 
-              style={{ width: '100%', fontSize: '12px', margin: 0 }} 
-              onClick={() => setActiveLayer('stats')}
-            >
-              Ver Fitossociologia e Estatísticas
-            </button>
-            {latestOfficialProcessing && (
-              <div style={{ background: 'rgba(255,255,255,0.01)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.04)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Snapshot Oficial</span>
-                <div>
-                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Erro de Amostragem %</span>
-                  <div style={{ fontSize: '18px', fontWeight: '800', color: '#fff', marginTop: '2px' }}>
-                    {stratifiedStats.errorRel !== undefined 
-                      ? `${stratifiedStats.errorRel.toFixed(2)}%`
-                      : 'N/D'}
-                  </div>
-                </div>
-                <div>
-                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Intervalo de Confiança</span>
-                  <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                    {stratifiedStats.meanSt !== undefined && stratifiedStats.errorAbs !== undefined
-                      ? `${Math.round(Math.max(0, stratifiedStats.meanSt - stratifiedStats.errorAbs))} a ${Math.round(stratifiedStats.meanSt + stratifiedStats.errorAbs)} m³/ha`
-                      : 'N/D'}
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        );
-
-      case 10: // Sortimento
-        return (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', height: '400px', overflowY: 'auto' }}>
-            <SortimentoTab activeFw={activeFw} inventories={inventories} activeTalhoes={activeTalhoes} />
-          </div>
-        );
-
-      case 11: // Relatório
-        return (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <button 
-                className="btn btn-primary" 
-                style={{ width: '100%', fontSize: '12px', margin: 0 }} 
-                onClick={() => setShowRelatorioModal(true)}
-              >
-                Baixar Relatórios Executivos
-              </button>
-              <button 
-                className="btn btn-secondary" 
-                style={{ width: '100%', fontSize: '12px', margin: 0 }} 
-                onClick={handleExportAll}
-              >
-                Exportar Excel Completo
-              </button>
-              {latestOfficialProcessing && (
-                <button 
-                  className="btn btn-secondary" 
-                  style={{ width: '100%', fontSize: '12px', borderColor: '#00e676', color: '#00e676', background: 'rgba(0,230,118,0.08)', margin: 0 }} 
-                  onClick={handleExportAllProcessed}
-                >
-                  Exportar Processamento (Excel)
-                </button>
-              )}
-            </div>
-          </div>
-        );
-
-      default:
-        return null;
-    }
+  const sidebarProps = {
+    sidebarOpen,
+    activeFwId,
+    setActiveFwId,
+    interfaceMode,
+    toggleInterfaceMode,
+    searchProjectQuery,
+    setSearchProjectQuery,
+    kpis,
+    activeParcels,
+    activeMenuFwId,
+    setActiveMenuFwId,
+    handleEditClick,
+    handleExportFieldWork,
+    setShowSettingsModal,
+    collaborators,
   };
 
-  const renderNestedTreeForStage = (id: number) => {
-    if (!activeFw) return null;
-    switch (id) {
-      case 1: // Projeto
-        return (
-          <div className="hud-tree-node">
-            <div 
-              className="hud-tree-card active"
-              onClick={() => {
-                setFocusedNode(1);
-                setShowProjectDashboard(true);
-              }}
-            >
-              <span>🏢 Ver Detalhes</span>
-            </div>
-            <div className="hud-tree-nested">
-              <div className="hud-tree-card leaf-node">
-                <span>📍 Local: {activeFw.local || 'Não especificado'}</span>
-              </div>
-              <div className="hud-tree-card leaf-node">
-                <span>📅 Data: {activeFw.dataInicio}</span>
-              </div>
-              <div className="hud-tree-card leaf-node">
-                <span>👥 Colaboradores: {collaborators.length}</span>
-              </div>
-            </div>
-          </div>
-        );
-
-      case 2: // Talhões
-        if (activeTalhoes.length === 0) {
-          return (
-            <div className="hud-tree-card leaf-node" style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>
-              Sem talhões cadastrados
-            </div>
-          );
-        }
-        return activeTalhoes.map(t => {
-          const isTalhaoExpanded = !!expandedTalhoes[t.id];
-          return (
-            <div key={t.id} className="hud-tree-node">
-              <div 
-                className={`hud-tree-card ${isTalhaoExpanded ? 'active' : ''}`}
-                onClick={() => {
-                  setExpandedTalhoes(prev => ({ ...prev, [t.id]: !prev[t.id] }));
-                  setTalhaoDashboardId(t.id);
-                  setFocusedNode(2);
-                }}
-              >
-                <span>🌳 {t.nome}</span>
-                <span>{t.area ? `${t.area} ha` : 'S/ Área'}</span>
-              </div>
-              {isTalhaoExpanded && (
-                <div className="hud-tree-nested">
-                  {activeParcels.filter(p => p.talhaoId === t.id).map(p => {
-                    const isParcelExpanded = !!expandedParcels[p.id];
-                    return (
-                      <div key={p.id} className="hud-tree-node">
-                        <div 
-                          className={`hud-tree-card ${isParcelExpanded ? 'active' : ''}`}
-                          onClick={() => {
-                            setExpandedParcels(prev => ({ ...prev, [p.id]: !prev[p.id] }));
-                            setShowParcelDashboardId(p.id);
-                            setFocusedNode(4);
-                          }}
-                        >
-                          <span>📍 Parcela {p.nome}</span>
-                          <span>{p.status}</span>
-                        </div>
-                        {isParcelExpanded && (
-                          <div className="hud-tree-nested">
-                            <div className="hud-tree-card leaf-node" onClick={() => { setAuditParcelId(p.id); setFocusedNode(4); }}>
-                              <span>📊 Dados ({p.dados ? p.dados.length : 0} árvores)</span>
-                            </div>
-                            <div className="hud-tree-card leaf-node">
-                              <span>📡 GPS: {p.coordenadas || 'Sem GPS'}</span>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                  {activeParcels.filter(p => p.talhaoId === t.id).length === 0 && (
-                    <div className="hud-tree-card leaf-node" style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                      Sem parcelas neste talhão
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          );
-        });
-
-      case 3: // Estratos
-        if (activeStrata.length === 0) {
-          return (
-            <div className="hud-tree-card leaf-node" style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>
-              Sem estratos cadastrados
-            </div>
-          );
-        }
-        return activeStrata.map(s => (
-          <div 
-            key={s.id} 
-            className="hud-tree-card" 
-            onClick={() => { 
-              setStratumDashboardId(s.id); 
-              setFocusedNode(3); 
-            }}
-          >
-            <span>🧬 {s.nome}</span>
-            <span>{s.area} ha</span>
-          </div>
-        ));
-
-      case 4: // Parcelas
-        if (activeParcels.length === 0) {
-          return (
-            <div className="hud-tree-card leaf-node" style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>
-              Sem parcelas cadastradas
-            </div>
-          );
-        }
-        return activeParcels.map(p => {
-          const isParcelExpanded = !!expandedParcels[p.id];
-          return (
-            <div key={p.id} className="hud-tree-node">
-              <div 
-                className={`hud-tree-card ${isParcelExpanded ? 'active' : ''}`}
-                onClick={() => {
-                  setExpandedParcels(prev => ({ ...prev, [p.id]: !prev[p.id] }));
-                  setShowParcelDashboardId(p.id);
-                  setFocusedNode(4);
-                }}
-              >
-                <span>📍 Parcela {p.nome}</span>
-                <span>{p.status}</span>
-              </div>
-              {isParcelExpanded && (
-                <div className="hud-tree-nested">
-                  <div className="hud-tree-card leaf-node" onClick={() => { setAuditParcelId(p.id); setFocusedNode(4); }}>
-                    <span>📊 Árvores ({p.dados ? p.dados.length : 0})</span>
-                  </div>
-                  <div className="hud-tree-card leaf-node">
-                    <span>📡 GPS: {p.coordenadas || 'Sem GPS'}</span>
-                  </div>
-                </div>
-              )}
-            </div>
-          );
-        });
-
-      case 5: // Coleta de Campo
-        if (activeParcels.length === 0) {
-          return (
-            <div className="hud-tree-card leaf-node" style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>
-              Sem parcelas para coleta
-            </div>
-          );
-        }
-        return (
-          <>
-            <div className="hud-tree-card active" onClick={() => { setShowColetaModal(true); setFocusedNode(5); }}>
-              <span>📥 Central de Coleta</span>
-            </div>
-            {activeParcels.map(p => (
-              <div key={p.id} className="hud-tree-card leaf-node" onClick={() => { setShowColetaModal(true); setFocusedNode(5); }}>
-                <span>{p.status === 'Concluído' ? '✅' : '⏳'} {p.nome}</span>
-                <span>{p.dados ? p.dados.length : 0}</span>
-              </div>
-            ))}
-          </>
-        );
-
-      case 6: // Cubagem
-        if (activeCubageSessions.length === 0) {
-          return (
-            <div className="hud-tree-card leaf-node" style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>
-              Sem sessões de cubagem
-            </div>
-          );
-        }
-        return activeCubageSessions.map(s => (
-          <div key={s.id} className="hud-tree-card" onClick={() => { setFocusedNode(6); }}>
-            <span>🪵 {s.nome || 'Sessão'}</span>
-            <span>{s.dados ? s.dados.length : 0} fustes</span>
-          </div>
-        ));
-
-      case 7: // Modelos
-        return (
-          <>
-            <div className="hud-tree-card" onClick={() => { setFocusedNode(7); }}>
-              <span>Hipsometria:</span>
-              <span style={{ fontSize: '9px', maxWidth: '90px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {selectedHeightModelId !== 'none' ? heightModels.find(m => m.id === selectedHeightModelId)?.nome : 'Medida'}
-              </span>
-            </div>
-            <div className="hud-tree-card" onClick={() => { setFocusedNode(7); }}>
-              <span>Volume:</span>
-              <span style={{ fontSize: '9px', maxWidth: '90px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {selectedVolumeModelId !== 'legacy' ? volumeModels.find(m => m.id === selectedVolumeModelId)?.nome : `FF: ${processingFatorForma}`}
-              </span>
-            </div>
-          </>
-        );
-
-      case 8: // Processamento
-        return (
-          <>
-            <div className="hud-tree-card active" onClick={() => { setShowBatchProcessModal(true); setFocusedNode(8); }}>
-              <span>⚡ Lote</span>
-            </div>
-            {activeProcessings.map(p => (
-              <div 
-                key={p.id} 
-                className={`hud-tree-card ${p.status === 'Oficial' ? 'active' : ''}`} 
-                onClick={() => { 
-                  setSelectedReportProcessing(p); 
-                  setFocusedNode(8); 
-                }}
-              >
-                <span>⚙️ {p.nomeProcessamento}</span>
-                <span>{p.status}</span>
-              </div>
-            ))}
-            <div className="hud-tree-card leaf-node" onClick={() => { setShowNewProcessModal(true); setFocusedNode(8); }}>
-              <span>➕ Novo Snapshot</span>
-            </div>
-          </>
-        );
-
-      case 9: // Extrapolação
-        return (
-          <>
-            <div className="hud-tree-card" onClick={() => { setFocusedNode(9); }}>
-              <span>Área Total:</span>
-              <span>{activeTalhoes.reduce((acc, t) => acc + (parseFloat(t.area as any) || 0), 0).toFixed(1)} ha</span>
-            </div>
-            <div className="hud-tree-card" onClick={() => { setFocusedNode(9); }}>
-              <span>Vol Total:</span>
-              <span>
-                {latestOfficialProcessing 
-                  ? `${cleanResult(latestOfficialProcessing.volumeTotalEstimado).toLocaleString('pt-BR', { maximumFractionDigits: 0 })} m³` 
-                  : 'Pendente'}
-              </span>
-            </div>
-          </>
-        );
-
-      case 10: // Sortimento
-        return (
-          <>
-            <div className="hud-tree-card" onClick={() => { setFocusedNode(10); }}>
-              <span>Regras ({sortimentRules.length})</span>
-            </div>
-            {activeSortimentResults.map(r => (
-              <div key={r.id} className="hud-tree-card" onClick={() => { setFocusedNode(10); }}>
-                <span>📋 Árvore #{r.treeNumber} ({r.especie})</span>
-                <span>{r.volumeSortidoTotal ? `${r.volumeSortidoTotal.toFixed(2)} m³` : '0.0 m³'}</span>
-              </div>
-            ))}
-          </>
-        );
-
-      case 11: // Relatório Final
-        return (
-          <>
-            <div className="hud-tree-card active" onClick={() => { setShowRelatorioModal(true); setFocusedNode(11); }}>
-              <span>📄 Relatório Executivo</span>
-            </div>
-            {reportGenerated && (
-              <div className="hud-tree-card leaf-node">
-                <span>✅ Exportado</span>
-              </div>
-            )}
-          </>
-        );
-
-      default:
-        return null;
-    }
+  const hudProps = {
+    activeFw,
+    sidebarOpen,
+    setSidebarOpen,
+    activeTier,
+    setActiveTier,
+    focusedNode,
+    setFocusedNode,
+    expandedStages,
+    setExpandedStages,
+    activeLayer,
+    setActiveLayer,
+    showUpgradeModal,
+    setShowUpgradeModal,
+    isStageLocked,
+    activeParcels,
+    activeTalhoes,
+    activeStrata,
+    kpis,
+    reportGenerated,
+    setReportGenerated,
+    allCubagedTrees,
+    heightModels,
+    volumeModels,
+    selectedHeightModelId,
+    setSelectedHeightModelId,
+    selectedVolumeModelId,
+    setSelectedVolumeModelId,
+    processingFatorForma,
+    setProcessingFatorForma,
+    activeProcessings,
+    stratifiedStats,
+    googleSheetsUrlInput,
+    setGoogleSheetsUrlInput,
+    isSyncingSheets,
+    editingTalhao,
+    setEditingTalhao,
+    editTalhaoName,
+    setEditTalhaoName,
+    editTalhaoArea,
+    setEditTalhaoArea,
+    editTalhaoObs,
+    setEditTalhaoObs,
+    showStratumModal,
+    setShowStratumModal,
+    showColetaModal,
+    setShowColetaModal,
+    showRelatorioModal,
+    setShowRelatorioModal,
+    showBatchProcessModal,
+    setShowBatchProcessModal,
+    showSheetsModal,
+    setShowSheetsModal,
+    selectedReportProcessing,
+    setSelectedReportProcessing,
+    showNewProcessModal,
+    setShowNewProcessModal,
+    newProcessName,
+    setNewProcessName,
+    newProcessConsolidationMode,
+    setNewProcessConsolidationMode,
+    newProcessFatorCasca,
+    setNewProcessFatorCasca,
+    expandedTalhoes,
+    setExpandedTalhoes,
+    expandedParcels,
+    setExpandedParcels,
+    setTalhaoDashboardId,
+    setShowParcelDashboardId,
+    setAuditParcelId,
+    setStratumDashboardId,
+    collaborators,
+    handleSyncGoogleSheets,
+    handleEditClick,
+    handleExportAll: () => handleExportFieldWork(activeFw),
+    handleExportAllProcessed,
+    handleCreateInventoryProcessing,
+    getStageStatus,
+    getStagePercent,
+    getStageName,
+    getStageKpi,
+    getStageDescription,
+    handleStageClick,
+    getNodeIcon,
+    getNodePos,
+    cols: 4,
+    mapContainerRef: { current: null },
+    canvasRef: { current: null },
   };
 
-  const renderSpaceHud = () => {
-    try {
-      let completedStagesCount = 0;
-      for (let i = 1; i <= 11; i++) {
-        if (getStageStatus(i) === 'complete') {
-          completedStagesCount++;
-        }
-      }
-      
-      return (
-        <div className="operation-center" style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%', background: '#020503', animation: 'fadeInUp 0.6s ease', overflow: 'hidden' }}>
-          
-          {/* HUD Top bar */}
-          <div style={{ 
-            display: 'flex', 
-            justifyContent: 'space-between', 
-            alignItems: 'center', 
-            padding: '16px 24px', 
-            borderBottom: '1px solid rgba(255,255,255,0.06)',
-            background: 'rgba(5, 13, 8, 0.25)',
-            backdropFilter: 'blur(20px)',
-            flexWrap: 'wrap', 
-            gap: '12px' 
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              <button
-                className="hud-btn-floating"
-                onClick={() => setSidebarOpen(prev => !prev)}
-                style={{ 
-                  background: sidebarOpen ? 'rgba(0,230,118,0.15)' : 'rgba(255,255,255,0.02)', 
-                  color: sidebarOpen ? '#ffffff' : '#00e676', 
-                  borderColor: sidebarOpen ? '#00e676' : 'rgba(255,255,255,0.1)',
-                  padding: '8px 12px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  fontFamily: 'monospace',
-                  fontSize: '11px',
-                  fontWeight: 'bold',
-                  letterSpacing: '0.5px'
-                }}
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="9" y1="3" x2="9" y2="21"></line></svg>
-                {sidebarOpen ? "FECHAR PAINEL" : "ABRIR PAINEL"}
-              </button>
-              <div>
-                <h2 style={{ fontSize: '18px', fontWeight: '800', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ color: '#00e676' }}>🛰</span> {activeFw ? activeFw.nome : "Centro de Operações"}
-                </h2>
-                <span style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.45)' }}>
-                  {activeFw ? `Fazenda/Local: ${activeFw.local} | Data Inicial: ${activeFw.dataInicio}` : "Missão de Inventário Florestal • LeafTag HUD"}
-                </span>
-              </div>
-            </div>
-            
-            <div style={{ display: 'flex', gap: '12px' }}>
-              <button 
-                className="hud-btn-floating"
-                onClick={() => { setActiveLayer('process'); setFocusedNode(null); }}
-                style={{ 
-                  background: activeLayer === 'process' ? 'rgba(0,230,118,0.15)' : 'rgba(255,255,255,0.02)', 
-                  color: activeLayer === 'process' ? '#ffffff' : '#00e676', 
-                  borderColor: activeLayer === 'process' ? '#00e676' : 'rgba(255,255,255,0.1)' 
-                }}
-              >
-                Visão de Processo
-              </button>
-              <button 
-                className="hud-btn-floating"
-                onClick={() => { setActiveLayer('gis'); setFocusedNode(null); }}
-                style={{ 
-                  background: activeLayer === 'gis' ? 'rgba(0,230,118,0.15)' : 'rgba(255,255,255,0.02)', 
-                  color: activeLayer === 'gis' ? '#ffffff' : '#00e676', 
-                  borderColor: activeLayer === 'gis' ? '#00e676' : 'rgba(255,255,255,0.1)' 
-                }}
-              >
-                Camada GIS (Territorial)
-              </button>
-              <button 
-                className="hud-btn-floating"
-                onClick={() => { setActiveLayer('stats'); setFocusedNode(null); }}
-                style={{ 
-                  background: activeLayer === 'stats' ? 'rgba(0,230,118,0.15)' : 'rgba(255,255,255,0.02)', 
-                  color: activeLayer === 'stats' ? '#ffffff' : '#00e676', 
-                  borderColor: activeLayer === 'stats' ? '#00e676' : 'rgba(255,255,255,0.1)' 
-                }}
-              >
-                Sala Estatística
-              </button>
-            </div>
-          </div>
-
-          {/* Core HUD Canvas Container */}
-          <div 
-            className="space-hud-container" 
-            ref={mapContainerRef}
-            style={{ 
-              flex: 1, 
-              height: 'auto', 
-              border: 'none', 
-              borderRadius: '0px', 
-              boxShadow: 'none',
-              display: 'flex',
-              flexDirection: 'column'
-            }}
-          >
-            
-            {/* Stars background */}
-            <div className="hud-stars" />
-            
-            {/* Left and Right Scroll Navigation Assists */}
-            {activeLayer === 'process' && (
-              <>
-                <button 
-                  className="hud-scroll-arrow left-arrow"
-                  onClick={() => {
-                    if (canvasRef.current) {
-                      canvasRef.current.scrollBy({ left: -360, behavior: 'smooth' });
-                    }
-                  }}
-                  style={{
-                    position: 'absolute',
-                    left: '16px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    zIndex: 10,
-                    background: 'rgba(5, 10, 8, 0.85)',
-                    border: '1px solid rgba(0, 230, 118, 0.25)',
-                    color: '#00e676',
-                    borderRadius: '50%',
-                    width: '36px',
-                    height: '36px',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.6)',
-                    transition: 'all 0.2s ease'
-                  }}
-                  title="Rolar para a esquerda"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
-                </button>
-                <button 
-                  className="hud-scroll-arrow right-arrow"
-                  onClick={() => {
-                    if (canvasRef.current) {
-                      canvasRef.current.scrollBy({ left: 360, behavior: 'smooth' });
-                    }
-                  }}
-                  style={{
-                    position: 'absolute',
-                    right: '16px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    zIndex: 10,
-                    background: 'rgba(5, 10, 8, 0.85)',
-                    border: '1px solid rgba(0, 230, 118, 0.25)',
-                    color: '#00e676',
-                    borderRadius: '50%',
-                    width: '36px',
-                    height: '36px',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.6)',
-                    transition: 'all 0.2s ease'
-                  }}
-                  title="Rolar para a direita"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
-                </button>
-              </>
-            )}
-
-            {/* GIS Layer Overlay */}
-            {activeLayer === 'gis' && (
-              <MapVisualization inventories={activeParcels} onClose={() => { setActiveLayer('process'); setFocusedNode(null); }} />
-            )}
-
-            {/* Stats Layer Overlay */}
-            {activeLayer === 'stats' && (
-              <StatisticalDashboard inventories={activeParcels} onClose={() => { setActiveLayer('process'); setFocusedNode(null); }} />
-            )}
-
-            {/* Nodes Layer - Redesign V2 Horizontal Flow Pipeline with Nested Expandable Tree Nodes */}
-            {activeLayer === 'process' && (
-              <div className="space-hud-canvas" ref={canvasRef}>
-                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map(id => {
-                  const status = getStageStatus(id);
-                  const percent = getStagePercent(id);
-                  const name = getStageName(id);
-                  const kpi = getStageKpi(id);
-                  const isExpanded = expandedStages[id];
-                  
-                  return (
-                    <div key={id} className="hud-pipeline-column">
-                      
-                      {/* Laser Connection Line between columns */}
-                      {id < 11 && (
-                        <div className="hud-pipeline-laser">
-                          <div className="hud-pipeline-laser-pulse" style={{ animationDelay: `${(id - 1) * 0.4}s` }} />
-                        </div>
-                      )}
-                      
-                      {/* Sphere Node (Circular tech-grade bezel) */}
-                      <div
-                        id={`op-node-${id}`}
-                        className={`hud-node-sphere status-${status} ${focusedNode === id ? 'active' : ''}`}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleStageClick(id);
-                        }}
-                      >
-                        {/* Orbit decorative dash ring */}
-                        <div className="hud-sphere-orbit" />
-
-                        {/* Hover Tooltip Card */}
-                        <div className="hud-hover-info">
-                          <div style={{ fontWeight: '800', fontSize: '11px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '6px', marginBottom: '6px', color: '#00e676', fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '0.5px' }}>
-                            {name.toUpperCase()}
-                          </div>
-                          <div className="hud-hover-line">
-                            <span>Status:</span>
-                            <span style={{ color: status === 'complete' || status === 'progress' ? '#00ff66' : '#94a3b8', fontWeight: 'bold' }}>
-                              {status === 'complete' ? 'Concluído' : status === 'progress' ? 'Em Progresso' : status === 'warning' ? 'Atenção' : 'Não Iniciado'}
-                            </span>
-                          </div>
-                          <div className="hud-hover-line">
-                            <span>Progresso:</span>
-                            <span style={{ color: '#ffffff' }}>{percent}%</span>
-                          </div>
-                          <div className="hud-hover-line">
-                            <span>Métrica:</span>
-                            <span style={{ color: '#cbd5e1' }}>{kpi}</span>
-                          </div>
-                          <div style={{ marginTop: '8px', borderTop: '1px dashed rgba(255,255,255,0.08)', paddingTop: '6px' }}>
-                            <span style={{ fontSize: '9px', color: '#aaa', fontStyle: 'italic', display: 'block', width: '100%', whiteSpace: 'normal', lineHeight: '1.3' }}>
-                              {getStageDescription(id)}
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Icon */}
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          {getNodeIcon(id)}
-                        </div>
-                      </div>
-
-                      {/* Info labels placed below the sphere */}
-                      <div className="hud-node-info-wrapper">
-                        <div className="hud-node-title">
-                          {name}
-                        </div>
-                        <div className="hud-node-kpi">
-                          {kpi}
-                        </div>
-                        
-                        {/* Expand Button */}
-                        <button 
-                          className="hud-expand-button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setExpandedStages(prev => ({ ...prev, [id]: !prev[id] }));
-                          }}
-                        >
-                          {isExpanded ? '▲' : '▼'}
-                        </button>
-                      </div>
-                      
-                      {/* Sub-tree nodes container when expanded */}
-                      {isExpanded && (
-                        <div className="hud-tree-container">
-                          {renderNestedTreeForStage(id)}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-            
-            {/* Sliding Control Side Panel */}
-            <div className={`glass-side-panel ${focusedNode !== null ? 'open' : ''}`}>
-              {focusedNode !== null && (
-                <>
-                  <div className="glass-side-panel-header">
-                    <div>
-                      <span style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: '800', letterSpacing: '1px' }}>ETAPA {String(focusedNode).padStart(2, '0')}</span>
-                      <h3 style={{ fontSize: '16px', fontWeight: '800', margin: '2px 0 0 0', color: '#fff' }}>{focusedNode === 1 ? "PROJETO" : getStageName(focusedNode)}</h3>
-                    </div>
-                    <button 
-                      className="btn btn-secondary" 
-                      style={{ width: 'auto', padding: '4px 10px', fontSize: '11px', margin: 0 }} 
-                      onClick={() => setFocusedNode(null)}
-                    >
-                      Fechar [X]
-                    </button>
-                  </div>
-                  
-                  <div className="glass-side-panel-body">
-                    {/* Status Alert */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '12px 16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                      <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Status da Etapa</span>
-                      <span style={{ 
-                        fontSize: '11px', 
-                        fontWeight: '800', 
-                        textTransform: 'uppercase', 
-                        color: getStageStatus(focusedNode) === 'complete' ? '#00e676' : getStageStatus(focusedNode) === 'progress' ? '#00ff66' : getStageStatus(focusedNode) === 'warning' ? '#00e676' : 'var(--text-muted)' 
-                      }}>
-                        {getStageStatus(focusedNode) === 'complete' ? 'Concluído' : getStageStatus(focusedNode) === 'progress' ? 'Em Progresso' : getStageStatus(focusedNode) === 'warning' ? 'Atenção' : 'Não Iniciado'}
-                      </span>
-                    </div>
-
-                    {/* Stage description */}
-                    <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: 0, lineHeight: '1.4' }}>
-                      {getStageDescription(focusedNode)}
-                    </p>
-
-                    <div style={{ height: '1px', background: 'rgba(255,255,255,0.08)', margin: '4px 0' }} />
-                    
-                    {/* Render Node Specific Subviews */}
-                    {renderSidePanelContent(focusedNode)}
-                  </div>
-                </>
-              )}
-            </div>
-
-          </div>
-        </div>
-      );
-    } catch (err: any) {
-      console.error("Erro ao renderizar o Space HUD:", err);
-      return (
-        <div className="glass-card" style={{ padding: '24px', border: '1px solid rgba(239,35,60,0.2)', background: 'rgba(239,35,60,0.05)', color: '#ff4d6d' }}>
-          <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '800' }}>Erro no Space HUD</h3>
-          <pre style={{ background: 'rgba(0,0,0,0.3)', padding: '12px', borderRadius: '8px', marginTop: '12px', fontSize: '12px', color: '#fff', overflowX: 'auto' }}>
-            {err.stack || err.message || String(err)}
-          </pre>
-        </div>
-      );
-    }
-  };
-
-  const renderCentroOperacoes = () => {
-    if (interfaceMode === 'hud') {
-      return renderSpaceHud();
-    }
-
-    try {
-      const nextStep = getNextRecommendedStep();
-      const bottlenecks = getBottlenecks();
-      
-      let completedStagesCount = 0;
-      for (let i = 1; i <= 11; i++) {
-        if (getStageStatus(i) === 'complete') {
-          completedStagesCount++;
-        }
-      }
-      const overallProgress = Math.round((completedStagesCount / 11) * 100);
-
-      const totalArea = activeTalhoes.reduce((acc, t) => {
-        const aVal = t.area ? (typeof t.area === 'number' ? t.area : parseFloat(t.area as any) || 0) : 0;
-        return acc + aVal;
-      }, 0);
-      
-      const completedParcelsCount = activeParcels.filter(p => p.status === 'Concluído').length;
-      const totalVolume = latestOfficialProcessing 
-        ? (typeof latestOfficialProcessing.volumeTotalEstimado === 'number' 
-            ? latestOfficialProcessing.volumeTotalEstimado 
-            : parseFloat(latestOfficialProcessing.volumeTotalEstimado as any) || 0) 
-        : 0;
-
-      return (
-        <div className="operation-center" style={{ animation: 'fadeInUp 0.6s ease' }}>
-        {/* PANEL DE INDICADORES EXECUTIVOS */}
-        <div className="glass-card" style={{ padding: '24px', border: '1px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.01)', borderRadius: '20px', marginBottom: 0 }}>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '24px', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <h2 style={{ fontSize: '20px', fontWeight: '800', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--primary-hover)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon></svg>
-                <span>Centro de Operações LeafTag</span>
-              </h2>
-              <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: '4px 0 0 0' }}>
-                Mapa operacional do inventário florestal
-              </p>
-            </div>
-            
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              <div style={{ textAlign: 'right' }}>
-                <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: '700', letterSpacing: '0.5px' }}>Progresso do Projeto</span>
-                <div style={{ fontSize: '22px', fontWeight: '800', color: '#00e676', marginTop: '2px' }}>{overallProgress}%</div>
-              </div>
-              <div style={{ width: '130px', height: '10px', background: 'rgba(255,255,255,0.05)', borderRadius: '5px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.03)' }}>
-                <div style={{ width: `${overallProgress}%`, height: '100%', background: 'linear-gradient(90deg, #2e7d32, #00e676)', borderRadius: '5px' }} />
-              </div>
-            </div>
-          </div>
-          
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '20px', marginTop: '24px', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '20px' }}>
-            {/* Próximo Passo */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: '700', letterSpacing: '0.5px' }}>Próximo Passo Recomendado</span>
-              <div style={{ fontSize: '13.5px', fontWeight: '700', color: '#00b0ff', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
-                {nextStep}
-              </div>
-            </div>
-
-            {/* Gargalos */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: '700', letterSpacing: '0.5px' }}>Gargalos Detectados</span>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', maxHeight: '54px', overflowY: 'auto', paddingRight: '4px' }}>
-                {bottlenecks.length === 0 ? (
-                  <span style={{ fontSize: '13px', color: '#00e676', fontWeight: 'bold' }}>✓ Nenhum gargalo crítico detectado</span>
-                ) : (
-                  bottlenecks.map((b, idx) => (
-                    <span key={idx} style={{ fontSize: '10px', padding: '3px 8px', borderRadius: '6px', background: 'rgba(239, 35, 60, 0.08)', color: '#ff4d6d', border: '1px solid rgba(239, 35, 60, 0.15)', fontWeight: '600' }}>
-                      ⚠ {b}
-                    </span>
-                  ))
-                )}
-              </div>
-            </div>
-
-            {/* Outros KPIs rápidos */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
-              <div style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.03)', padding: '10px', borderRadius: '10px' }}>
-                <span style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: '700', letterSpacing: '0.3px' }}>Área Total</span>
-                <div style={{ fontSize: '15px', fontWeight: '800', marginTop: '2px' }}>{totalArea.toFixed(2)} ha</div>
-              </div>
-              <div style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.03)', padding: '10px', borderRadius: '10px' }}>
-                <span style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: '700', letterSpacing: '0.3px' }}>Parcelas Col.</span>
-                <div style={{ fontSize: '15px', fontWeight: '800', marginTop: '2px', color: '#00b0ff' }}>{completedParcelsCount} / {activeParcels.length}</div>
-              </div>
-              <div style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.03)', padding: '10px', borderRadius: '10px' }}>
-                <span style={{ fontSize: '9px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: '700', letterSpacing: '0.3px' }}>Volume CC Est.</span>
-                <div style={{ fontSize: '15px', fontWeight: '800', color: '#00e676', marginTop: '2px' }}>
-                  {totalVolume > 0 ? `${Math.round(totalVolume).toLocaleString('pt-BR')} m³` : '-'}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* MAPA OPERACIONAL COM SVG CONNECTOR */}
-        <div className="operation-map-container" ref={mapContainerRef}>
-          <svg className="operation-svg-overlay" viewBox="0 0 100 100" preserveAspectRatio="none">
-            {[2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map(targetId => {
-              const startId = targetId === 2 ? 1 : targetId - 1;
-              const startPos = getNodePos(startId, cols);
-              const endPos = getNodePos(targetId, cols);
-              const targetStatus = getStageStatus(targetId);
-              
-              let lineClass = 'line-empty';
-              if (targetStatus === 'complete') lineClass = 'line-complete';
-              else if (targetStatus === 'progress') lineClass = 'line-progress';
-              else if (targetStatus === 'warning') lineClass = 'line-warning';
-              
-              return (
-                <line
-                  key={targetId}
-                  x1={startPos.x}
-                  y1={startPos.y}
-                  x2={endPos.x}
-                  y2={endPos.y}
-                  className={`hud-connection-line ${lineClass}`}
-                />
-              );
-            })}
-          </svg>
-
-          <div className="operation-map-grid" style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}>
-            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map(id => {
-              const status = getStageStatus(id);
-              const percent = getStagePercent(id);
-              const kpi = getStageKpi(id);
-              const desc = getStageDescription(id);
-              const name = getStageName(id);
-              
-              let statusLabel = 'Não Iniciado';
-              let statusColor = 'var(--text-muted)';
-              if (status === 'complete') { statusLabel = 'Concluído'; statusColor = '#00e676'; }
-              else if (status === 'progress') { statusLabel = 'Em Progresso'; statusColor = '#00b0ff'; }
-              else if (status === 'warning') { statusLabel = 'Atenção'; statusColor = '#ff9800'; }
-
-              const idx = id - 1;
-              const rowIndex = Math.floor(idx / cols);
-              const colIndex = rowIndex % 2 === 0 
-                ? idx % cols 
-                : cols - 1 - (idx % cols);
-
-              return (
-                <div
-                  id={`op-node-${id}`}
-                  key={id}
-                  className={`operation-node status-${status}`}
-                  onClick={() => handleStageClick(id)}
-                  style={{
-                    gridRow: rowIndex + 1,
-                    gridColumn: colIndex + 1
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-                    <span style={{ fontSize: '9.5px', fontWeight: '800', opacity: 0.5, letterSpacing: '0.5px' }}>ETAPA {String(id).padStart(2, '0')}</span>
-                    <span style={{ fontSize: '9px', padding: '2px 8px', borderRadius: '10px', background: 'rgba(255,255,255,0.03)', color: statusColor, fontWeight: '700', border: `1px solid rgba(255,255,255,0.01)` }}>
-                      {statusLabel}
-                    </span>
-                  </div>
-
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '38px', height: '38px', borderRadius: '10px', background: 'rgba(255,255,255,0.03)', color: statusColor }}>
-                      {getNodeIcon(id)}
-                    </div>
-                    <div>
-                      <h3 style={{ fontSize: '14.5px', fontWeight: '800', margin: 0 }}>{name}</h3>
-                      <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 'bold' }}>{percent}% concluído</span>
-                    </div>
-                  </div>
-
-                  <p style={{ fontSize: '11px', color: 'var(--text-muted)', margin: '4px 0 14px 0', minHeight: '34px', lineHeight: '1.4' }}>
-                    {desc}
-                  </p>
-
-                  <div style={{ height: '1px', background: 'rgba(255,255,255,0.06)', margin: '8px 0' }} />
-
-                  <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ minWidth: 0, flex: 1 }}>
-                      <span style={{ fontSize: '8.5px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: '700', letterSpacing: '0.3px' }}>KPI Principal</span>
-                      <div style={{ fontSize: '12.5px', fontWeight: '700', color: '#fff', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={kpi}>
-                        {kpi}
-                      </div>
-                    </div>
-                    
-                    <div style={{ opacity: 0.4, display: 'flex', alignItems: 'center', flexShrink: 0, marginLeft: '8px' }}>
-                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-    );
-    } catch (err: any) {
-      console.error("Erro ao renderizar o Centro de Operações:", err);
-      return (
-        <div className="glass-card" style={{ padding: '24px', border: '1px solid rgba(239,35,60,0.2)', background: 'rgba(239,35,60,0.05)', color: '#ff4d6d' }}>
-          <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '800' }}>Erro no Centro de Operações</h3>
-          <p style={{ fontSize: '13px', margin: '8px 0 0 0' }}>
-            Ocorreu um erro ao processar os dados do projeto para o mapa operacional:
-          </p>
-          <pre style={{ background: 'rgba(0,0,0,0.3)', padding: '12px', borderRadius: '8px', marginTop: '12px', fontSize: '12px', color: '#fff', overflowX: 'auto' }}>
-            {err.stack || err.message || String(err)}
-          </pre>
-        </div>
-      );
-    }
+  const classicProps = {
+    activeFw,
+    activeTab,
+    setActiveTab,
+    activeParcels,
+    activeTalhoes,
+    activeStrata,
+    activeSortimentResults: sortimentResults,
+    latestOfficialProcessing,
+    extrapolationData: {},
+    kpis,
+    stratifiedStats,
+    allCubagedTrees,
+    cubageSortOrder,
+    setCubageSortOrder,
+    setEditingTalhao,
+    setEditTalhaoName,
+    setEditTalhaoArea,
+    setEditTalhaoObs,
+    setAuditParcelId,
+    setTalhaoDashboardId,
+    setStratumDashboardId,
+    setShowParcelDashboardId,
+    selectedTalhaoId,
+    setSelectedTalhaoId,
+    setShowProjectDashboard,
+    setShowStratumModal,
+    setShowBatchProcessModal,
+    setShowSheetsModal,
+    isSyncingSheets,
+    handleExportAll: () => handleExportFieldWork(activeFw),
+    handleExportAllProcessed,
+    handleSyncGoogleSheets,
+    handleExportTalhao,
+    handleExportParcelProcessed: () => {},
+    heightModels,
+    volumeModels,
+    selectedHeightModelId,
+    setSelectedHeightModelId,
+    selectedVolumeModelId,
+    setSelectedVolumeModelId,
+    processingFatorForma,
+    setProcessingFatorForma,
+    handleProcessParcelDataInOffice,
+    auditParcel: activeParcels.find(p => p.id === auditParcelId) || null,
+    auditParcelKpis: {},
+    setSelectedVisualizerTree,
+    setSelectedVisualizerPoint,
+    setSelectedVisualizerSectionId,
+    activeProcessings,
+    deleteProcessing,
+    handleDuplicarConfiguracao: () => {},
+    selectedReportProcessing,
+    setSelectedReportProcessing,
+    showNewProcessModal,
+    setShowNewProcessModal,
+    newProcessName,
+    setNewProcessName,
+    newProcessConsolidationMode,
+    setNewProcessConsolidationMode,
+    newProcessFatorCasca,
+    setNewProcessFatorCasca,
+    handleCreateInventoryProcessing,
+    handleExportAdvancedXLSX,
+    reportGenerated,
+    setReportGenerated,
+    getStageStatus,
+    getStagePercent,
+    getStageName,
+    getStageKpi,
+    getStageDescription,
+    getNextRecommendedStep,
+    getBottlenecks,
+    handleStageClick,
+    getNodeIcon,
+    getNodePos,
+    cols: 4,
+    mapContainerRef: { current: null }
   };
 
   return (
     <div className="office-dashboard-layout" style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg-color)', color: 'var(--text-main)', fontFamily: "'Plus Jakarta Sans', sans-serif", overflowX: 'hidden' }}>
       
-      {/* Sidebar (List of projects) */}
-      <div 
-        className="office-sidebar" 
-        style={{ 
-          width: !sidebarOpen && interfaceMode === 'hud' ? '0px' : '320px', 
-          minWidth: !sidebarOpen && interfaceMode === 'hud' ? '0px' : '320px',
-          background: 'rgba(5, 13, 8, 0.4)', 
-          backdropFilter: 'blur(30px)', 
-          borderRight: !sidebarOpen && interfaceMode === 'hud' ? 'none' : '1px solid rgba(255, 255, 255, 0.05)', 
-          display: 'flex', 
-          flexDirection: 'column', 
-          flexShrink: 0,
-          overflow: 'hidden',
-          transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
-          opacity: !sidebarOpen && interfaceMode === 'hud' ? 0 : 1
-        }}
-      >
-        
-        {interfaceMode === 'hud' ? (
-          <>
-            {/* HUD Brand Header */}
-            <div style={{ padding: '24px 24px 16px', display: 'flex', flexDirection: 'column', gap: '8px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <img src="/logo.png" alt="Logo" style={{ width: '40px', height: '40px', filter: 'hue-rotate(180deg)' }} />
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <h1 style={{ color: '#00e676', fontSize: '18px', fontWeight: '900', margin: 0, letterSpacing: '1px' }}>LEAFTAG</h1>
-                    <span className="hud-badge pulse" style={{ background: 'rgba(0, 230, 118, 0.15)', color: '#00e676', fontSize: '8px', padding: '2px 6px', borderRadius: '4px', border: '1px solid #00e676', fontWeight: 'bold' }}>HUD</span>
-                  </div>
-                  <span style={{ fontSize: '9px', color: '#00e676', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '2px', opacity: 0.8 }}>CENTRO DE OPERAÇÕES</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Toggle Button Bezel */}
-            <div style={{ padding: '16px 24px 8px', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-              <button 
-                onClick={toggleInterfaceMode}
-                style={{
-                  width: '100%',
-                  background: 'rgba(0, 230, 118, 0.04)',
-                  border: '1px dashed rgba(0, 230, 118, 0.4)',
-                  borderRadius: '10px',
-                  color: '#00e676',
-                  padding: '10px 14px',
-                  fontSize: '11px',
-                  fontWeight: 'bold',
-                  letterSpacing: '1px',
-                  textTransform: 'uppercase',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px',
-                  fontFamily: 'monospace'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = 'rgba(0, 230, 118, 0.12)';
-                  e.currentTarget.style.border = '1px solid #00e676';
-                  e.currentTarget.style.color = '#fff';
-                  e.currentTarget.style.boxShadow = '0 0 12px rgba(0, 230, 118, 0.2)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'rgba(0, 230, 118, 0.04)';
-                  e.currentTarget.style.border = '1px dashed rgba(0, 230, 118, 0.4)';
-                  e.currentTarget.style.color = '#00e676';
-                  e.currentTarget.style.boxShadow = 'none';
-                }}
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
-                </svg>
-                Alternar p/ Modo Clássico
-              </button>
-            </div>
-
-            {/* Sector/Project Selector (Sci-Fi Theme) */}
-            <div style={{ flex: 1, overflowY: 'auto', padding: '16px 24px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <span style={{ fontSize: '9px', color: '#00e676', textTransform: 'uppercase', fontWeight: '900', letterSpacing: '1.5px', display: 'block', fontFamily: 'monospace' }}>
-                // TRABALHOS_DE_CAMPO.LOG
-              </span>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                {filteredFieldWorks.map(fw => {
-                  const isActive = fw.id === activeFwId;
-                  const countTalhoes = talhoes.filter(t => t.fieldWorkId === fw.id).length;
-                  const countParcelas = inventories.filter(i => i.fieldWorkId === fw.id && i.template !== 'cubagem').length;
-                  return (
-                    <div 
-                      key={fw.id} 
-                      onClick={() => setActiveFwId(fw.id)}
-                      className={`hud-project-card ${isActive ? 'active' : ''}`}
-                      style={{
-                        padding: '12px 14px',
-                        borderRadius: '8px',
-                        cursor: 'pointer',
-                        background: isActive ? 'rgba(0, 230, 118, 0.08)' : 'rgba(255, 255, 255, 0.01)',
-                        border: isActive ? '1px solid rgba(0, 230, 118, 0.3)' : '1px solid rgba(255, 255, 255, 0.03)',
-                        transition: 'all 0.2s ease',
-                        position: 'relative'
-                      }}
-                    >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <h4 style={{ fontSize: '12.5px', margin: 0, fontWeight: '700', color: isActive ? '#00e676' : '#eee', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '180px' }}>
-                          {fw.nome}
-                        </h4>
-                        <span style={{ fontSize: '8px', fontFamily: 'monospace', color: isActive ? '#00e676' : 'var(--text-muted)' }}>
-                          SEC_{fw.id.substring(0, 4).toUpperCase()}
-                        </span>
-                      </div>
-                      <span style={{ fontSize: '9px', color: 'var(--text-muted)', display: 'block', marginTop: '2px', fontFamily: 'monospace' }}>
-                        TALHÕES: {countTalhoes} | PARCELAS: {countParcelas}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* High-Tech System Diagnostic Summary */}
-            <div style={{ padding: '16px 24px', borderTop: '1px solid rgba(0, 230, 118, 0.15)', background: 'rgba(10, 24, 15, 0.45)', fontFamily: 'monospace' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
-                  <span className="hud-pulse-dot" style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#00e676', display: 'inline-block', boxShadow: '0 0 8px #00e676' }} />
-                  <span style={{ fontSize: '9px', color: '#00e676', fontWeight: '900', letterSpacing: '1.2px' }}>TELEMETRIA_SISTEMA</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px' }}>
-                  <span style={{ color: 'var(--text-muted)' }}>STATUS:</span>
-                  <span style={{ color: '#00e676', fontWeight: 'bold' }}>ONLINE // ATIVO</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px' }}>
-                  <span style={{ color: 'var(--text-muted)' }}>SINCRONIA:</span>
-                  <span style={{ color: isSynced ? '#00e676' : 'rgba(255, 255, 255, 0.4)' }}>
-                    {isSynced ? "SNC_OK" : "SYNC_PROG"}
-                  </span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px' }}>
-                  <span style={{ color: 'var(--text-muted)' }}>LATÊNCIA:</span>
-                  <span style={{ color: '#00e676' }}>38 ms</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px' }}>
-                  <span style={{ color: 'var(--text-muted)' }}>PARCELAS:</span>
-                  <span style={{ color: '#fff' }}>{activeParcels.length}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px' }}>
-                  <span style={{ color: 'var(--text-muted)' }}>FUSTES:</span>
-                  <span style={{ color: '#fff' }}>{kpis.totalTrees}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px' }}>
-                  <span style={{ color: 'var(--text-muted)' }}>BIOMASSA:</span>
-                  <span style={{ color: '#fff' }}>{kpis.totalV.toFixed(1)} m³</span>
-                </div>
-              </div>
-            </div>
-          </>
-        ) : (
-          <>
-            {/* Brand Header */}
-            <div style={{ padding: '24px 24px 16px', display: 'flex', flexDirection: 'column', gap: '12px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <img src="/logo.png" alt="Logo" style={{ width: '40px', height: '40px' }} />
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <h1 style={{ color: 'var(--primary-color)', fontSize: '18px', fontWeight: '800', margin: 0, letterSpacing: '0.5px' }}>LeafTag</h1>
-                    <div 
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: isSynced ? '#81c784' : '#ffb74d',
-                        transition: 'all 0.3s ease',
-                        cursor: 'default'
-                      }}
-                      title={isSynced ? "Dados 100% Sincronizados" : "Sincronizando com a Nuvem..."}
-                    >
-                      <svg 
-                        xmlns="http://www.w3.org/2000/svg" 
-                        width="10" 
-                        height="10" 
-                        viewBox="0 0 24 24" 
-                        fill="none" 
-                        stroke="currentColor" 
-                        strokeWidth="2.5" 
-                        strokeLinecap="round" 
-                        strokeLinejoin="round"
-                        className={isSynced ? "" : "spin-icon"}
-                      >
-                        <path d="M17.5 19A3.5 3.5 0 0 0 21 15.5c0-2.79-2.54-4.5-5-4.5-.47-.47-1.15-.78-2-.78-2 0-3.5 1.5-3.5 3.5v.78c-2.3 0-4 1.7-4 4A3.5 3.5 0 0 0 10 22h7.5" />
-                        {isSynced && <path d="M9 16l2 2 4-4" />}
-                      </svg>
-                    </div>
-                  </div>
-                  <span style={{ fontSize: '11px', color: '#00e676', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '1px' }}>Painel Escritório</span>
-                </div>
-              </div>
-              <div>
-                <button 
-                  onClick={() => {
-                    localStorage.setItem('preferredMode', 'field');
-                    navigate('/');
-                  }}
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    color: 'var(--text-muted)',
-                    fontSize: '11px',
-                    cursor: 'pointer',
-                    padding: '4px 0',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    textDecoration: 'none',
-                    transition: 'all 0.2s',
-                    fontFamily: 'inherit',
-                    fontWeight: '600'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.color = '#00e676';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.color = 'var(--text-muted)';
-                  }}
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
-                  Ir para Modo Campo
-                </button>
-              </div>
-            </div>
-
-            {/* Toggle HUD Mode Button */}
-            <div style={{ padding: '12px 24px 4px' }}>
-              <button 
-                onClick={toggleInterfaceMode}
-                style={{
-                  width: '100%',
-                  background: 'linear-gradient(135deg, rgba(0, 176, 255, 0.1) 0%, rgba(0, 230, 118, 0.1) 100%)',
-                  border: '1px solid rgba(0, 176, 255, 0.3)',
-                  borderRadius: '12px',
-                  color: '#ffffff',
-                  padding: '12px 16px',
-                  fontSize: '13px',
-                  fontWeight: '700',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '10px',
-                  transition: 'all 0.2s ease',
-                  boxShadow: '0 4px 12px rgba(0, 176, 255, 0.05)'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.border = '1px solid #00b0ff';
-                  e.currentTarget.style.transform = 'translateY(-1px)';
-                  e.currentTarget.style.boxShadow = '0 6px 16px rgba(0, 176, 255, 0.15)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.border = '1px solid rgba(0, 176, 255, 0.3)';
-                  e.currentTarget.style.transform = 'none';
-                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 176, 255, 0.05)';
-                }}
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
-                </svg>
-                <span>Ativar Space HUD</span>
-              </button>
-            </div>
-
-            {/* Biblioteca de Modelos Button */}
-            <div style={{ padding: '12px 24px 4px' }}>
-              <button 
-                onClick={() => navigate('/modelos')}
-                style={{
-                  width: '100%',
-                  background: 'linear-gradient(135deg, rgba(0, 230, 118, 0.15) 0%, rgba(0, 176, 255, 0.15) 100%)',
-                  border: '1px solid rgba(0, 230, 118, 0.35)',
-                  borderRadius: '12px',
-                  color: '#ffffff',
-                  padding: '12px 16px',
-                  fontSize: '13px',
-                  fontWeight: '700',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '10px',
-                  transition: 'all 0.2s ease',
-                  boxShadow: '0 4px 12px rgba(0, 230, 118, 0.05)'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.border = '1px solid #00e676';
-                  e.currentTarget.style.transform = 'translateY(-1px)';
-                  e.currentTarget.style.boxShadow = '0 6px 16px rgba(0, 230, 118, 0.15)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.border = '1px solid rgba(0, 230, 118, 0.35)';
-                  e.currentTarget.style.transform = 'none';
-                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 230, 118, 0.05)';
-                }}
-              >
-                <span>Biblioteca de Equações</span>
-              </button>
-            </div>
-
-            {/* Project search */}
-            <div style={{ padding: '8px 24px' }}>
-              <div style={{ position: 'relative' }}>
-                <input 
-                  type="text" 
-                  className="input-field" 
-                  placeholder="Pesquisar projetos..."
-                  style={{ background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '10px', fontSize: '13px', paddingLeft: '34px', marginBottom: 0 }}
-                  value={searchProjectQuery}
-                  onChange={e => setSearchProjectQuery(e.target.value)}
-                />
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }}>
-                  <circle cx="11" cy="11" r="8"></circle>
-                  <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                </svg>
-              </div>
-            </div>
-
-            {/* Project list items */}
-            <div style={{ flex: 1, overflowY: 'auto', padding: '12px 24px' }}>
-              <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '0.8px', display: 'block', marginBottom: '8px' }}>
-                Trabalhos de Campo ({filteredFieldWorks.length})
-              </span>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {filteredFieldWorks.map(fw => {
-                  const countTalhoes = talhoes.filter(t => t.fieldWorkId === fw.id).length;
-                  const countParcelas = inventories.filter(i => i.fieldWorkId === fw.id && i.template !== 'cubagem').length;
-                  const countArvores = inventories
-                    .filter(i => i.fieldWorkId === fw.id)
-                    .reduce((acc, curr) => acc + (curr.dados ? curr.dados.length : 0), 0);
-                  const isActive = fw.id === activeFwId;
-                  return (
-                    <div 
-                      key={fw.id} 
-                      onClick={() => setActiveFwId(fw.id)}
-                      style={{
-                        padding: '12px 16px',
-                        borderRadius: '12px',
-                        cursor: 'pointer',
-                        background: isActive ? 'rgba(0, 230, 118, 0.08)' : 'rgba(255, 255, 255, 0.01)',
-                        border: isActive ? '1px solid rgba(0, 230, 118, 0.3)' : '1px solid rgba(255, 255, 255, 0.04)',
-                        transition: 'all 0.2s ease',
-                        position: 'relative',
-                        overflow: 'visible'
-                      }}
-                    >
-                      {isActive && (
-                        <div style={{ position: 'absolute', left: '0', top: '50%', transform: 'translateY(-50%)', width: '3px', height: '20px', background: 'var(--primary-color)', borderRadius: '0 4px 4px 0' }} />
-                      )}
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                        <h4 style={{ fontSize: '13.5px', margin: 0, fontWeight: '700', color: isActive ? 'var(--primary-hover)' : '#fff', flex: 1, paddingRight: '8px' }}>{fw.nome}</h4>
-                        <div style={{ position: 'relative' }}>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setActiveMenuFwId(activeMenuFwId === fw.id ? null : fw.id);
-                            }}
-                            style={{
-                              background: 'transparent',
-                              border: 'none',
-                              color: 'var(--text-muted)',
-                              fontSize: '18px',
-                              cursor: 'pointer',
-                              padding: '0 4px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              transition: 'color 0.2s',
-                              lineHeight: 1
-                            }}
-                            onMouseEnter={(e) => { e.currentTarget.style.color = '#fff'; }}
-                            onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; }}
-                          >
-                            •••
-                          </button>
-                          
-                          {activeMenuFwId === fw.id && (
-                            <div 
-                              style={{
-                                position: 'absolute',
-                                top: '24px',
-                                right: '0',
-                                background: '#1a1a1a',
-                                border: '1px solid rgba(255, 255, 255, 0.08)',
-                                borderRadius: '12px',
-                                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)',
-                                zIndex: 100,
-                                minWidth: '130px',
-                                overflow: 'hidden',
-                                backdropFilter: 'blur(16px)',
-                                WebkitBackdropFilter: 'blur(16px)',
-                              }}
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleEditClick(fw);
-                                }}
-                                style={{
-                                  width: '100%',
-                                  padding: '10px 16px',
-                                  background: 'transparent',
-                                  border: 'none',
-                                  color: '#fff',
-                                  fontSize: '13px',
-                                  textAlign: 'left',
-                                  cursor: 'pointer',
-                                  transition: 'background-color 0.2s',
-                                  borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
-                                  display: 'block',
-                                }}
-                                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)'; }}
-                                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
-                              >
-                                Editar
-                              </button>
-                              <button
-                                type="button"
-                                onClick={async (e) => {
-                                  e.stopPropagation();
-                                  setActiveMenuFwId(null);
-                                  if (confirm(`Deseja duplicar o trabalho de campo "${fw.nome}"?`)) {
-                                    try {
-                                      await duplicateFieldWork(fw.id);
-                                      alert("Trabalho de campo duplicado com sucesso.");
-                                    } catch (err: any) {
-                                      alert("Erro ao duplicar: " + err.message);
-                                    }
-                                  }
-                                }}
-                                style={{
-                                  width: '100%',
-                                  padding: '10px 16px',
-                                  background: 'transparent',
-                                  border: 'none',
-                                  color: '#fff',
-                                  fontSize: '13px',
-                                  textAlign: 'left',
-                                  cursor: 'pointer',
-                                  transition: 'background-color 0.2s',
-                                  borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
-                                  display: 'block',
-                                }}
-                                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)'; }}
-                                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
-                              >
-                                Duplicar
-                              </button>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setActiveMenuFwId(null);
-                                  handleExportFieldWork(fw);
-                                }}
-                                style={{
-                                  width: '100%',
-                                  padding: '10px 16px',
-                                  background: 'transparent',
-                                  border: 'none',
-                                  color: '#fff',
-                                  fontSize: '13px',
-                                  textAlign: 'left',
-                                  cursor: 'pointer',
-                                  transition: 'background-color 0.2s',
-                                  display: 'block',
-                                }}
-                                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)'; }}
-                                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
-                              >
-                                Exportar
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginTop: '4px' }}>
-                        Local: {fw.local}
-                      </span>
-                      <span style={{ fontSize: '10.5px', color: 'var(--text-muted)', display: 'block', marginTop: '2px', opacity: 0.8 }}>
-                        {countTalhoes} {countTalhoes === 1 ? 'talhão' : 'talhões'} • {countParcelas} {countParcelas === 1 ? 'parcela' : 'parcelas'} • {countArvores} {countArvores === 1 ? 'árvore' : 'árvores'}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Profile Footer */}
-            <div style={{ padding: '16px 20px', borderTop: '1px solid rgba(255,255,255,0.05)', background: 'rgba(0,0,0,0.15)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                <div style={{ minWidth: 0, flex: 1 }}>
-                  <span style={{ fontSize: '12.5px', color: '#fff', fontWeight: 'bold', display: 'block', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{currentUser?.displayName || 'Escritório'}</span>
-                  <span style={{ fontSize: '10.5px', color: 'var(--text-muted)', display: 'block', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{currentUser?.email}</span>
-                </div>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexShrink: 0 }}>
-                  <button 
-                    onClick={() => setShowSettingsModal(true)}
-                    style={{ 
-                      background: 'transparent', 
-                      border: 'none', 
-                      color: 'var(--text-muted)', 
-                      cursor: 'pointer', 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      justifyContent: 'center',
-                      padding: '4px'
-                    }}
-                    title="Configurações"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <circle cx="12" cy="12" r="3"></circle>
-                      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-                    </svg>
-                  </button>
-                </div>
-              </div>
-            </div>
-          </>
-        )}
-
-      </div>
+      {/* Sidebar List of Projects */}
+      <ProjectSelectionView {...sidebarProps} />
 
       {/* Main Content Area */}
       <div 
@@ -4713,2763 +3064,119 @@ export const OfficeDashboard = () => {
           display: 'flex', 
           flexDirection: 'column', 
           height: '100vh', 
-          overflowY: interfaceMode === 'hud' ? 'hidden' : 'auto' 
+          overflowY: interfaceMode === 'hud' ? 'hidden' : 'auto',
+          position: 'relative'
         }}
       >
         {activeFw ? (
-          <div 
-            style={interfaceMode === 'hud' ? { 
-              padding: '0px', 
-              boxSizing: 'border-box', 
-              width: '100%', 
-              height: '100%', 
-              display: 'flex', 
-              flexDirection: 'column', 
-              overflow: 'hidden' 
-            } : { 
-              padding: '32px', 
-              boxSizing: 'border-box', 
-              width: '100%' 
-            }}
-          >
-            
-            {/* Project Title and Header buttons */}
-            {interfaceMode === 'classic' && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '20px', marginBottom: '28px' }}>
-              <div>
-                <span style={{ fontSize: '11px', color: 'var(--primary-hover)', textTransform: 'uppercase', fontWeight: '800', letterSpacing: '1px' }}>Projeto Selecionado</span>
-                <h2 style={{ fontSize: '24px', fontWeight: '800', color: '#fff', margin: '4px 0 0 0' }}>{activeFw.nome}</h2>
-                <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Fazenda/Local: {activeFw.local} | Data Inicial: {activeFw.dataInicio}</span>
-              </div>
-              
-              {activeParcels.length > 0 && (
-                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                  <button 
-                    className="btn btn-primary" 
-                    style={{ 
-                      width: 'auto', 
-                      padding: '10px 20px', 
-                      background: 'linear-gradient(135deg, #ffd54f 0%, #fbc02d 100%)', 
-                      border: 'none',
-                      color: '#000000',
-                      fontWeight: '800',
-                      borderRadius: '8px',
-                      boxShadow: '0 4px 14px rgba(251, 192, 45, 0.2)'
-                    }} 
-                    onClick={() => {
-                      setBatchScope('total');
-                      setBatchTalhaoId('');
-                      setBatchParcelId(null);
-                      setShowBatchProcessModal(true);
-                    }}
-                  >
-                    Processamento em Lote
-                  </button>
-                  <button 
-                    className="btn btn-secondary" 
-                    style={{ width: 'auto', padding: '10px 20px', borderColor: '#2e7d32', color: '#a5d6a7', background: 'rgba(46, 125, 50, 0.08)' }} 
-                    onClick={() => setShowProjectDashboard(true)}
-                  >
-                    Dashboard Geral
-                  </button>
-
-                  <button 
-                    className="btn btn-secondary" 
-                    style={{ width: 'auto', padding: '10px 20px' }} 
-                    onClick={handleExportAll}
-                  >
-                    Exportar Excel Completo
-                  </button>
-                  <button 
-                    className="btn btn-secondary" 
-                    style={{ width: 'auto', padding: '10px 20px', borderColor: '#fbc02d', color: '#ffd54f', background: 'rgba(251, 192, 45, 0.08)' }} 
-                    onClick={handleExportAllProcessed}
-                  >
-                    Exportar Processamento (Excel)
-                  </button>
-                  <button 
-                    type="button" 
-                    className="btn btn-secondary" 
-                    style={{ 
-                      width: 'auto', 
-                      padding: '10px 20px', 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      gap: '8px', 
-                      borderColor: activeFw.googleSheetsUrl ? 'var(--primary-hover)' : 'rgba(255,255,255,0.1)' 
-                    }} 
-                    onClick={() => setShowSheetsModal(true)}
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                      <line x1="3" y1="9" x2="21" y2="9"></line>
-                      <line x1="9" y1="21" x2="9" y2="9"></line>
-                    </svg>
-                    {activeFw.googleSheetsUrl ? "Planilha Vinculada" : "Vincular Planilha"}
-                  </button>
-                  {activeFw.googleSheetsUrl && (
-                    <button 
-                      type="button" 
-                      className="btn btn-primary" 
-                      style={{ 
-                        width: 'auto', 
-                        padding: '10px 20px', 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        gap: '8px', 
-                        background: 'linear-gradient(135deg, #00e676 0%, #00b0ff 100%)',
-                        border: 'none'
-                      }} 
-                      onClick={handleSyncGoogleSheets}
-                      disabled={isSyncingSheets}
-                    >
-                      <svg 
-                        xmlns="http://www.w3.org/2000/svg" 
-                        width="16" height="16" 
-                        viewBox="0 0 24 24" 
-                        fill="none" 
-                        stroke="currentColor" 
-                        strokeWidth="2.5" 
-                        strokeLinecap="round" 
-                        strokeLinejoin="round"
-                        className={isSyncingSheets ? "spin-icon" : ""}
-                      >
-                        <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
-                      </svg>
-                      {isSyncingSheets ? "Enviando..." : "Sincronizar Planilha"}
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-            )}
-
-            {/* Abas layout for Talões / Parcelas / Estratos */}
-            {interfaceMode === 'classic' && (
-              <div className="office-tab-bar">
-              <button 
-                onClick={() => setActiveTab('centro-operacoes')}
-                className={`office-tab-button ${activeTab === 'centro-operacoes' ? 'active' : ''}`}
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: '8px' }}>
-                  <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
-                </svg>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                  <span style={{ fontSize: '13.5px', fontWeight: 'bold' }}>Centro de Operações</span>
-                  <span style={{ fontSize: '10.5px', opacity: 0.7, marginTop: '2px' }}>Mapa de Processo</span>
-                </div>
-              </button>
-
-              <button 
-                onClick={() => setActiveTab('talhoes')}
-                className={`office-tab-button ${activeTab === 'talhoes' ? 'active' : ''}`}
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: '8px' }}>
-                  <path d="M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z"/>
-                </svg>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                  <span style={{ fontSize: '13.5px', fontWeight: 'bold' }}>Talões</span>
-                  <span style={{ fontSize: '10.5px', opacity: 0.7, marginTop: '2px' }}>{activeTalhoes.length} cadastrados</span>
-                </div>
-              </button>
-
-              <button 
-                onClick={() => setActiveTab('parcelas')}
-                className={`office-tab-button ${activeTab === 'parcelas' ? 'active' : ''}`}
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: '8px' }}>
-                  <circle cx="12" cy="12" r="10"></circle>
-                  <line x1="22" y1="12" x2="18" y2="12"></line>
-                  <line x1="6" y1="12" x2="2" y2="12"></line>
-                  <line x1="12" y1="6" x2="12" y2="2"></line>
-                  <line x1="12" y1="22" x2="12" y2="18"></line>
-                </svg>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                  <span style={{ fontSize: '13.5px', fontWeight: 'bold' }}>Parcelas</span>
-                  <span style={{ fontSize: '10.5px', opacity: 0.7, marginTop: '2px' }}>{activeParcels.length} registradas</span>
-                </div>
-              </button>
-
-              <button 
-                onClick={() => setActiveTab('estratos')}
-                className={`office-tab-button ${activeTab === 'estratos' ? 'active' : ''}`}
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: '8px' }}>
-                  <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
-                  <polyline points="2 17 12 22 22 17"></polyline>
-                  <polyline points="2 12 12 17 22 12"></polyline>
-                </svg>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                  <span style={{ fontSize: '13.5px', fontWeight: 'bold' }}>Estratos</span>
-                  <span style={{ fontSize: '10.5px', opacity: 0.7, marginTop: '2px' }}>{activeStrata.length} grupos</span>
-                </div>
-              </button>
-
-              <button 
-                onClick={() => setActiveTab('cubagem')}
-                className={`office-tab-button ${activeTab === 'cubagem' ? 'active' : ''}`}
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: '8px' }}>
-                  <path d="M12 20V10M18 20V4M6 20V16"/>
-                  <line x1="2" y1="20" x2="22" y2="20"></line>
-                </svg>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                  <span style={{ fontSize: '13.5px', fontWeight: 'bold' }}>Cubagem</span>
-                  <span style={{ fontSize: '10.5px', opacity: 0.7, marginTop: '2px' }}>{allCubagedTrees.length} fustes</span>
-                </div>
-              </button>
-
-              <button 
-                onClick={() => setActiveTab('extrapolacao')}
-                className={`office-tab-button ${activeTab === 'extrapolacao' ? 'active' : ''}`}
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: '8px' }}>
-                  <line x1="18" y1="20" x2="18" y2="10"></line>
-                  <line x1="12" y1="20" x2="12" y2="4"></line>
-                  <line x1="6" y1="20" x2="6" y2="14"></line>
-                  <line x1="2" y1="20" x2="22" y2="20"></line>
-                </svg>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                  <span style={{ fontSize: '13.5px', fontWeight: 'bold' }}>Extrapolação</span>
-                  <span style={{ fontSize: '10.5px', opacity: 0.7, marginTop: '2px' }}>Médias e Totais</span>
-                </div>
-              </button>
-
-              <button 
-                onClick={() => setActiveTab('processamentos')}
-                className={`office-tab-button ${activeTab === 'processamentos' ? 'active' : ''}`}
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: '8px' }}>
-                  <circle cx="12" cy="12" r="3"></circle>
-                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-                </svg>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                  <span style={{ fontSize: '13.5px', fontWeight: 'bold' }}>Processamentos</span>
-                  <span style={{ fontSize: '10.5px', opacity: 0.7, marginTop: '2px' }}>{activeProcessings.length} snapshots</span>
-                </div>
-              </button>
-
-              <button 
-                onClick={() => setActiveTab('sortimento')}
-                className={`office-tab-button ${activeTab === 'sortimento' ? 'active' : ''}`}
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: '8px' }}>
-                  <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
-                  <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
-                  <line x1="12" y1="22.08" x2="12" y2="12"></line>
-                </svg>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                  <span style={{ fontSize: '13.5px', fontWeight: 'bold' }}>Sortimento</span>
-                  <span style={{ fontSize: '10.5px', opacity: 0.7, marginTop: '2px' }}>Otimização e Toras</span>
-                </div>
-              </button>
-            </div>
-            )}
-
-            {/* KPI Cards Row */}
-            {activeTab !== 'centro-operacoes' && (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '32px' }}>
-                
-                <div className="glass-card" style={{ padding: '20px', border: '1px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.01)', borderRadius: '16px', marginBottom: 0 }}>
-                  <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Indivíduos Totais</span>
-                  <h3 style={{ fontSize: '24px', fontWeight: '800', margin: '8px 0 0 0', color: '#4fc3f7' }}>{kpis.totalTrees}</h3>
-                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Árvores e Fustes Coletados</span>
-                </div>
-
-                <div className="glass-card" style={{ padding: '20px', border: '1px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.01)', borderRadius: '16px', marginBottom: 0 }}>
-                  <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Riqueza (Espécies)</span>
-                  <h3 style={{ fontSize: '24px', fontWeight: '800', margin: '8px 0 0 0', color: '#aed581' }}>{kpis.speciesCount}</h3>
-                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Espécies Mapeadas em Campo</span>
-                </div>
-
-                <div className="glass-card" style={{ padding: '20px', border: '1px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.01)', borderRadius: '16px', marginBottom: 0 }}>
-                  <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Biomassa Agregada</span>
-                  <h3 style={{ fontSize: '24px', fontWeight: '800', margin: '8px 0 0 0', color: '#ba68c8' }}>{kpis.totalV.toFixed(2)} m³</h3>
-                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Volume Comercial Estimado</span>
-                </div>
-
-                <div className="glass-card" style={{ padding: '20px', border: '1px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.01)', borderRadius: '16px', marginBottom: 0 }}>
-                  <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Diversidade Shannon</span>
-                  <h3 style={{ fontSize: '24px', fontWeight: '800', margin: '8px 0 0 0', color: '#ffb74d' }}>{kpis.shannon.toFixed(3)}</h3>
-                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Índice de Diversidade Ecológica</span>
-                </div>
-
-              </div>
-            )}
-
-            {/* TAB CONTENT */}
-            {activeTab === 'centro-operacoes' ? (
-              renderCentroOperacoes()
-            ) : activeTab === 'talhoes' ? (
-              <div className="glass-card" style={{ padding: 0, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.05)' }}>
-                {activeTalhoes.length === 0 ? (
-                  <div style={{ padding: '48px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                    Nenhum talhão cadastrado neste projeto.
-                  </div>
-                ) : (
-                  <div style={{ overflowX: 'auto' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                      <thead>
-                        <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                          <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Nome do Talhão</th>
-                          <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', width: '120px' }}>Área (ha)</th>
-                          <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Observações</th>
-                          <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', width: '100px' }}>Nº Parcelas</th>
-                          <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', width: '100px' }}>Nº Árvores</th>
-                          <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', width: '380px' }}>Ações</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {activeTalhoes.map(t => {
-                          const talParcels = activeParcels.filter(p => p.talhaoId === t.id);
-                          let treesCount = 0;
-                          talParcels.forEach(p => treesCount += p.dados.length);
-
-                          return (
-                            <tr key={t.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-                              <td style={{ padding: '12px 16px', fontWeight: 'bold' }}>{t.nome}</td>
-                              <td style={{ padding: '12px 16px', fontWeight: 'bold', color: '#00e676' }}>
-                                {t.area !== undefined ? `${t.area.toFixed(2)} ha` : '-'}
-                              </td>
-                              <td style={{ padding: '12px 16px', color: 'var(--text-muted)', fontSize: '13px' }}>{t.observacoes || 'Sem observações'}</td>
-                              <td style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 'bold' }}>{talParcels.length}</td>
-                              <td style={{ padding: '12px 16px', textAlign: 'center', color: '#4fc3f7', fontWeight: 'bold' }}>{treesCount}</td>
-                              <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                                <div style={{ display: 'inline-flex', gap: '6px', justifyContent: 'center', alignItems: 'center', whiteSpace: 'nowrap' }}>
-                                  <button 
-                                    className="btn btn-secondary" 
-                                    style={{ 
-                                      width: 'auto', 
-                                      padding: '4px 8px', 
-                                      fontSize: '10px', 
-                                      height: '26px', 
-                                      borderColor: isLight ? '#16a34a' : '#00e676', 
-                                      color: isLight ? '#16a34a' : '#00e676', 
-                                      background: isLight ? 'rgba(22, 163, 74, 0.06)' : 'rgba(0, 230, 118, 0.08)', 
-                                      margin: 0 
-                                    }} 
-                                    onClick={() => {
-                                      setSelectedTalhaoId(t.id);
-                                      setActiveTab('parcelas');
-                                    }}
-                                  >
-                                    Ver Parcelas
-                                  </button>
-                                  {talParcels.length > 0 && (
-                                    <>
-                                      <button 
-                                        className="btn btn-secondary" 
-                                        style={{ 
-                                          width: 'auto', 
-                                          padding: '4px 8px', 
-                                          fontSize: '10px', 
-                                          height: '26px', 
-                                          borderColor: isLight ? '#d97706' : '#ffb74d', 
-                                          color: isLight ? '#d97706' : '#ffb74d', 
-                                          background: isLight ? 'rgba(217, 119, 6, 0.06)' : 'rgba(255, 183, 77, 0.08)', 
-                                          margin: 0 
-                                        }} 
-                                        onClick={() => setTalhaoDashboardId(t.id)}
-                                      >
-                                        Dashboard
-                                      </button>
-                                      <button 
-                                        className="btn btn-secondary" 
-                                        style={{ 
-                                          width: 'auto', 
-                                          padding: '4px 8px', 
-                                          fontSize: '10px', 
-                                          height: '26px', 
-                                          borderColor: isLight ? '#0891b2' : '#00838f', 
-                                          color: isLight ? '#0891b2' : '#80deea', 
-                                          background: isLight ? 'rgba(8, 145, 178, 0.06)' : 'rgba(0, 131, 143, 0.08)', 
-                                          margin: 0 
-                                        }} 
-                                        onClick={() => handleExportTalhao(t.id, t.nome)}
-                                      >
-                                        Excel
-                                      </button>
-                                    </>
-                                  )}
-                                  <button 
-                                    className="btn btn-secondary" 
-                                    style={{ 
-                                      width: 'auto', 
-                                      padding: '4px 8px', 
-                                      fontSize: '10px', 
-                                      height: '26px', 
-                                      borderColor: isLight ? '#0284c7' : '#4fc3f7', 
-                                      color: isLight ? '#0284c7' : '#4fc3f7', 
-                                      background: isLight ? 'rgba(2, 132, 199, 0.06)' : 'rgba(79, 195, 247, 0.08)', 
-                                      margin: 0 
-                                    }} 
-                                    onClick={() => {
-                                      setEditingTalhao(t);
-                                      setEditTalhaoName(t.nome);
-                                      setEditTalhaoArea(t.area?.toString() || '');
-                                      setEditTalhaoObs(t.observacoes || '');
-                                    }}
-                                  >
-                                    Editar
-                                  </button>
-                                  <button 
-                                    className="btn btn-danger" 
-                                    style={{ 
-                                      width: '28px', 
-                                      height: '26px', 
-                                      padding: 0, 
-                                      display: 'inline-flex', 
-                                      alignItems: 'center', 
-                                      justifyContent: 'center', 
-                                      margin: 0 
-                                    }} 
-                                    onClick={() => {
-                                      if (confirm(`Excluir o talhão "${t.nome}" apagará permanentemente todas as parcelas (${talParcels.length}) vinculadas a ele. Deseja prosseguir?`)) {
-                                        deleteTalhao(t.id);
-                                      }
-                                    }}
-                                    title="Excluir Talhão"
-                                  >
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-            ) : activeTab === 'parcelas' ? (
-              <div className="glass-card" style={{ padding: 24, border: '1px solid rgba(255,255,255,0.05)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
-                  <h3 style={{ fontSize: '16px', fontWeight: '800', margin: 0 }}>Parcelas Cadastradas ({filteredParcelsList.length})</h3>
-                  {/* Filter Button */}
-                  <button 
-                    type="button" 
-                    className="btn btn-secondary" 
-                    style={{ 
-                      width: 'auto', 
-                      padding: '8px 16px', 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      gap: '8px', 
-                      borderColor: isFilterActive ? 'var(--primary-hover)' : 'rgba(255,255,255,0.1)',
-                      background: isFilterActive ? 'rgba(76, 175, 80, 0.05)' : 'transparent',
-                      fontSize: '12px'
-                    }} 
-                    onClick={() => setShowFilterPanel(!showFilterPanel)}
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
-                    </svg>
-                    Filtrar {isFilterActive && "•"}
-                  </button>
-                </div>
-
-                {/* Expanded Filter Panel */}
-                {showFilterPanel && (
-                  <div className="glass-card" style={{
-                    marginTop: '12px',
-                    marginBottom: '20px',
-                    padding: '20px',
-                    background: 'rgba(255, 255, 255, 0.02)',
-                    border: '1px solid rgba(255, 255, 255, 0.05)',
-                    borderRadius: '16px',
-                    width: '100%'
-                  }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px' }}>
-                      
-                      {/* Date Filter */}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                        <label style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Data de Coleta</label>
-                        <input 
-                          type="date" 
-                          className="input-field" 
-                          style={{ marginBottom: 0, padding: '8px 12px', height: '38px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', color: '#fff' }} 
-                          value={dateFilter} 
-                          onChange={e => setDateFilter(e.target.value)} 
-                        />
-                      </div>
-
-                      {/* Talhao Filter */}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                        <label style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Talhão</label>
-                        <select 
-                          className="input-field" 
-                          style={{ marginBottom: 0, padding: '8px 12px', height: '38px', borderRadius: '10px', background: 'rgba(0,0,0,0.3)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }} 
-                          value={talhaoFilter} 
-                          onChange={e => setTalhaoFilter(e.target.value)}
-                        >
-                          <option value="">-- Todos --</option>
-                          <option value="sem-talhao">Sem Talhão</option>
-                          {activeTalhoes.map(t => (
-                            <option key={t.id} value={t.id}>{t.nome}</option>
-                          ))}
-                        </select>
-                      </div>
-
-                      {/* Stratum Filter */}
-                      {activeStrata.length > 0 && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                          <label style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Estrato</label>
-                          <select 
-                            className="input-field" 
-                            style={{ marginBottom: 0, padding: '8px 12px', height: '38px', borderRadius: '10px', background: 'rgba(0,0,0,0.3)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }} 
-                            value={stratumFilter} 
-                            onChange={e => setStratumFilter(e.target.value)}
-                          >
-                            <option value="">-- Todos --</option>
-                            {activeStrata.map(s => (
-                              <option key={s.id} value={s.id}>{s.nome}</option>
-                            ))}
-                          </select>
-                        </div>
-                      )}
-
-                      {/* Status Filter */}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                        <label style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Status</label>
-                        <select 
-                          className="input-field" 
-                          style={{ marginBottom: 0, padding: '8px 12px', height: '38px', borderRadius: '10px', background: 'rgba(0,0,0,0.3)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }} 
-                          value={statusFilter} 
-                          onChange={e => setStatusFilter(e.target.value)}
-                        >
-                          <option value="">-- Todos --</option>
-                          <option value="Aberto">Aberto</option>
-                          <option value="Em Andamento">Em Andamento</option>
-                          <option value="Concluído">Concluído</option>
-                        </select>
-                      </div>
-
-                    </div>
-
-                    {isFilterActive && (
-                      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '16px' }}>
-                        <button 
-                          className="btn btn-secondary" 
-                          style={{ width: 'auto', padding: '6px 16px', fontSize: '12px' }}
-                          onClick={() => {
-                            setDateFilter('');
-                            setTalhaoFilter('');
-                            setStratumFilter('');
-                            setStatusFilter('');
-                          }}
-                        >
-                          Limpar Filtros
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {selectedTalhaoId && (
-                  <div style={{ marginBottom: '20px' }}>
-                    {/* Filter Banner */}
-                    <div style={{
-                      background: 'rgba(0, 230, 118, 0.06)',
-                      border: '1px solid rgba(0, 230, 118, 0.15)',
-                      borderRadius: '12px',
-                      padding: '12px 20px',
-                      marginBottom: '16px',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center'
-                    }}>
-                      <span style={{ fontSize: '13px', color: '#a5d6a7', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
-                        Filtrado pelo Talhão: <strong style={{ color: '#fff', fontSize: '14px' }}>{activeTalhoes.find(t => t.id === selectedTalhaoId)?.nome || 'Sem Nome'}</strong>
-                      </span>
-                      <button 
-                        onClick={() => setSelectedTalhaoId(null)}
-                        style={{
-                          background: 'rgba(255, 77, 109, 0.1)',
-                          border: '1px solid rgba(255, 77, 109, 0.25)',
-                          borderRadius: '8px',
-                          color: '#ff4d6d',
-                          fontSize: '11px',
-                          fontWeight: 'bold',
-                          cursor: 'pointer',
-                          padding: '6px 12px',
-                          transition: 'all 0.2s',
-                          borderStyle: 'solid'
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.background = 'rgba(255, 77, 109, 0.2)';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.background = 'rgba(255, 77, 109, 0.1)';
-                        }}
-                      >
-                        Remover Filtro
-                      </button>
-                    </div>
-
-                    {/* Talhão KPI Grid */}
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px', marginBottom: '16px' }}>
-                      <div style={{ padding: '12px 16px', background: 'rgba(79, 195, 247, 0.03)', border: '1px solid rgba(79, 195, 247, 0.08)', borderRadius: '12px' }}>
-                        <span style={{ fontSize: '10px', color: 'rgba(79, 195, 247, 0.7)', textTransform: 'uppercase', fontWeight: 'bold' }}>Árvores do Talhão</span>
-                        <span style={{ fontSize: '18px', color: '#4fc3f7', fontWeight: '800', display: 'block', marginTop: '4px' }}>
-                          {talhaoKpis.totalTrees}
-                        </span>
-                      </div>
-                      <div style={{ padding: '12px 16px', background: 'rgba(174, 213, 129, 0.03)', border: '1px solid rgba(174, 213, 129, 0.08)', borderRadius: '12px' }}>
-                        <span style={{ fontSize: '10px', color: 'rgba(174, 213, 129, 0.7)', textTransform: 'uppercase', fontWeight: 'bold' }}>Riqueza do Talhão</span>
-                        <span style={{ fontSize: '18px', color: '#aed581', fontWeight: '800', display: 'block', marginTop: '4px' }}>
-                          {talhaoKpis.speciesCount}
-                        </span>
-                      </div>
-                      <div style={{ padding: '12px 16px', background: 'rgba(186, 104, 200, 0.03)', border: '1px solid rgba(186, 104, 200, 0.08)', borderRadius: '12px' }}>
-                        <span style={{ fontSize: '10px', color: 'rgba(186, 104, 200, 0.7)', textTransform: 'uppercase', fontWeight: 'bold' }}>Volume do Talhão</span>
-                        <span style={{ fontSize: '18px', color: '#ba68c8', fontWeight: '800', display: 'block', marginTop: '4px' }}>
-                          {talhaoKpis.totalV.toFixed(2)} m³
-                        </span>
-                      </div>
-                      <div style={{ padding: '12px 16px', background: 'rgba(255, 183, 77, 0.03)', border: '1px solid rgba(255, 183, 77, 0.08)', borderRadius: '12px' }}>
-                        <span style={{ fontSize: '10px', color: 'rgba(255, 183, 77, 0.7)', textTransform: 'uppercase', fontWeight: 'bold' }}>Shannon do Talhão</span>
-                        <span style={{ fontSize: '18px', color: '#ffb74d', fontWeight: '800', display: 'block', marginTop: '4px' }}>
-                          {talhaoKpis.shannon.toFixed(3)}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {filteredParcelsList.length === 0 ? (
-                  <div style={{ padding: '48px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                    Nenhuma parcela corresponde aos filtros ativos.
-                  </div>
-                ) : (
-                  <div style={{ overflowX: 'auto' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                      <thead>
-                        <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                          <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Nome da Parcela</th>
-                          <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Talhão</th>
-                          {activeStrata.length > 0 && (
-                            <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Estrato</th>
-                          )}
-                          <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Coordenadas GPS</th>
-                          <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', width: '110px' }}>Área (m²)</th>
-                          <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', width: '110px' }}>Árvores</th>
-                          <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', width: '320px' }}>Ações de Auditoria</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {filteredParcelsList.map(p => {
-                          const talName = activeTalhoes.find(t => t.id === p.talhaoId)?.nome || 'Sem Talhão';
-                          return (
-                            <tr key={p.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-                              <td style={{ padding: '12px 16px', fontWeight: 'bold' }}>{p.nome}</td>
-                              <td style={{ padding: '12px 16px', color: '#ff9800', fontSize: '13.5px', fontWeight: 'bold' }}>{talName}</td>
-                              {activeStrata.length > 0 && (
-                                <td style={{ padding: '12px 16px' }}>
-                                  <select 
-                                    value={p.stratumId || ''} 
-                                    onChange={async (e) => {
-                                      const newStratumId = e.target.value;
-                                      const updatedInv = { ...p, stratumId: newStratumId || undefined };
-                                      if (!newStratumId) delete updatedInv.stratumId;
-                                      await saveInventory(updatedInv);
-                                    }}
-                                    style={{
-                                      background: 'rgba(0,0,0,0.3)',
-                                      border: '1px solid rgba(255,255,255,0.08)',
-                                      color: '#fff',
-                                      fontSize: '12.5px',
-                                      padding: '6px 10px',
-                                      borderRadius: '8px',
-                                      cursor: 'pointer',
-                                      outline: 'none',
-                                      fontFamily: 'inherit',
-                                    }}
-                                  >
-                                    <option value="">-- Sem Estrato --</option>
-                                    {activeStrata.map(s => (
-                                      <option key={s.id} value={s.id}>{s.nome}</option>
-                                    ))}
-                                  </select>
-                                </td>
-                              )}
-                              <td style={{ padding: '12px 16px', fontFamily: 'monospace', fontSize: '12px', color: 'var(--text-muted)' }}>{p.coordenadas || 'Não coletada'}</td>
-                              <td style={{ padding: '12px 16px', textAlign: 'center' }}>{p.areaParcela}</td>
-                              <td style={{ padding: '12px 16px', textAlign: 'center', color: '#aed581', fontWeight: 'bold' }}>{p.dados.length}</td>
-                              <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                                <div style={{ display: 'inline-flex', gap: '6px', justifyContent: 'center', alignItems: 'center', whiteSpace: 'nowrap' }}>
-                                  <button 
-                                    className="btn btn-secondary" 
-                                    style={{ width: 'auto', padding: '4px 8px', fontSize: '10px', height: '26px', margin: 0 }} 
-                                    onClick={() => setAuditParcelId(p.id)}
-                                  >
-                                    Auditar Dados
-                                  </button>
-                                  {p.dados.length > 0 && (
-                                    <>
-                                      <button 
-                                        className="btn btn-secondary" 
-                                        style={{ width: 'auto', padding: '4px 8px', fontSize: '10px', height: '26px', borderColor: '#2e7d32', color: '#a5d6a7', background: 'rgba(46, 125, 50, 0.08)', margin: 0 }} 
-                                        onClick={() => setShowParcelDashboardId(p.id)}
-                                      >
-                                        Dashboard
-                                      </button>
-                                      <button 
-                                        className="btn btn-secondary" 
-                                        style={{ width: 'auto', padding: '4px 8px', fontSize: '10px', height: '26px', borderColor: 'var(--primary-color)', color: 'var(--primary-color)', margin: 0 }} 
-                                        onClick={() => handleExportParcelProcessed(p)}
-                                      >
-                                        Exportar Excel
-                                      </button>
-                                    </>
-                                  )}
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-            ) : activeTab === 'estratos' ? (
-              /* ESTRATOS TAB VIEW */
-              <div className="glass-card" style={{ padding: 24, border: '1px solid rgba(255,255,255,0.05)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                  <h3 style={{ fontSize: '16px', fontWeight: '800', margin: 0 }}>Estratos Florestais</h3>
-                  <button className="btn btn-primary" style={{ width: 'auto', padding: '8px 16px', fontSize: '12px' }} onClick={() => setShowStratumModal(true)}>
-                    + Novo Estrato
-                  </button>
-                </div>
-
-                {activeStrata.length === 0 ? (
-                  <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                    <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="1.5" style={{ marginBottom: '16px' }}>
-                      <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
-                    </svg>
-                    <h4 style={{ margin: '0 0 8px 0', color: '#fff' }}>Nenhum estrato cadastrado neste projeto</h4>
-                    <p style={{ fontSize: '13px', color: '#666', maxWidth: '500px', margin: '0 auto', lineHeight: 1.5 }}>
-                      A estratificação é opcional. Se você trabalha com inventários mais simples, não precisa preencher esta aba. Use-a apenas se quiser agrupar parcelas semelhantes (por clone, idade ou sítio) para rodar o cálculo de suficiência e reduzir o erro de amostragem.
-                    </p>
-                  </div>
-                ) : (
-                  <>
-                    <div style={{ overflowX: 'auto', marginBottom: '32px' }}>
-                      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                        <thead>
-                          <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                            <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Nome do Estrato</th>
-                            <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Descrição</th>
-                            <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', width: '120px' }}>Área (ha)</th>
-                            <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', width: '120px' }}>Peso (Wh)</th>
-                            <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', width: '120px' }}>Nº Parcelas</th>
-                            <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', width: '220px' }}>Ações</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {stratifiedStats.strataDetails.map(d => (
-                            <tr key={d.stratum.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-                              <td style={{ padding: '12px 16px', fontWeight: 'bold' }}>{d.stratum.nome}</td>
-                              <td style={{ padding: '12px 16px', color: 'var(--text-muted)', fontSize: '12.5px' }}>{d.stratum.descricao || 'Sem descrição'}</td>
-                              <td style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 'bold' }}>{d.stratum.area} ha</td>
-                              <td style={{ padding: '12px 16px', textAlign: 'center', color: '#ffb74d', fontWeight: 'bold' }}>{(d.Wh * 100).toFixed(1)}%</td>
-                              <td style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 'bold', color: '#4fc3f7' }}>{d.nh}</td>
-                              <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                                <div style={{ display: 'inline-flex', gap: '6px', justifyContent: 'center', alignItems: 'center', whiteSpace: 'nowrap' }}>
-                                  {d.nh > 0 && (
-                                    <button 
-                                      className="btn btn-secondary" 
-                                      style={{ 
-                                        width: 'auto', 
-                                        padding: '4px 8px', 
-                                        fontSize: '10px', 
-                                        height: '26px', 
-                                        borderColor: isLight ? '#16a34a' : '#2e7d32', 
-                                        color: isLight ? '#16a34a' : '#a5d6a7', 
-                                        background: isLight ? 'rgba(22, 163, 74, 0.06)' : 'rgba(46, 125, 50, 0.08)', 
-                                        margin: 0 
-                                      }} 
-                                      onClick={() => setStratumDashboardId(d.stratum.id)}
-                                    >
-                                      Dashboard
-                                    </button>
-                                  )}
-                                  <button 
-                                    className="btn btn-danger" 
-                                    style={{ 
-                                      width: '28px', 
-                                      height: '26px', 
-                                      padding: 0, 
-                                      display: 'inline-flex', 
-                                      alignItems: 'center', 
-                                      justifyContent: 'center', 
-                                      margin: 0 
-                                    }} 
-                                    onClick={() => {
-                                      if (confirm(`Deseja deletar o estrato ${d.stratum.nome}? Todas as parcelas associadas a ele ficarão sem estrato.`)) {
-                                        deleteStratum(d.stratum.id);
-                                      }
-                                    }}
-                                    title="Excluir Estrato"
-                                  >
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-
-                    {/* Calculations summary card */}
-                    <div className="glass-card" style={{ padding: '24px', border: '1px solid rgba(255,255,255,0.05)', background: 'rgba(0,230,118,0.02)', borderRadius: '16px', marginBottom: 0 }}>
-                      <h4 style={{ color: 'var(--primary-hover)', fontSize: '14px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '16px' }}>
-                        Relatório Estatístico: Amostragem Casual Estratificada
-                      </h4>
-                      
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '20px' }}>
-                        <div style={{ padding: '12px 16px', background: 'rgba(0,0,0,0.2)', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.03)' }}>
-                          <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Volume Médio Estratificado</span>
-                          <span style={{ fontSize: '18px', color: '#fff', fontWeight: '800', display: 'block', marginTop: '4px' }}>
-                            {stratifiedStats.meanSt.toFixed(2)} m³/ha
-                          </span>
-                        </div>
-                        <div style={{ padding: '12px 16px', background: 'rgba(0,0,0,0.2)', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.03)' }}>
-                          <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Erro de Amostragem Relativo</span>
-                          <span style={{ fontSize: '18px', color: stratifiedStats.errorRel <= 10 ? '#aed581' : '#ffb74d', fontWeight: '800', display: 'block', marginTop: '4px' }}>
-                            {stratifiedStats.errorRel.toFixed(2)}%
-                            <span style={{ fontSize: '10px', display: 'flex', alignItems: 'center', color: 'var(--text-muted)', fontWeight: 'normal', marginTop: '4px' }}>
-                              {stratifiedStats.errorRel <= 10 ? (
-                                <>
-                                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#aed581" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '4px' }}><polyline points="20 6 9 17 4 12"></polyline></svg>
-                                  Dentro do limite (10%)
-                                </>
-                              ) : (
-                                <>
-                                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ffb74d" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '4px' }}><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
-                                  Fora do limite (10%)
-                                </>
-                              )}
-                            </span>
-                          </span>
-                        </div>
-                        <div style={{ padding: '12px 16px', background: 'rgba(0,0,0,0.2)', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.03)' }}>
-                          <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Volume Total Floresta</span>
-                          <span style={{ fontSize: '18px', color: '#ba68c8', fontWeight: '800', display: 'block', marginTop: '4px' }}>
-                            {stratifiedStats.totalVolumeForest.toFixed(2)} m³
-                          </span>
-                        </div>
-                        <div style={{ padding: '12px 16px', background: 'rgba(0,0,0,0.2)', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.03)' }}>
-                          <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Intervalo de Confiança (95%)</span>
-                          <span style={{ fontSize: '13px', color: '#fff', display: 'block', marginTop: '4px', fontFamily: 'monospace' }}>
-                            [{stratifiedStats.lowerVolumeForest.toFixed(1)} - {stratifiedStats.upperVolumeForest.toFixed(1)}] m³
-                          </span>
-                        </div>
-                      </div>
-                      <div style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: 1.5, display: 'flex', alignItems: 'center' }}>
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--primary-color)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px', flexShrink: 0 }}><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
-                        <span><strong>Nota Silvicultural</strong>: Os cálculos utilizam a metodologia oficial de Amostragem Casual Estratificada (Student t = {2.0} com 95% de confiança). Para resultados estatisticamente válidos, certifique-se de cadastrar pelo menos 2 parcelas em cada estrato.</span>
-                      </div>
-                    </div>
-                  </>
-                )}
-              </div>
-            ) : activeTab === 'cubagem' ? (
-              /* CUBAGEM TAB VIEW */
-              <div className="glass-card" style={{ padding: 0, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.05)' }}>
-                {allCubagedTrees.length === 0 ? (
-                  <div style={{ padding: '48px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                    Nenhuma árvore cubada neste trabalho de campo.
-                  </div>
-                ) : (
-                  <div style={{ overflowX: 'auto' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                      <thead>
-                        <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                          <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Árvore</th>
-                          <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Sessão de Cubagem</th>
-                          <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Espécie</th>
-                          <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', width: '120px' }}>Altura (m)</th>
-                          <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', width: '150px' }}>Método Utilizado</th>
-                          <th 
-                            style={{ 
-                              padding: '12px 16px', 
-                              textAlign: 'center', 
-                              fontSize: '11px', 
-                              color: 'var(--primary-hover)', 
-                              textTransform: 'uppercase', 
-                              width: '180px',
-                              cursor: 'pointer',
-                              userSelect: 'none'
-                            }}
-                            onClick={() => {
-                              setCubageSortOrder(prev => prev === 'desc' ? 'asc' : 'desc');
-                            }}
-                          >
-                            Volume Total (m³) {cubageSortOrder === 'desc' ? '▼' : cubageSortOrder === 'asc' ? '▲' : ''}
-                          </th>
-                          <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', width: '140px' }}>Data do Cálculo</th>
-                          <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', width: '120px' }}>Ações</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {allCubagedTrees.map((tree, idx) => (
-                          <tr key={tree.id || idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-                            <td style={{ padding: '12px 16px', fontWeight: 'bold' }}>#{tree.numeroIndividuo}</td>
-                            <td style={{ padding: '12px 16px', color: 'var(--text-muted)' }}>{tree.sessionName}</td>
-                            <td style={{ padding: '12px 16px', fontStyle: 'italic' }}>{tree.especie}</td>
-                            <td style={{ padding: '12px 16px', textAlign: 'center' }}>{tree.alturaTotal ? `${tree.alturaTotal.toFixed(2)} m` : '-'}</td>
-                            <td style={{ padding: '12px 16px', textAlign: 'center', textTransform: 'capitalize' }}>
-                              <span style={{
-                                padding: '4px 8px',
-                                borderRadius: '6px',
-                                fontSize: '12px',
-                                background: 'rgba(255, 255, 255, 0.05)',
-                                color: '#fff'
-                              }}>
-                                {tree.metodoCalculo}
-                              </span>
-                            </td>
-                            <td style={{ padding: '12px 16px', textAlign: 'center', color: '#00e676', fontWeight: 'bold', fontSize: '15px' }}>
-                              {tree.volumeTotal ? `${tree.volumeTotal.toFixed(4).replace('.', ',')}` : '0,0000'}
-                            </td>
-                            <td style={{ padding: '12px 16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
-                              {tree.dataCalculo || '-'}
-                            </td>
-                            <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                              <button 
-                                className="btn btn-secondary" 
-                                style={{ 
-                                  width: 'auto', 
-                                  padding: '6px 12px', 
-                                  fontSize: '11.5px', 
-                                  height: '28px', 
-                                  display: 'inline-flex', 
-                                  alignItems: 'center', 
-                                  gap: '4px',
-                                  borderColor: isLight ? 'rgba(22, 163, 74, 0.4)' : 'rgba(0, 230, 118, 0.3)',
-                                  background: isLight ? 'rgba(22, 163, 74, 0.05)' : 'rgba(0, 230, 118, 0.04)',
-                                  color: isLight ? '#16a34a' : '#00e676'
-                                }}
-                                onClick={() => {
-                                  setSelectedVisualizerTree(tree);
-                                  if (tree.modoColeta === 'relativo') {
-                                    setSelectedVisualizerPoint('Base');
-                                  } else {
-                                    setSelectedVisualizerSectionId(tree.secoes?.[0]?.id || null);
-                                  }
-                                }}
-                              >
-                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
-                                Ver Fuste
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-            ) : activeTab === 'extrapolacao' ? (
-              /* EXTRAPOLATION VIEW CONTENT */
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                
-                {/* SUB TABS */}
-                <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '10px' }}>
-                  {(['parcelas', 'talhoes', 'estratos', 'trabalho'] as const).map(tab => (
-                    <button
-                      key={tab}
-                      onClick={() => setExtraTab(tab)}
-                      style={{
-                        background: extraTab === tab ? 'var(--primary-color)' : 'rgba(255, 255, 255, 0.02)',
-                        border: '1px solid rgba(255,255,255,0.08)',
-                        borderRadius: '8px',
-                        color: extraTab === tab ? '#fff' : 'var(--text-muted)',
-                        padding: '8px 16px',
-                        cursor: 'pointer',
-                        fontWeight: 'bold',
-                        fontSize: '13px',
-                        transition: 'all 0.2s',
-                        textTransform: 'capitalize'
-                      }}
-                    >
-                      {tab === 'trabalho' ? 'Trabalho Total' : tab}
-                    </button>
-                  ))}
-                </div>
-
-                {extrapolationData && (
-                  <div>
-                    {extraTab === 'parcelas' && (
-                      <div className="glass-card" style={{ padding: 0, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.05)' }}>
-                        <div style={{ overflowX: 'auto' }}>
-                          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                            <thead>
-                              <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', background: 'rgba(0,0,0,0.1)' }}>
-                                <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Parcela</th>
-                                <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Área (m²)</th>
-                                <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Fator Expansão</th>
-                                <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Vol. Total (m³)</th>
-                                <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '11px', color: 'var(--primary-hover)', textTransform: 'uppercase' }}>Vol. / ha (m³)</th>
-                                <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>G / ha (m²)</th>
-                                <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Árvores / ha</th>
-                                <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Status</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {extrapolationData.processedParcels.map(p => (
-                                <tr key={p.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-                                  <td style={{ padding: '12px 16px', fontWeight: 'bold' }}>{p.nome}</td>
-                                  <td style={{ padding: '12px 16px', textAlign: 'center' }}>{p.areaParcela.toFixed(1)}</td>
-                                  <td style={{ padding: '12px 16px', textAlign: 'center', color: 'var(--text-muted)' }}>{p.isProcessed ? p.fatorExpansao.toFixed(2) : '-'}</td>
-                                  <td style={{ padding: '12px 16px', textAlign: 'center' }}>{p.isProcessed ? p.volumeTotalParcela.toFixed(4) : '-'}</td>
-                                  <td style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 'bold', color: '#00e676' }}>{p.isProcessed ? p.volumePorHa.toFixed(2) : '-'}</td>
-                                  <td style={{ padding: '12px 16px', textAlign: 'center' }}>{p.isProcessed ? p.areaBasalPorHa.toFixed(3) : '-'}</td>
-                                  <td style={{ padding: '12px 16px', textAlign: 'center' }}>{p.isProcessed ? p.densidadePorHa.toFixed(1) : '-'}</td>
-                                  <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                                    {p.isProcessed ? (
-                                      <span style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '11px', background: 'rgba(76, 175, 80, 0.15)', color: '#4caf50', fontWeight: 'bold' }}>Processado</span>
-                                    ) : (
-                                      <span style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '11px', background: 'rgba(244, 67, 54, 0.15)', color: '#f44336', fontWeight: 'bold' }}>Não Processado</span>
-                                    )}
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                        {extrapolationData.processedParcels.some(p => !p.isProcessed) && (
-                          <div style={{ padding: '12px 16px', background: 'rgba(244, 67, 54, 0.08)', borderTop: '1px solid rgba(244, 67, 54, 0.15)', color: '#ef5350', fontSize: '13px', display: 'flex', gap: '8px', alignItems: 'center' }}>
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
-                            <span>Esta parcela ainda não foi processada.</span>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {extraTab === 'talhoes' && (
-                      <div className="glass-card" style={{ padding: 0, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.05)' }}>
-                        <div style={{ overflowX: 'auto' }}>
-                          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                            <thead>
-                              <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', background: 'rgba(0,0,0,0.1)' }}>
-                                <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Talhão</th>
-                                <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Área Talhão (ha)</th>
-                                <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Parcelas Processadas</th>
-                                <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Área Amostrada (m²)</th>
-                                <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Vol. Médio / ha (m³)</th>
-                                <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>G Médio / ha (m²)</th>
-                                <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>DAP Médio (cm)</th>
-                                <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Altura Média (m)</th>
-                                <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '11px', color: 'var(--primary-hover)', textTransform: 'uppercase' }}>Volume Total (m³)</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {extrapolationData.talhoesResults.map(t => (
-                                <tr key={t.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-                                  <td style={{ padding: '12px 16px', fontWeight: 'bold' }}>{t.nome}</td>
-                                  <td style={{ padding: '12px 16px', textAlign: 'center' }}>{t.areaTalhaoHa > 0 ? t.areaTalhaoHa.toFixed(2) : 'Não Informado'}</td>
-                                  <td style={{ padding: '12px 16px', textAlign: 'center' }}>{t.numParcelas}</td>
-                                  <td style={{ padding: '12px 16px', textAlign: 'center', color: 'var(--text-muted)' }}>{t.areaAmostradaTotal.toFixed(1)}</td>
-                                  <td style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 'bold' }}>{t.numParcelas > 0 ? t.volumeMedioPorHa.toFixed(2) : '-'}</td>
-                                  <td style={{ padding: '12px 16px', textAlign: 'center' }}>{t.numParcelas > 0 ? t.areaBasalMedioPorHa.toFixed(3) : '-'}</td>
-                                  <td style={{ padding: '12px 16px', textAlign: 'center' }}>{t.numParcelas > 0 ? t.dapMedio.toFixed(2) : '-'}</td>
-                                  <td style={{ padding: '12px 16px', textAlign: 'center' }}>{t.numParcelas > 0 ? t.alturaMedio.toFixed(2) : '-'}</td>
-                                  <td style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 'bold', color: '#00e676', fontSize: '14px' }}>
-                                    {t.numParcelas > 0 && t.areaTalhaoHa > 0 ? t.volumeTotalTalhao.toFixed(2) : '-'}
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    )}
-
-                    {extraTab === 'estratos' && (
-                      <div className="glass-card" style={{ padding: 0, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.05)' }}>
-                        <div style={{ overflowX: 'auto' }}>
-                          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                            <thead>
-                              <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', background: 'rgba(0,0,0,0.1)' }}>
-                                <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Estrato</th>
-                                <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Área Estrato (ha)</th>
-                                <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Parcelas Processadas</th>
-                                <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Área Amostrada (m²)</th>
-                                <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Vol. Médio / ha (m³)</th>
-                                <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>G Médio / ha (m²)</th>
-                                <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Densidade Média / ha</th>
-                                <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '11px', color: 'var(--primary-hover)', textTransform: 'uppercase' }}>Volume Total (m³)</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {extrapolationData.strataResults.map(s => (
-                                <tr key={s.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-                                  <td style={{ padding: '12px 16px', fontWeight: 'bold' }}>{s.nome}</td>
-                                  <td style={{ padding: '12px 16px', textAlign: 'center' }}>{s.areaEstratoHa > 0 ? s.areaEstratoHa.toFixed(2) : 'Não Informado'}</td>
-                                  <td style={{ padding: '12px 16px', textAlign: 'center' }}>{s.numParcelas}</td>
-                                  <td style={{ padding: '12px 16px', textAlign: 'center', color: 'var(--text-muted)' }}>{s.areaAmostradaTotal.toFixed(1)}</td>
-                                  <td style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 'bold' }}>{s.numParcelas > 0 ? s.volumeMedioPorHa.toFixed(2) : '-'}</td>
-                                  <td style={{ padding: '12px 16px', textAlign: 'center' }}>{s.numParcelas > 0 ? s.areaBasalMedioPorHa.toFixed(3) : '-'}</td>
-                                  <td style={{ padding: '12px 16px', textAlign: 'center' }}>{s.numParcelas > 0 ? s.densidadeMedioPorHa.toFixed(1) : '-'}</td>
-                                  <td style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 'bold', color: '#00e676', fontSize: '14px' }}>
-                                    {s.numParcelas > 0 && s.areaEstratoHa > 0 ? s.volumeTotalEstrato.toFixed(2) : '-'}
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    )}
-
-                    {extraTab === 'trabalho' && (
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px' }}>
-                        
-                        <div className="glass-card" style={{ padding: '24px', border: '1px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.01)', borderRadius: '16px', marginBottom: 0 }}>
-                          <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Área Total Inventariada</span>
-                          <h3 style={{ fontSize: '24px', fontWeight: '800', margin: '8px 0 0 0', color: '#64b5f6' }}>{extrapolationData.trabalho.areaTotalInventariada.toFixed(2)} ha</h3>
-                          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Soma dos talhões/estratos cadastrados</span>
-                        </div>
-
-                        <div className="glass-card" style={{ padding: '24px', border: '1px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.01)', borderRadius: '16px', marginBottom: 0 }}>
-                          <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Área Total Amostrada</span>
-                          <h3 style={{ fontSize: '24px', fontWeight: '800', margin: '8px 0 0 0', color: '#81c784' }}>{(extrapolationData.trabalho.areaTotalAmostrada / 10000).toFixed(4)} ha</h3>
-                          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{extrapolationData.trabalho.areaTotalAmostrada.toFixed(0)} m² no total</span>
-                        </div>
-
-                        <div className="glass-card" style={{ padding: '24px', border: '1px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.01)', borderRadius: '16px', marginBottom: 0 }}>
-                          <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Parcelas Processadas</span>
-                          <h3 style={{ fontSize: '24px', fontWeight: '800', margin: '8px 0 0 0', color: '#ffb74d' }}>{extrapolationData.trabalho.numTotalParcelas}</h3>
-                          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Parcelas consideradas na amostragem</span>
-                        </div>
-
-                        <div className="glass-card" style={{ padding: '24px', border: '1px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.01)', borderRadius: '16px', marginBottom: 0 }}>
-                          <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Árvores Medidas</span>
-                          <h3 style={{ fontSize: '24px', fontWeight: '800', margin: '8px 0 0 0', color: '#ba68c8' }}>{extrapolationData.trabalho.numTotalArvoresMedidas}</h3>
-                          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Registradas nas parcelas válidas</span>
-                        </div>
-
-                        <div className="glass-card" style={{ padding: '24px', border: '1px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.01)', borderRadius: '16px', marginBottom: 0 }}>
-                          <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Volume Médio / ha</span>
-                          <h3 style={{ fontSize: '24px', fontWeight: '800', margin: '8px 0 0 0', color: '#e57373' }}>{extrapolationData.trabalho.volumeMedioGeralPorHa.toFixed(2)} m³/ha</h3>
-                          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Média aritmética por hectare</span>
-                        </div>
-
-                        <div className="glass-card" style={{ padding: '24px', border: '1px solid rgba(255, 255, 255, 0.1)', background: 'rgba(0, 230, 118, 0.08)', borderRadius: '16px', marginBottom: 0 }}>
-                          <span style={{ fontSize: '10px', color: 'var(--primary-hover)', textTransform: 'uppercase', fontWeight: 'bold' }}>Volume Total Estimado</span>
-                          <h3 style={{ fontSize: '24px', fontWeight: '800', margin: '8px 0 0 0', color: '#00e676' }}>{extrapolationData.trabalho.volumeTotalEstimado.toFixed(2)} m³</h3>
-                          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Extrapolação para a área total</span>
-                        </div>
-
-                        <div className="glass-card" style={{ padding: '24px', border: '1px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.01)', borderRadius: '16px', marginBottom: 0 }}>
-                          <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Área Basal / ha</span>
-                          <h3 style={{ fontSize: '24px', fontWeight: '800', margin: '8px 0 0 0', color: '#a1887f' }}>{extrapolationData.trabalho.areaBasalMediaPorHa.toFixed(3)} m²/ha</h3>
-                          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Média de área transversal acumulada</span>
-                        </div>
-
-                        <div className="glass-card" style={{ padding: '24px', border: '1px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.01)', borderRadius: '16px', marginBottom: 0 }}>
-                          <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Densidade Média / ha</span>
-                          <h3 style={{ fontSize: '24px', fontWeight: '800', margin: '8px 0 0 0', color: '#4db6ac' }}>{extrapolationData.trabalho.densidadeMediaPorHa.toFixed(1)} árv/ha</h3>
-                          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Média de árvores por hectare</span>
-                        </div>
-
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            ) : activeTab === 'processamentos' ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                
-                {/* TOOLBAR */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
-                  <div>
-                    <h2 style={{ fontSize: '20px', fontWeight: '800', margin: 0 }}>Consolidação & Processamentos</h2>
-                    <p style={{ color: 'var(--text-muted)', fontSize: '13px', margin: '4px 0 0 0' }}>
-                      Gere snapshots oficiais e consolidados para amostragem florestal técnica.
-                    </p>
-                  </div>
-                  <button 
-                    className="btn btn-primary" 
-                    style={{ width: 'auto', padding: '12px 24px' }}
-                    onClick={() => {
-                      setNewProcessName(`Processamento Oficial - ${new Date().toLocaleDateString('pt-BR')} ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`);
-                      setNewProcessConsolidationMode('auto');
-                      setShowNewProcessModal(true);
-                    }}
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '8px' }}>
-                      <line x1="12" y1="5" x2="12" y2="19"></line>
-                      <line x1="5" y1="12" x2="19" y2="12"></line>
-                    </svg>
-                    Processar Novo Inventário
-                  </button>
-                </div>
-
-                {/* HISTÓRICO TABLE */}
-                <div className="glass-card" style={{ padding: 0, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.05)' }}>
-                  <div style={{ padding: '20px 24px', borderBottom: '1px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.01)' }}>
-                    <h3 style={{ fontSize: '13px', fontWeight: '800', textTransform: 'uppercase', color: 'var(--primary-hover)', margin: 0, letterSpacing: '0.5px' }}>
-                      Histórico de Versões
-                    </h3>
-                  </div>
-
-                  {activeProcessings.length === 0 ? (
-                    <div style={{ padding: '60px 24px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                      <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="1.5" style={{ marginBottom: '12px' }}>
-                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                        <line x1="16" y1="2" x2="16" y2="6"></line>
-                        <line x1="8" y1="2" x2="8" y2="6"></line>
-                        <line x1="3" y1="10" x2="21" y2="10"></line>
-                      </svg>
-                      <h4 style={{ color: '#fff', fontSize: '15px', fontWeight: '700' }}>Sem processamentos oficiais</h4>
-                      <p style={{ fontSize: '13px', marginTop: '4px' }}>
-                        Clique no botão acima para processar as parcelas e congelar a primeira versão oficial.
-                      </p>
-                    </div>
-                  ) : (
-                    <div style={{ overflowX: 'auto' }}>
-                      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                        <thead>
-                          <tr style={{ background: 'rgba(0,0,0,0.1)' }}>
-                            <th style={{ padding: '12px 16px', fontSize: '11px', color: 'var(--text-muted)' }}>Nome do Processamento</th>
-                            <th style={{ padding: '12px 16px', fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center' }}>Data</th>
-                            <th style={{ padding: '12px 16px', fontSize: '11px', color: 'var(--text-muted)' }}>Responsável</th>
-                            <th style={{ padding: '12px 16px', fontSize: '11px', color: 'var(--text-muted)' }}>Equações H / V</th>
-                            <th style={{ padding: '12px 16px', fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center' }}>Modo</th>
-                            <th style={{ padding: '12px 16px', fontSize: '11px', color: 'var(--text-muted)', textAlign: 'right' }}>Vol. Total CC / SC (m³)</th>
-                            <th style={{ padding: '12px 16px', fontSize: '11px', color: 'var(--text-muted)', textAlign: 'right' }}>Média CC / SC (m³/ha)</th>
-                            <th style={{ padding: '12px 16px', fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center' }}>Ações</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {activeProcessings.map(proc => (
-                            <tr key={proc.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-                              <td style={{ padding: '12px 16px', fontWeight: 'bold', fontSize: '14.5px', color: '#fff' }}>{proc.nomeProcessamento}</td>
-                              <td style={{ padding: '12px 16px', textAlign: 'center', fontSize: '13px', color: 'var(--text-muted)' }}>{proc.dataProcessamento}</td>
-                              <td style={{ padding: '12px 16px', fontSize: '13px' }}>{proc.createdBy}</td>
-                              <td style={{ padding: '12px 16px', fontSize: '12px', color: 'var(--text-muted)', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                H: {proc.heightModelSnapshot ? proc.heightModelSnapshot.nome : 'Medida'} <br />
-                                V: {proc.volumeModelSnapshot ? proc.volumeModelSnapshot.nome : '-'}
-                              </td>
-                              <td style={{ padding: '12px 16px', textAlign: 'center', fontSize: '12px' }}>
-                                <span style={{ padding: '3px 8px', borderRadius: '6px', background: 'rgba(255,255,255,0.04)', color: 'var(--text-muted)' }}>
-                                  {proc.effectiveConsolidationMode === 'stratum' ? 'Estrato' : 'Talhão'}{proc.consolidationMode === 'auto' ? ' (Auto)' : ''}
-                                </span>
-                              </td>
-                              <td style={{ padding: '12px 16px', textAlign: 'right', fontSize: '13px' }}>
-                                <div style={{ fontWeight: 'bold', color: '#81c784' }} title="Com Casca">
-                                  {proc.volumeTotalEstimado.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} CC
-                                </div>
-                                <div style={{ fontSize: '12px', color: '#00b0ff' }} title="Sem Casca">
-                                  {(proc.volumeTotalEstimadoSemCasca || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} SC
-                                </div>
-                              </td>
-                              <td style={{ padding: '12px 16px', textAlign: 'right', fontSize: '13px' }}>
-                                <div style={{ color: 'var(--text-muted)' }} title="Com Casca">
-                                  {proc.volumeMedioHa.toFixed(2)} CC
-                                </div>
-                                <div style={{ fontSize: '12px', color: '#00b0ff' }} title="Sem Casca">
-                                  {(proc.volumeMedioHaSemCasca || 0).toFixed(2)} SC
-                                </div>
-                              </td>
-                              <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                                <div style={{ display: 'inline-flex', gap: '6px', justifyContent: 'center', alignItems: 'center', whiteSpace: 'nowrap' }}>
-                                  <button 
-                                    className="btn btn-secondary" 
-                                    style={{ width: 'auto', padding: '6px 10px', height: '28px', fontSize: '10px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                                    onClick={() => setSelectedReportProcessing(proc)}
-                                    title="Visualizar Relatório Executivo"
-                                  >
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
-                                    Relatório
-                                  </button>
-                                  <button 
-                                    className="btn btn-secondary" 
-                                    style={{ width: 'auto', padding: '6px 10px', height: '28px', fontSize: '10px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                                    onClick={() => handleDuplicarConfiguracao(proc)}
-                                    title="Duplicar Configurações no Painel"
-                                  >
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-                                    Duplicar Configuração
-                                  </button>
-                                  <button 
-                                    className="btn btn-danger" 
-                                    style={{ 
-                                      width: '28px', 
-                                      height: '28px', 
-                                      padding: 0, 
-                                      display: 'inline-flex', 
-                                      alignItems: 'center', 
-                                      justifyContent: 'center', 
-                                      margin: 0 
-                                    }} 
-                                    onClick={async () => {
-                                      if (confirm(`Deseja realmente deletar permanentemente o processamento "${proc.nomeProcessamento}"?`)) {
-                                        await deleteProcessing(proc.id);
-                                      }
-                                    }}
-                                    title="Excluir Processamento"
-                                  >
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
-
-                {/* COMPARADOR DE CENÁRIOS */}
-                {activeProcessings.length >= 2 && (
-                  <div className="glass-card" style={{ border: '1px solid rgba(255,255,255,0.06)' }}>
-                    <h3 style={{ fontSize: '15px', fontWeight: '800', color: 'var(--primary-hover)', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                      Comparação de Cenários (Auditoria Metodológica)
-                    </h3>
-                    <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginBottom: '20px' }}>
-                      Selecione dois processamentos oficiais do histórico para comparar o impacto estatístico da troca de modelos e consolidação.
-                    </p>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
-                      <div>
-                        <label className="input-label">Cenário A (Base)</label>
-                        <select 
-                          className="input-field" 
-                          style={{ marginBottom: 0 }}
-                          value={selectedProcessAId}
-                          onChange={e => setSelectedProcessAId(e.target.value)}
-                        >
-                          <option value="">Selecione...</option>
-                          {activeProcessings.map(p => (
-                            <option key={p.id} value={p.id}>{p.nomeProcessamento} ({p.dataProcessamento})</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="input-label">Cenário B (Simulação)</label>
-                        <select 
-                          className="input-field" 
-                          style={{ marginBottom: 0 }}
-                          value={selectedProcessBId}
-                          onChange={e => setSelectedProcessBId(e.target.value)}
-                        >
-                          <option value="">Selecione...</option>
-                          {activeProcessings.map(p => (
-                            <option key={p.id} value={p.id}>{p.nomeProcessamento} ({p.dataProcessamento})</option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-
-                    {/* COMPARISON RESULTS */}
-                    {(() => {
-                      const procA = activeProcessings.find(p => p.id === selectedProcessAId);
-                      const procB = activeProcessings.find(p => p.id === selectedProcessBId);
-
-                      if (!procA || !procB) {
-                        return (
-                          <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', background: 'rgba(255,255,255,0.01)', border: '1px dashed rgba(255,255,255,0.05)', borderRadius: '12px' }}>
-                            Escolha os cenários A e B acima para ver a comparação de variação técnica.
-                          </div>
-                        );
-                      }
-
-                      const renderDiffRow = (label: string, valA: number, valB: number, digits = 2, unit = "") => {
-                        const diffAbs = valB - valA;
-                        const diffPct = valA > 0 ? (diffAbs / valA) * 100 : 0;
-                        const isPos = diffAbs > 0;
-                        const isZero = Math.abs(diffAbs) < 0.0001;
-
-                        const diffColor = isZero ? 'var(--text-muted)' : (isPos ? '#00e676' : '#ff5252');
-                        const diffSign = isZero ? '' : (isPos ? '+' : '');
-
-                        return (
-                          <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-                            <td style={{ padding: '14px 20px', fontWeight: 'bold' }}>{label}</td>
-                            <td style={{ padding: '14px 20px', textAlign: 'right' }}>{valA.toLocaleString('pt-BR', { minimumFractionDigits: digits, maximumFractionDigits: digits })} {unit}</td>
-                            <td style={{ padding: '14px 20px', textAlign: 'right' }}>{valB.toLocaleString('pt-BR', { minimumFractionDigits: digits, maximumFractionDigits: digits })} {unit}</td>
-                            <td style={{ padding: '14px 20px', textAlign: 'right', fontWeight: 'bold', color: diffColor }}>
-                              {diffSign}{diffAbs.toLocaleString('pt-BR', { minimumFractionDigits: digits, maximumFractionDigits: digits })} {unit}
-                            </td>
-                            <td style={{ padding: '14px 20px', textAlign: 'right', fontWeight: 'bold', color: diffColor }}>
-                              {isZero ? '0.00%' : `${diffSign}${diffPct.toFixed(2)}%`}
-                            </td>
-                          </tr>
-                        );
-                      };
-
-                      return (
-                        <div style={{ overflowX: 'auto', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px', background: 'rgba(0,0,0,0.1)' }}>
-                          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                            <thead>
-                              <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', background: 'rgba(0,0,0,0.2)' }}>
-                                <th style={{ padding: '14px 20px', fontSize: '11px', color: 'var(--text-muted)' }}>Parâmetro Florestal</th>
-                                <th style={{ padding: '14px 20px', fontSize: '11px', color: 'var(--text-muted)', textAlign: 'right' }}>Cenário A (Base)</th>
-                                <th style={{ padding: '14px 20px', fontSize: '11px', color: 'var(--text-muted)', textAlign: 'right' }}>Cenário B (Simulação)</th>
-                                <th style={{ padding: '14px 20px', fontSize: '11px', color: 'var(--text-muted)', textAlign: 'right' }}>Diferença Absoluta</th>
-                                <th style={{ padding: '14px 20px', fontSize: '11px', color: 'var(--text-muted)', textAlign: 'right' }}>Variação (%)</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {renderDiffRow("Volume Total CC Estimado", procA.trabalho.volumeTotalEstimado, procB.trabalho.volumeTotalEstimado, 2, "m³")}
-                              {renderDiffRow("Volume Total SC Estimado", procA.volumeTotalEstimadoSemCasca || procA.trabalho.volumeTotalEstimadoSemCasca || 0, procB.volumeTotalEstimadoSemCasca || procB.trabalho.volumeTotalEstimadoSemCasca || 0, 2, "m³")}
-                              {renderDiffRow("Volume Médio CC por Hectare", procA.trabalho.volumeMedioHa, procB.trabalho.volumeMedioHa, 2, "m³/ha")}
-                              {renderDiffRow("Volume Médio SC por Hectare", procA.volumeMedioHaSemCasca || procA.trabalho.volumeMedioHaSemCasca || 0, procB.volumeMedioHaSemCasca || procB.trabalho.volumeMedioHaSemCasca || 0, 2, "m³/ha")}
-                              {renderDiffRow("Fator de Casca (k)", procA.fatorCasca !== undefined ? procA.fatorCasca : 1.0, procB.fatorCasca !== undefined ? procB.fatorCasca : 1.0, 2, "")}
-                              {renderDiffRow("Área Basal Média por Hectare", procA.trabalho.areaBasalMediaHa, procB.trabalho.areaBasalMediaHa, 3, "m²/ha")}
-                              {renderDiffRow("Densidade Média por Hectare", procA.trabalho.densidadeMedia, procB.trabalho.densidadeMedia, 1, "árv/ha")}
-                              {renderDiffRow("DAP Médio", procA.trabalho.dapMedio, procB.trabalho.dapMedio, 2, "cm")}
-                              {renderDiffRow("Altura Média", procA.trabalho.alturaMedia, procB.trabalho.alturaMedia, 2, "m")}
-                            </tbody>
-                          </table>
-                        </div>
-                      );
-                    })()}
-                  </div>
-                )}
-              </div>
-            ) : activeTab === 'sortimento' ? (
-              <SortimentoTab 
-                activeFw={activeFw} 
-                inventories={inventories} 
-                activeTalhoes={activeTalhoes} 
-              />
-            ) : null}
-
-            {/* Modal de Novo Processamento */}
-            {showNewProcessModal && (
-              <div style={{ 
-                position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
-                background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', 
-                zIndex: 10000, padding: '20px', backdropFilter: 'blur(8px)'
-              }}>
-                <div className="glass-card" style={{ width: '100%', maxWidth: '480px', padding: '24px', marginBottom: 0 }}>
-                  <h3 style={{ fontSize: '18px', fontWeight: '800', color: 'var(--primary-hover)', margin: 0 }}>
-                    Novo Processamento Oficial
-                  </h3>
-                  <p style={{ color: 'var(--text-muted)', fontSize: '13px', margin: '8px 0 20px 0', lineHeight: '1.4' }}>
-                    Isso calculará todas as parcelas e árvores usando os modelos ativos no painel e salvará um snapshot consolidado permanente.
-                  </p>
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '24px' }}>
-                    <div>
-                      <label className="input-label">Nome do Processamento</label>
-                      <input 
-                        type="text" 
-                        className="input-field" 
-                        style={{ marginBottom: 0 }}
-                        placeholder="Ex: Processamento Consolidação Junho"
-                        value={newProcessName}
-                        onChange={e => setNewProcessName(e.target.value)}
-                      />
-                    </div>
-
-                    <div>
-                      <label className="input-label">Modo de Consolidação de Área</label>
-                      <select 
-                        className="input-field" 
-                        style={{ marginBottom: 0 }}
-                        value={newProcessConsolidationMode}
-                        onChange={e => setNewProcessConsolidationMode(e.target.value as any)}
-                      >
-                        <option value="auto">Automático (Prioriza Estrato se houver area)</option>
-                        <option value="talhao">Por Talhões</option>
-                        <option value="stratum">Por Estratos</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="input-label">Fator de Casca (k)</label>
-                      <input 
-                        type="number" 
-                        step="0.01"
-                        min="0.5"
-                        max="1.0"
-                        className="input-field" 
-                        style={{ marginBottom: 0 }}
-                        placeholder="Ex: 0.90"
-                        value={newProcessFatorCasca}
-                        onChange={e => setNewProcessFatorCasca(e.target.value)}
-                      />
-                      <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
-                        Utilizado para deduzir o diâmetro sem casca: DAPsc = DAPcc * k
-                      </span>
-                    </div>
-
-                    <div style={{ background: 'rgba(255,255,255,0.02)', padding: '12px 16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.06)' }}>
-                      <span style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold', display: 'block', marginBottom: '6px' }}>
-                        Modelos Selecionados
-                      </span>
-                      <span style={{ fontSize: '13px', display: 'block', color: '#fff' }}>
-                        <strong>Hipsometria:</strong> {selectedHeightModelId !== 'none' ? heightModels.find(m => m.id === selectedHeightModelId)?.nome : 'Medida / Sem Modelo'}
-                      </span>
-                      <span style={{ fontSize: '13px', display: 'block', color: '#fff', marginTop: '4px' }}>
-                        <strong>Volume:</strong> {selectedVolumeModelId === 'legacy' ? `Fator de Forma (${processingFatorForma})` : volumeModels.find(m => m.id === selectedVolumeModelId)?.nome}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', gap: '12px' }}>
-                    <button 
-                      className="btn btn-secondary" 
-                      onClick={() => setShowNewProcessModal(false)}
-                    >
-                      Cancelar
-                    </button>
-                    <button 
-                      className="btn btn-primary"
-                      onClick={async () => {
-                        await handleCreateInventoryProcessing(newProcessName, newProcessConsolidationMode);
-                        setShowNewProcessModal(false);
-                      }}
-                    >
-                      Processar e Salvar
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Relatório Executivo Printável */}
-            {selectedReportProcessing && (
-              <div style={{ 
-                position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
-                background: 'rgba(0,0,0,0.9)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', 
-                zIndex: 10000, padding: '20px', overflowY: 'auto', backdropFilter: 'blur(8px)'
-              }} className="report-modal-backdrop">
-                <div className="glass-card printable-report" style={{ width: '100%', maxWidth: '900px', marginTop: '30px', marginBottom: '30px', padding: '32px' }}>
-                  
-                  {/* Header com botões - Ocultado na Impressão via CSS */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: '16px' }} className="no-print">
-                    <div>
-                      <span style={{ fontSize: '10px', color: 'var(--primary-hover)', textTransform: 'uppercase', fontWeight: 'bold' }}>Relatório Oficial Consolidado</span>
-                      <h3 style={{ fontSize: '20px', fontWeight: '800', color: '#fff', margin: '2px 0 0 0' }}>{selectedReportProcessing.nomeProcessamento}</h3>
-                    </div>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <button 
-                        className="btn btn-primary" 
-                        style={{ width: 'auto', padding: '8px 16px', fontSize: '11px', height: '36px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                        onClick={() => window.print()}
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
-                        Imprimir / PDF
-                      </button>
-                      <button 
-                        className="btn btn-secondary" 
-                        style={{ width: 'auto', padding: '8px 16px', fontSize: '11px', height: '36px', borderColor: '#4caf50', color: '#4caf50', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                        onClick={() => handleExportAdvancedXLSX(selectedReportProcessing)}
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                        Planilha XLSX
-                      </button>
-                      <button 
-                        className="btn btn-secondary" 
-                        style={{ width: 'auto', padding: '8px 16px', fontSize: '11px', height: '36px' }}
-                        onClick={() => setSelectedReportProcessing(null)}
-                      >
-                        Fechar
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* CONTEÚDO DO RELATÓRIO */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
-                    
-                    {/* CABEÇALHO DA PÁGINA (Aparece na impressão) */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                      <div>
-                        <h1 style={{ fontSize: '24px', fontWeight: '800', color: 'var(--primary-hover)' }}>LeafTag - Relatório de Inventário</h1>
-                        <p style={{ color: 'var(--text-muted)', fontSize: '13px', margin: '4px 0 0 0' }}>
-                          Projeto de Campo: <strong>{activeFw?.nome}</strong> ({activeFw?.local || 'Local não especificado'})
-                        </p>
-                      </div>
-                      <div style={{ textAlign: 'right' }}>
-                        <span style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block' }}>Data Processamento: <strong>{selectedReportProcessing.dataProcessamento}</strong></span>
-                        <span style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block' }}>Responsável: <strong>{selectedReportProcessing.createdBy}</strong></span>
-                        <span style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block' }}>Fator de Casca (k): <strong>{selectedReportProcessing.fatorCasca !== undefined ? selectedReportProcessing.fatorCasca.toFixed(2) : '1,00'}</strong></span>
-                        <span style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block' }}>Modo Consolidação: <strong>{selectedReportProcessing.effectiveConsolidationMode === 'stratum' ? 'Estrato' : 'Talhão'}{selectedReportProcessing.consolidationMode === 'auto' ? ' (Automático)' : ''}</strong></span>
-                      </div>
-                    </div>
-
-                    <div style={{ height: '1px', background: 'rgba(255,255,255,0.06)' }}></div>
-
-                    {/* 1. RESUMO EXECUTIVO DO TRABALHO */}
-                    <div>
-                      <h3 style={{ fontSize: '14px', fontWeight: '800', color: 'var(--primary-hover)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px' }}>
-                        1. Resumo Executivo
-                      </h3>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px' }}>
-                        <div style={{ padding: '14px', background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: '12px' }}>
-                          <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Volume Total Estimado</span>
-                          <h4 style={{ fontSize: '18px', fontWeight: '800', color: '#00e676', marginTop: '4px' }}>{selectedReportProcessing.trabalho.volumeTotalEstimado.toLocaleString('pt-BR')} m³ <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 'normal' }}>CC</span></h4>
-                          <h4 style={{ fontSize: '16px', fontWeight: '800', color: '#00b0ff', marginTop: '2px' }}>{(selectedReportProcessing.volumeTotalEstimadoSemCasca || selectedReportProcessing.trabalho.volumeTotalEstimadoSemCasca || 0).toLocaleString('pt-BR')} m³ <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 'normal' }}>SC</span></h4>
-                        </div>
-                        <div style={{ padding: '14px', background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: '12px' }}>
-                          <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Volume Médio por Hectare</span>
-                          <h4 style={{ fontSize: '18px', fontWeight: '800', color: '#fff', marginTop: '4px' }}>{selectedReportProcessing.trabalho.volumeMedioHa.toFixed(2)} m³/ha <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 'normal' }}>CC</span></h4>
-                          <h4 style={{ fontSize: '16px', fontWeight: '800', color: '#00b0ff', marginTop: '2px' }}>{(selectedReportProcessing.volumeMedioHaSemCasca || selectedReportProcessing.trabalho.volumeMedioHaSemCasca || 0).toFixed(2)} m³/ha <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 'normal' }}>SC</span></h4>
-                        </div>
-                        <div style={{ padding: '14px', background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: '12px' }}>
-                          <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Área Total Inventariada</span>
-                          <h4 style={{ fontSize: '20px', fontWeight: '800', color: '#64b5f6', marginTop: '4px' }}>{selectedReportProcessing.trabalho.areaTotal} ha</h4>
-                        </div>
-                        <div style={{ padding: '14px', background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: '12px' }}>
-                          <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Área Total Amostrada</span>
-                          <h4 style={{ fontSize: '20px', fontWeight: '800', color: '#ffb74d', marginTop: '4px' }}>{selectedReportProcessing.trabalho.areaAmostrada} ha</h4>
-                        </div>
-                        <div style={{ padding: '14px', background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: '12px' }}>
-                          <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Área Basal Média</span>
-                          <h4 style={{ fontSize: '20px', fontWeight: '800', color: '#fff', marginTop: '4px' }}>{selectedReportProcessing.trabalho.areaBasalMediaHa.toFixed(3)} m²/ha</h4>
-                        </div>
-                        <div style={{ padding: '14px', background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: '12px' }}>
-                          <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>DAP / Altura Média</span>
-                          <h4 style={{ fontSize: '20px', fontWeight: '800', color: '#fff', marginTop: '4px' }}>{selectedReportProcessing.trabalho.dapMedio.toFixed(1)} cm / {selectedReportProcessing.trabalho.alturaMedia.toFixed(1)} m</h4>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* 2. METODOLOGIA E MODELOS MATEMÁTICOS */}
-                    <div>
-                      <h3 style={{ fontSize: '14px', fontWeight: '800', color: 'var(--primary-hover)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px' }}>
-                        2. Metodologia e Modelos Matemáticos
-                      </h3>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-                        {/* Hipsometria */}
-                        <div style={{ padding: '16px', background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px' }}>
-                          <span style={{ fontSize: '11px', color: 'var(--primary-hover)', textTransform: 'uppercase', fontWeight: 'bold' }}>Relação Hipsométrica (Altura)</span>
-                          <h4 style={{ fontSize: '15px', fontWeight: '700', color: '#fff', marginTop: '8px' }}>
-                            {selectedReportProcessing.heightModelSnapshot ? selectedReportProcessing.heightModelSnapshot.nome : 'Alturas Medidas em Campo'}
-                          </h4>
-                          {selectedReportProcessing.heightModelSnapshot && (
-                            <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                              <span>Tipo: <strong>{selectedReportProcessing.heightModelSnapshot.tipoModelo}</strong></span>
-                              <span>Fórmula: <code>{selectedReportProcessing.heightModelSnapshot.formula}</code></span>
-                              <span>Coeficientes: <br />
-                                <code>B0: {selectedReportProcessing.heightModelSnapshot.coeficientes.beta0} | B1: {selectedReportProcessing.heightModelSnapshot.coeficientes.beta1}</code>
-                              </span>
-                              {selectedReportProcessing.heightModelSnapshot.fonteBibliografica && (
-                                <span>Fonte: {selectedReportProcessing.heightModelSnapshot.fonteBibliografica}</span>
-                              )}
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Volumetria */}
-                        <div style={{ padding: '16px', background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px' }}>
-                          <span style={{ fontSize: '11px', color: 'var(--primary-hover)', textTransform: 'uppercase', fontWeight: 'bold' }}>Cálculo Volumétrico (Volume)</span>
-                          <h4 style={{ fontSize: '15px', fontWeight: '700', color: '#fff', marginTop: '8px' }}>
-                            {selectedReportProcessing.volumeModelSnapshot ? selectedReportProcessing.volumeModelSnapshot.nome : '-'}
-                          </h4>
-                          {selectedReportProcessing.volumeModelSnapshot && (
-                            <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                              <span>Tipo: <strong>{selectedReportProcessing.volumeModelSnapshot.tipoModelo}</strong></span>
-                              <span>Fórmula: <code>{selectedReportProcessing.volumeModelSnapshot.formula}</code></span>
-                              <span>Coeficientes: <br />
-                                <code>B0: {selectedReportProcessing.volumeModelSnapshot.coeficientes.beta0}
-                                  {selectedReportProcessing.volumeModelSnapshot.coeficientes.beta1 !== undefined && ` | B1: ${selectedReportProcessing.volumeModelSnapshot.coeficientes.beta1}`}
-                                  {selectedReportProcessing.volumeModelSnapshot.coeficientes.beta2 !== undefined && ` | B2: ${selectedReportProcessing.volumeModelSnapshot.coeficientes.beta2}`}
-                                </code>
-                              </span>
-                              {selectedReportProcessing.volumeModelSnapshot.fonteBibliografica && (
-                                <span>Fonte: {selectedReportProcessing.volumeModelSnapshot.fonteBibliografica}</span>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* 3. AUDITORIA E CONSISTÊNCIA DE DADOS */}
-                    <div>
-                      <h3 style={{ fontSize: '14px', fontWeight: '800', color: 'var(--primary-hover)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px' }}>
-                        3. Auditoria e Validação Técnica
-                      </h3>
-                      <div style={{ padding: '16px', background: 'rgba(239, 35, 60, 0.02)', border: '1px solid rgba(239, 35, 60, 0.15)', borderRadius: '12px' }}>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '12px', marginBottom: '14px' }}>
-                          <span style={{ fontSize: '13px' }}>Parcelas Ignoradas: <strong>{selectedReportProcessing.parcelasIgnoradas.length}</strong></span>
-                          <span style={{ fontSize: '13px' }}>Árvores Ignoradas: <strong>{selectedReportProcessing.arvoresIgnoradas}</strong></span>
-                          <span style={{ fontSize: '13px' }}>Árvores sem DAP: <strong>{selectedReportProcessing.arvoresSemDAP}</strong></span>
-                          <span style={{ fontSize: '13px' }}>Árvores sem Altura: <strong>{selectedReportProcessing.arvoresSemAltura}</strong></span>
-                          <span style={{ fontSize: '13px' }}>Árvores sem Volume: <strong>{selectedReportProcessing.arvoresSemVolume}</strong></span>
-                        </div>
-
-                        {selectedReportProcessing.warnings.length > 0 && (
-                          <div>
-                            <span style={{ fontSize: '11px', color: '#ff5252', fontWeight: 'bold', display: 'block', marginBottom: '6px', textTransform: 'uppercase' }}>
-                              Inconsistências encontradas ({selectedReportProcessing.warnings.length})
-                            </span>
-                            <div style={{ maxHeight: '120px', overflowY: 'auto', background: 'rgba(0,0,0,0.2)', padding: '10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.03)' }}>
-                              {selectedReportProcessing.warnings.map((warn, i) => (
-                                <div key={i} style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px', display: 'flex', gap: '6px' }}>
-                                  <span>•</span> <span>{warn}</span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* 4. RESULTADOS POR TALHÃO */}
-                    <div>
-                      <h3 style={{ fontSize: '14px', fontWeight: '800', color: 'var(--primary-hover)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px' }}>
-                        4. Resultados Consolidados por Talhão
-                      </h3>
-                      <div style={{ overflowX: 'auto', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                          <thead>
-                            <tr style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-                              <th style={{ padding: '12px 16px', fontSize: '10px' }}>Talhão</th>
-                              <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'center' }}>Área (ha)</th>
-                              <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'center' }}>Parc. Usadas</th>
-                              <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'center' }}>Árv. Usadas</th>
-                              <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'right' }}>Vol CC / ha (m³)</th>
-                              <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'right' }}>Vol SC / ha (m³)</th>
-                              <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'right' }}>Área Basal / ha (m²)</th>
-                              <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'right' }}>Densidade / ha</th>
-                              <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'right' }}>Vol Total CC (m³)</th>
-                              <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'right' }}>Vol Total SC (m³)</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {selectedReportProcessing.talhoes.map(t => (
-                              <tr key={t.talhaoId} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-                                <td style={{ padding: '12px 16px', fontWeight: 'bold' }}>{t.nome}</td>
-                                <td style={{ padding: '12px 16px', textAlign: 'center' }}>{t.areaTalhao.toFixed(2)}</td>
-                                <td style={{ padding: '12px 16px', textAlign: 'center' }}>{t.parcelasUtilizadas}</td>
-                                <td style={{ padding: '12px 16px', textAlign: 'center' }}>{t.arvoresUtilizadas}</td>
-                                <td style={{ padding: '12px 16px', textAlign: 'right' }}>{t.volumeMedioHa.toFixed(2)}</td>
-                                <td style={{ padding: '12px 16px', textAlign: 'right' }}>{(t.volumeMedioHaSemCasca || 0).toFixed(2)}</td>
-                                <td style={{ padding: '12px 16px', textAlign: 'right' }}>{t.areaBasalMediaHa.toFixed(3)}</td>
-                                <td style={{ padding: '12px 16px', textAlign: 'right' }}>{t.densidadeMediaHa.toFixed(0)}</td>
-                                <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 'bold', color: '#81c784' }}>{t.volumeTotalEstimado.toLocaleString('pt-BR')}</td>
-                                <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 'bold', color: '#29b6f6' }}>{(t.volumeTotalEstimadoSemCasca || 0).toLocaleString('pt-BR')}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-
-                    {/* 5. RESULTADOS POR ESTRATO */}
-                    {selectedReportProcessing.strata.length > 0 && (
-                      <div>
-                        <h3 style={{ fontSize: '14px', fontWeight: '800', color: 'var(--primary-hover)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px' }}>
-                          5. Resultados Consolidados por Estrato
-                        </h3>
-                        <div style={{ overflowX: 'auto', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px' }}>
-                          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                            <thead>
-                              <tr style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-                                <th style={{ padding: '12px 16px', fontSize: '10px' }}>Estrato</th>
-                                <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'center' }}>Área (ha)</th>
-                                <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'center' }}>Parc. Usadas</th>
-                                <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'center' }}>Árv. Usadas</th>
-                                <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'right' }}>Vol CC / ha (m³)</th>
-                                <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'right' }}>Vol SC / ha (m³)</th>
-                                <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'right' }}>Área Basal / ha (m²)</th>
-                                <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'right' }}>Densidade / ha</th>
-                                <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'right' }}>Vol Total CC (m³)</th>
-                                <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'right' }}>Vol Total SC (m³)</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {selectedReportProcessing.strata.map(s => (
-                                <tr key={s.stratumId} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-                                  <td style={{ padding: '12px 16px', fontWeight: 'bold' }}>{s.nome}</td>
-                                  <td style={{ padding: '12px 16px', textAlign: 'center' }}>{s.areaEstrato.toFixed(2)}</td>
-                                  <td style={{ padding: '12px 16px', textAlign: 'center' }}>{s.parcelasUtilizadas}</td>
-                                  <td style={{ padding: '12px 16px', textAlign: 'center' }}>{s.arvoresUtilizadas}</td>
-                                  <td style={{ padding: '12px 16px', textAlign: 'right' }}>{s.volumeMedioHa.toFixed(2)}</td>
-                                  <td style={{ padding: '12px 16px', textAlign: 'right' }}>{(s.volumeMedioHaSemCasca || 0).toFixed(2)}</td>
-                                  <td style={{ padding: '12px 16px', textAlign: 'right' }}>{s.areaBasalMediaHa.toFixed(3)}</td>
-                                  <td style={{ padding: '12px 16px', textAlign: 'right' }}>{s.densidadeMediaHa.toFixed(0)}</td>
-                                  <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 'bold', color: '#81c784' }}>{s.volumeTotalEstimado.toLocaleString('pt-BR')}</td>
-                                  <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 'bold', color: '#29b6f6' }}>{(s.volumeTotalEstimadoSemCasca || 0).toLocaleString('pt-BR')}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* 6. RESULTADOS DETALHADOS POR PARCELA */}
-                    <div>
-                      <h3 style={{ fontSize: '14px', fontWeight: '800', color: 'var(--primary-hover)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px' }}>
-                        {selectedReportProcessing.strata.length > 0 ? '6. Detalhamento das Unidades Amostrais' : '5. Detalhamento das Unidades Amostrais'}
-                      </h3>
-                      <div style={{ overflowX: 'auto', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                          <thead>
-                            <tr style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-                              <th style={{ padding: '12px 16px', fontSize: '10px' }}>Parcela</th>
-                              <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'center' }}>Área (m²)</th>
-                              <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'center' }}>Fator Expansão</th>
-                              <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'center' }}>Árvores Medidas</th>
-                              <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'right' }}>Vol CC Parcela (m³)</th>
-                              <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'right' }}>Vol SC Parcela (m³)</th>
-                              <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'right' }}>Vol CC / ha (m³)</th>
-                              <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'right' }}>Vol SC / ha (m³)</th>
-                              <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'right' }}>Área Basal / ha (m²)</th>
-                              <th style={{ padding: '12px 16px', fontSize: '10px', textAlign: 'right' }}>Densidade / ha (árv)</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {selectedReportProcessing.parcelas.map(p => (
-                              <tr key={p.parcelaId} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-                                <td style={{ padding: '12px 16px', fontWeight: 'bold' }}>{p.nome}</td>
-                                <td style={{ padding: '12px 16px', textAlign: 'center' }}>{p.areaParcela}</td>
-                                <td style={{ padding: '12px 16px', textAlign: 'center' }}>{p.fatorExpansao.toFixed(2)}</td>
-                                <td style={{ padding: '12px 16px', textAlign: 'center' }}>{p.numeroArvores}</td>
-                                <td style={{ padding: '12px 16px', textAlign: 'right' }}>{p.volumeTotal.toFixed(4)}</td>
-                                <td style={{ padding: '12px 16px', textAlign: 'right' }}>{(p.volumeTotalSemCasca || 0).toFixed(4)}</td>
-                                <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 'bold' }}>{p.volumePorHa.toFixed(2)}</td>
-                                <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 'bold' }}>{(p.volumePorHaSemCasca || 0).toFixed(2)}</td>
-                                <td style={{ padding: '12px 16px', textAlign: 'right' }}>{p.areaBasalPorHa.toFixed(3)}</td>
-                                <td style={{ padding: '12px 16px', textAlign: 'right' }}>{p.densidadePorHa.toFixed(0)}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-          </div>
+          interfaceMode === 'hud' ? (
+            <HUDOfficeDashboard {...hudProps} />
+          ) : (
+            <ClassicOfficeDashboard {...classicProps} />
+          )
         ) : (
           <div style={{ display: 'flex', flex: 1, flexDirection: 'column', justifyContent: 'center', alignItems: 'center', padding: '48px', color: 'var(--text-muted)' }}>
-            <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="1.5" style={{ marginBottom: '16px' }}>
-              <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
-              <line x1="8" y1="21" x2="16" y2="21"></line>
-              <line x1="12" y1="17" x2="12" y2="21"></line>
-            </svg>
-            <h3>Nenhum Projeto Encontrado</h3>
-            <p style={{ fontSize: '14px', margin: '4px 0 0 0' }}>Por favor, retorne ao Modo Campo para criar o seu primeiro trabalho.</p>
+            <img src="/logo.png" alt="LeafTag" style={{ width: '80px', height: '80px', opacity: 0.15, marginBottom: '24px' }} />
+            <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: '#fff', margin: '0 0 8px 0' }}>Nenhum Projeto Selecionado</h3>
+            <p style={{ fontSize: '13.5px', margin: 0, opacity: 0.7 }}>Selecione ou crie um trabalho de campo na barra lateral para começar.</p>
           </div>
         )}
       </div>
 
-      {/* Embedded Read-only Audit Modal */}
-      {auditParcel && (
-        <div style={{ 
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
-          background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', 
-          zIndex: 10000, padding: '20px', overflowY: 'auto', backdropFilter: 'blur(8px)'
-        }}>
-           <div className="glass-card" style={{ width: '100%', maxWidth: '840px', marginTop: '40px', marginBottom: '40px', padding: '24px 32px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                <div>
-                  <span style={{ fontSize: '10px', color: 'var(--primary-hover)', textTransform: 'uppercase', fontWeight: 'bold' }}>Visualização e Auditoria</span>
-                  <h3 style={{ fontSize: '20px', fontWeight: '800', color: '#fff', margin: '2px 0 0 0' }}>Inspeção da Parcela: {auditParcel.nome}</h3>
-                </div>
-                <button onClick={() => setAuditParcelId(null)} style={{ background: 'transparent', color: 'white', border: 'none', fontSize: '24px', cursor: 'pointer' }}>×</button>
-              </div>
+      {/* Modals rendered at the bottom */}
+      <SettingsModal 
+        isOpen={showSettingsModal} 
+        onClose={() => setShowSettingsModal(false)} 
+        onOpenTeamModal={() => setShowTeamModal(true)} 
+      />
 
-              {/* Parcela Info Details Grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', marginBottom: '24px' }}>
-                <div style={{ padding: '12px 16px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px' }}>
-                  <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Talhão</span>
-                  <span style={{ fontSize: '14.5px', color: '#ff9800', fontWeight: 'bold', display: 'block', marginTop: '4px' }}>
-                    {activeTalhoes.find(t => t.id === auditParcel.talhaoId)?.nome || 'Sem Talhão'}
-                  </span>
-                </div>
-                {activeStrata.length > 0 && (
-                  <div style={{ padding: '12px 16px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px' }}>
-                    <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Estrato Florestal</span>
-                    <span style={{ fontSize: '14px', color: '#00e676', fontWeight: 'bold', display: 'block', marginTop: '4px' }}>
-                      {activeStrata.find(s => s.id === auditParcel.stratumId)?.nome || 'Sem Estrato'}
-                    </span>
-                  </div>
-                )}
-                <div style={{ padding: '12px 16px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px' }}>
-                  <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Área Amostral</span>
-                  <span style={{ fontSize: '14.5px', color: '#fff', fontWeight: 'bold', display: 'block', marginTop: '4px' }}>
-                    {auditParcel.areaParcela} m²
-                  </span>
-                </div>
-                <div style={{ padding: '12px 16px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px' }}>
-                  <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Coordenadas GPS</span>
-                  <span style={{ fontSize: '13px', color: '#fff', fontFamily: 'monospace', display: 'block', marginTop: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {auditParcel.coordenadas || 'Não Coletadas'}
-                  </span>
-                </div>
-                <div style={{ padding: '12px 16px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px' }}>
-                  <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Observações</span>
-                  <span style={{ fontSize: '13px', color: 'var(--text-muted)', display: 'block', marginTop: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {auditParcel.observacoes || 'Sem Observações'}
-                  </span>
-                </div>
-              </div>
+      <TeamModal 
+        isOpen={showTeamModal} 
+        onClose={() => setShowTeamModal(false)} 
+      />
 
-              {/* Parcela KPI Summary Grid */}
-              {auditParcelKpis && (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', marginBottom: '24px' }}>
-                  <div style={{ padding: '12px 16px', background: 'rgba(79, 195, 247, 0.04)', border: '1px solid rgba(79, 195, 247, 0.15)', borderRadius: '12px' }}>
-                    <span style={{ fontSize: '10px', color: 'rgba(79, 195, 247, 0.8)', textTransform: 'uppercase', fontWeight: 'bold' }}>Árvores na Parcela</span>
-                    <span style={{ fontSize: '18px', color: '#4fc3f7', fontWeight: '800', display: 'block', marginTop: '4px' }}>
-                      {auditParcelKpis.totalTrees}
-                    </span>
-                  </div>
-                  <div style={{ padding: '12px 16px', background: 'rgba(174, 213, 129, 0.04)', border: '1px solid rgba(174, 213, 129, 0.15)', borderRadius: '12px' }}>
-                    <span style={{ fontSize: '10px', color: 'rgba(174, 213, 129, 0.8)', textTransform: 'uppercase', fontWeight: 'bold' }}>Riqueza (Espécies)</span>
-                    <span style={{ fontSize: '18px', color: '#aed581', fontWeight: '800', display: 'block', marginTop: '4px' }}>
-                      {auditParcelKpis.speciesCount}
-                    </span>
-                  </div>
-                  <div style={{ padding: '12px 16px', background: 'rgba(186, 104, 200, 0.04)', border: '1px solid rgba(186, 104, 200, 0.15)', borderRadius: '12px' }}>
-                    <span style={{ fontSize: '10px', color: 'rgba(186, 104, 200, 0.8)', textTransform: 'uppercase', fontWeight: 'bold' }}>Volume Parcela</span>
-                    <span style={{ fontSize: '18px', color: '#ba68c8', fontWeight: '800', display: 'block', marginTop: '4px' }}>
-                      {auditParcelKpis.totalV.toFixed(3)} m³
-                    </span>
-                  </div>
-                  <div style={{ padding: '12px 16px', background: 'rgba(255, 183, 77, 0.04)', border: '1px solid rgba(255, 183, 77, 0.15)', borderRadius: '12px' }}>
-                    <span style={{ fontSize: '10px', color: 'rgba(255, 183, 77, 0.8)', textTransform: 'uppercase', fontWeight: 'bold' }}>Shannon (H')</span>
-                    <span style={{ fontSize: '18px', color: '#ffb74d', fontWeight: '800', display: 'block', marginTop: '4px' }}>
-                      {auditParcelKpis.shannon.toFixed(3)}
-                    </span>
-                  </div>
-                </div>
-              )}
+      {activeFw && (
+        <GoogleSheetsModal 
+          isOpen={showSheetsModal} 
+          onClose={() => setShowSheetsModal(false)} 
+          activeFw={activeFw} 
+        />
+      )}
 
-              {/* Actions Row */}
-              <div style={{ display: 'flex', gap: '12px', marginBottom: '24px', flexWrap: 'wrap' }}>
-                <button
-                  className="btn btn-secondary"
-                  style={{ width: 'auto', padding: '8px 16px', fontSize: '12px', borderColor: '#2e7d32', color: '#a5d6a7', background: 'rgba(46, 125, 50, 0.08)' }}
-                  onClick={() => setShowParcelDashboardId(auditParcel.id)}
-                >
-                  📊 Ver Dashboard da Parcela
-                </button>
-                {auditParcel.dados.length > 0 && (
-                  <button
-                    className="btn btn-secondary"
-                    style={{ width: 'auto', padding: '8px 16px', fontSize: '12px', borderColor: 'var(--primary-color)', color: 'var(--primary-color)' }}
-                    onClick={() => handleExportParcelProcessed(auditParcel)}
-                  >
-                    Exportar Excel da Parcela
-                  </button>
-                )}
-              </div>
+      {activeFw && (
+        <BatchProcessModal 
+          isOpen={showBatchProcessModal} 
+          onClose={() => setShowBatchProcessModal(false)} 
+          activeFwId={activeFwId}
+        />
+      )}
 
-              {/* Processamento Profissional (Modelos Florestais) no Escritório */}
-              {auditParcel.dados.length > 0 && (
-                <div style={{ 
-                  background: 'rgba(251, 192, 45, 0.03)', 
-                  border: '1px solid rgba(251, 192, 45, 0.25)', 
-                  boxShadow: '0 4px 24px rgba(251, 192, 45, 0.04)',
-                  padding: '20px', 
-                  borderRadius: '16px', 
-                  marginBottom: '20px' 
-                }}>
-                  <h4 style={{ margin: '0 0 12px 0', fontSize: '15px', fontWeight: '800', color: '#ffd54f', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    Processamento Profissional (Modelos Florestais)
-                  </h4>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '0 0 16px 0', flexWrap: 'wrap', gap: '8px' }}>
-                    <p style={{ color: 'var(--text-muted)', fontSize: '12.5px', lineHeight: '1.4', margin: 0, flex: 1 }}>
-                      Estime alturas faltantes e volumes de fustes individuais utilizando equações cadastradas na sua biblioteca de modelos.
-                    </p>
-                    <button 
-                      className="btn btn-secondary" 
-                      style={{ fontSize: '12px', padding: '6px 12px', height: 'auto', width: 'auto', borderColor: '#ffd54f', color: '#ffd54f', background: 'transparent' }}
-                      onClick={() => navigate('/modelos')}
-                    >
-                      Gerenciar Biblioteca
-                    </button>
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', marginBottom: '16px' }}>
-                    {/* Etapa 1: Hipsometria */}
-                    <div>
-                      <label className="input-label" style={{ fontWeight: 'bold', fontSize: '11.5px' }}>ETAPA 1: Selecionar Modelo Hipsométrico (Altura)</label>
-                      <select
-                        className="input-field"
-                        style={{ marginBottom: 0, marginTop: '4px', fontSize: '13px', height: '38px' }}
-                        value={selectedHeightModelId}
-                        onChange={e => setSelectedHeightModelId(e.target.value)}
-                      >
-                        <option value="none">Não utilizar modelo (ignorar estimativa)</option>
-                        {heightModels.map(m => (
-                          <option key={m.id} value={m.id}>
-                            {m.nome} ({m.especie} | {m.regiao})
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Etapa 2: Volumetria */}
-                    <div>
-                      <label className="input-label" style={{ fontWeight: 'bold', fontSize: '11.5px' }}>ETAPA 2: Selecionar Modelo Volumétrico (Volume)</label>
-                      <select
-                        className="input-field"
-                        style={{ marginBottom: 0, marginTop: '4px', fontSize: '13px', height: '38px' }}
-                        value={selectedVolumeModelId}
-                        onChange={e => setSelectedVolumeModelId(e.target.value)}
-                      >
-                        <option value="legacy">Fator de Forma Comercial (Legacy)</option>
-                        {volumeModels.map(m => (
-                          <option key={m.id} value={m.id}>
-                            {m.nome} ({m.especie} | {m.regiao})
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Fator de forma se selecionado legacy */}
-                    {selectedVolumeModelId === 'legacy' && (
-                      <div>
-                        <label className="input-label" style={{ fontSize: '11.5px' }}>Fator de Forma Comercial (Legacy) *</label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          className="input-field"
-                          style={{ marginBottom: 0, marginTop: '4px', fontSize: '13px', height: '38px' }}
-                          value={processingFatorForma}
-                          onChange={e => setProcessingFatorForma(e.target.value)}
-                        />
-                      </div>
-                    )}
-                  </div>
-
-                  <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                    <button
-                      className="btn btn-primary"
-                      style={{ 
-                        width: 'auto', 
-                        padding: '10px 24px', 
-                        fontSize: '13px', 
-                        fontWeight: '800',
-                        background: 'linear-gradient(135deg, #ffd54f 0%, #fbc02d 100%)', 
-                        border: 'none',
-                        color: '#000000',
-                        borderRadius: '8px',
-                        boxShadow: '0 4px 14px rgba(251, 192, 45, 0.2)'
-                      }}
-                      onClick={() => handleProcessParcelDataInOffice(auditParcel)}
-                    >
-                      Executar Processamento e Salvar na Parcela
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              <div style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.08)', padding: '12px 18px', borderRadius: '12px', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '20px' }}>
-                <strong>Painel de Auditoria (Modo de Leitura)</strong>: Este espaço destina-se apenas à verificação e auditoria de consistência das árvores cadastradas em campo. Modificações ou exclusões acidentais estão bloqueadas no ambiente de escritório.
-              </div>
-
-              {/* Data Table */}
-              {auditParcel.dados.length === 0 ? (
-                <p style={{ color: 'var(--text-muted)', fontStyle: 'italic', padding: '20px 0' }}>Nenhuma árvore cadastrada nesta parcela ainda.</p>
-              ) : (
-                <div style={{ overflowX: 'auto', maxHeight: '320px', overflowY: 'auto', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '12px' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                    <thead>
-                      <tr style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid rgba(255,255,255,0.06)', position: 'sticky', top: 0, zIndex: 1 }}>
-                        <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '10.5px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Nº</th>
-                        <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '10.5px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Hora Cadastro</th>
-                        {auditParcel.colunas.map(col => (
-                          <th key={col.id} style={{ padding: '12px 16px', textAlign: 'left', fontSize: '10.5px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>{col.nome}</th>
-                        ))}
-                        <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '10.5px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>H. Calc. (m)</th>
-                        <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '10.5px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Vol (m³)</th>
-                        <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '10.5px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Modelo</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {auditParcel.dados.map((ind: any) => (
-                        <tr key={ind.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-                          <td style={{ padding: '12px 16px', fontWeight: 'bold' }}>{ind.numeroIndividuo}</td>
-                          <td style={{ padding: '12px 16px', fontSize: '12px', color: 'var(--text-muted)' }}>{new Date(ind.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</td>
-                          {auditParcel.colunas.map(col => (
-                            <td key={col.id} style={{ padding: '12px 16px', fontSize: '13px' }}>
-                              {col.id === 'coordenadas' ? ind[col.id]?.substring(0, 15) + '...' : ind[col.id]}
-                              {ind.multipleStems && ['cap', 'hc', 'ht'].includes(col.id) ? ` [Bifurcado: ${ind.stems?.length}]` : ''}
-                            </td>
-                          ))}
-                          <td style={{ padding: '12px 16px', fontSize: '13px', color: ind.alturaMedidaOuEstimada === 'estimada' ? '#ffd54f' : '#81c784' }}>
-                            {ind.alturaUtilizada !== undefined ? `${ind.alturaUtilizada.toFixed(2)} ${ind.alturaMedidaOuEstimada === 'estimada' ? '(E)' : '(M)'}` : '-'}
-                          </td>
-                          <td style={{ padding: '12px 16px', fontSize: '13px', fontWeight: 'bold', color: '#ffb74d' }}>
-                            {ind.volumeCalculado !== undefined ? ind.volumeCalculado.toFixed(4) : '-'}
-                          </td>
-                          <td style={{ padding: '12px 16px', fontSize: '11px', color: 'var(--text-muted)' }}>
-                            {ind.modeloUtilizado || '-'}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '24px' }}>
-                <button className="btn btn-secondary" style={{ width: 'auto' }} onClick={() => setAuditParcelId(null)}>Fechar Auditoria</button>
-              </div>
-           </div>
+      {showNewProcessModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100000, padding: '20px', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
+          <div className="glass-card" style={{ width: '100%', maxWidth: '450px', background: '#0e1511', border: '1px solid rgba(255, 255, 255, 0.12)', boxShadow: '0 20px 40px rgba(0,0,0,0.6)', borderRadius: '12px', padding: '24px' }}>
+            <h3 style={{ margin: 0, fontSize: '18px', color: 'var(--primary-hover)', fontWeight: '800' }}>Salvar Novo Processamento</h3>
+            <p style={{ margin: '4px 0 16px 0', fontSize: '12.5px', color: 'var(--text-muted)' }}>Oficialize as configurações de cálculo e salve um snapshot do inventário</p>
+            <input className="input-field" placeholder="Nome (Ex: Inventário 2026 - Oficial)" value={newProcessName} onChange={e => setNewProcessName(e.target.value)} style={{ borderRadius: '6px' }} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '16px' }}>
+              <label style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Modo de Consolidação</label>
+              <select className="input-field" value={newProcessConsolidationMode} onChange={e => setNewProcessConsolidationMode(e.target.value as any)} style={{ borderRadius: '6px' }}>
+                <option value="auto">Automático (Ponderado por Área)</option>
+                <option value="talhao">Somente por Talhão</option>
+                <option value="stratum">Somente por Estrato</option>
+              </select>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '16px' }}>
+              <label style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Fator de Casca Médio (k)</label>
+              <input type="number" className="input-field" value={newProcessFatorCasca} onChange={e => setNewProcessFatorCasca(e.target.value)} step="0.01" style={{ borderRadius: '6px' }} />
+            </div>
+            <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
+              <button className="btn btn-secondary" style={{ borderRadius: '6px' }} onClick={() => setShowNewProcessModal(false)}>Cancelar</button>
+              <button className="btn btn-primary" style={{ borderRadius: '6px' }} onClick={() => handleCreateInventoryProcessing(newProcessName, newProcessConsolidationMode)}>Salvar Processamento</button>
+            </div>
+          </div>
         </div>
       )}
 
-      {/* Strata Creation Modal */}
       {showStratumModal && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100000, padding: '20px', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
-          <div className="glass-card" style={{ width: '100%', maxWidth: '400px', margin: 0 }}>
-            <h3 style={{ margin: 0, fontSize: '18px', color: 'var(--primary-hover)', fontWeight: '800' }}>Novo Estrato Florestal</h3>
-            <p style={{ color: 'var(--text-muted)', fontSize: '12px', marginTop: '4px', marginBottom: '16px' }}>Crie uma nova subdivisão florestal homogênea.</p>
-            
-            <input className="input-field" placeholder="Nome (Ex: Eucalipto 5 anos - Argiloso)" value={newStratumName} onChange={e => setNewStratumName(e.target.value)} style={{ marginTop: '8px' }} />
-            <input type="number" step="0.01" className="input-field" placeholder="Área Total do Estrato (Hectares)" value={newStratumArea} onChange={e => setNewStratumArea(e.target.value)} />
-            <textarea className="input-field" placeholder="Descrição/Observações opcional" value={newStratumDesc} onChange={e => setNewStratumDesc(e.target.value)} style={{ minHeight: '80px', fontFamily: 'inherit' }} />
-            
+          <div className="glass-card" style={{ width: '100%', maxWidth: '400px', background: '#0e1511', border: '1px solid rgba(255, 255, 255, 0.12)', boxShadow: '0 20px 40px rgba(0,0,0,0.6)', borderRadius: '12px', padding: '24px' }}>
+            <h3 style={{ margin: 0, fontSize: '18px', color: 'var(--primary-hover)', fontWeight: '800' }}>Cadastrar Novo Estrato</h3>
+            <p style={{ margin: '4px 0 16px 0', fontSize: '12.5px', color: 'var(--text-muted)' }}>Agrupar parcelas homogêneas para cálculo estratificado</p>
+            <input className="input-field" placeholder="Nome do Estrato (Ex: Estrato Alto)" value={newStratumName} onChange={e => setNewStratumName(e.target.value)} style={{ borderRadius: '6px' }} />
+            <input type="number" className="input-field" placeholder="Área Total do Estrato (ha)" value={newStratumArea} onChange={e => setNewStratumArea(e.target.value)} style={{ borderRadius: '6px' }} />
+            <input className="input-field" placeholder="Observações" value={newStratumDesc} onChange={e => setNewStratumDesc(e.target.value)} style={{ borderRadius: '6px' }} />
             <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
-              <button className="btn btn-secondary" onClick={() => {
-                setShowStratumModal(false);
-                setNewStratumName('');
-                setNewStratumArea('');
-                setNewStratumDesc('');
-              }}>Cancelar</button>
-              <button className="btn btn-primary" onClick={async () => {
-                if (!newStratumName) return alert('Dê um nome ao estrato.');
-                const areaNum = parseFloat(newStratumArea);
-                if (isNaN(areaNum) || areaNum <= 0) return alert('Digite uma área válida maior que zero.');
-
-                await createStratum({
-                  id: Date.now().toString(),
-                  fieldWorkId: activeFwId,
-                  nome: newStratumName,
-                  area: areaNum,
-                  descricao: newStratumDesc || undefined
-                });
-
-                setShowStratumModal(false);
-                setNewStratumName('');
-                setNewStratumArea('');
-                setNewStratumDesc('');
-              }}>Criar</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Talhão Edit Modal */}
-      {editingTalhao && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100000, padding: '20px', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
-          <div className="glass-card" style={{ width: '100%', maxWidth: '400px', margin: 0 }}>
-            <h3 style={{ margin: 0, fontSize: '18px', color: 'var(--primary-hover)', fontWeight: '800' }}>Editar Talhão</h3>
-            <p style={{ color: 'var(--text-muted)', fontSize: '12px', marginTop: '4px', marginBottom: '16px' }}>Edite as informações do talhão.</p>
-            
-            <input 
-              className="input-field" 
-              placeholder="Nome do Talhão" 
-              value={editTalhaoName} 
-              onChange={e => setEditTalhaoName(e.target.value)} 
-              style={{ marginTop: '8px' }} 
-            />
-            <input 
-              type="number" 
-              step="0.01" 
-              className="input-field" 
-              placeholder="Área em Hectares (Ex: 10.5)" 
-              value={editTalhaoArea} 
-              onChange={e => setEditTalhaoArea(e.target.value)} 
-            />
-            <textarea 
-              className="input-field" 
-              placeholder="Observações do talhão (Opcional)" 
-              value={editTalhaoObs} 
-              onChange={e => setEditTalhaoObs(e.target.value)} 
-              style={{ minHeight: '80px', fontFamily: 'inherit' }} 
-            />
-            
-            <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
-              <button className="btn btn-secondary" onClick={() => {
-                setEditingTalhao(null);
-                setEditTalhaoName('');
-                setEditTalhaoArea('');
-                setEditTalhaoObs('');
-              }}>Cancelar</button>
-              <button className="btn btn-primary" onClick={async () => {
-                if (!editTalhaoName.trim()) return alert('Por favor, dê um nome ao talhão.');
-                
-                await createTalhao({
-                  ...editingTalhao,
-                  nome: editTalhaoName.trim(),
-                  area: editTalhaoArea ? parseFloat(editTalhaoArea) : undefined,
-                  observacoes: editTalhaoObs.trim()
-                });
-
-                setEditingTalhao(null);
-                setEditTalhaoName('');
-                setEditTalhaoArea('');
-                setEditTalhaoObs('');
-              }}>Salvar</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Batch Process Modal */}
-      {showBatchProcessModal && activeFw && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100000, padding: '20px', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
-          <div className="glass-card" style={{ width: '100%', maxWidth: '500px', margin: 0, maxHeight: '95vh', overflowY: 'auto', padding: '24px' }}>
-            <h3 style={{ margin: 0, fontSize: '18px', color: '#00e676', fontWeight: '800' }}>Processamento em Lote</h3>
-            <p style={{ color: 'var(--text-muted)', fontSize: '12.5px', marginTop: '6px', marginBottom: '20px', lineHeight: '1.4' }}>
-              Execute o processamento matemático em lote para estimar as alturas faltantes e os volumes de fustes em várias parcelas simultaneamente.
-            </p>
-            
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '24px' }}>
-              {/* Escopo de Processamento */}
-              <div>
-                <label className="input-label" style={{ fontWeight: 'bold', fontSize: '11.5px', color: 'var(--text-muted)' }}>Escopo do Processamento</label>
-                <select
-                  className="input-field"
-                  style={{ marginBottom: 0, marginTop: '4px', fontSize: '13px', height: '38px' }}
-                  value={batchScope}
-                  onChange={e => {
-                    const val = e.target.value as 'total' | 'talhao' | 'parcela';
-                    setBatchScope(val);
-                    setBatchTalhaoId('');
-                    setBatchParcelId(null);
-                  }}
-                >
-                  <option value="total">Trabalho Completo (Todas as Parcelas)</option>
-                  <option value="talhao">Por Talhão</option>
-                  <option value="parcela">Por Parcela</option>
-                </select>
-              </div>
-
-              {/* Se o escopo for talhao, escolhe o talhao */}
-              {batchScope === 'talhao' && (
-                <div>
-                  <label className="input-label" style={{ fontWeight: 'bold', fontSize: '11.5px', color: 'var(--text-muted)' }}>Selecionar Talhão</label>
-                  <select
-                    className="input-field"
-                    style={{ marginBottom: 0, marginTop: '4px', fontSize: '13px', height: '38px' }}
-                    value={batchTalhaoId}
-                    onChange={e => setBatchTalhaoId(e.target.value)}
-                  >
-                    <option value="">Selecione um talhão...</option>
-                    {activeTalhoes.map(t => (
-                      <option key={t.id} value={t.id}>{t.nome}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              {/* Se o escopo for parcela, escolhe a parcela */}
-              {batchScope === 'parcela' && (
-                <div>
-                  <label className="input-label" style={{ fontWeight: 'bold', fontSize: '11.5px', color: 'var(--text-muted)' }}>Selecionar Parcela</label>
-                  <select
-                    className="input-field"
-                    style={{ marginBottom: 0, marginTop: '4px', fontSize: '13px', height: '38px' }}
-                    value={batchParcelId || ''}
-                    onChange={e => setBatchParcelId(e.target.value ? Number(e.target.value) : null)}
-                  >
-                    <option value="">Selecione uma parcela...</option>
-                    {activeParcels.map(p => (
-                      <option key={p.id} value={p.id}>{p.nome}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              {/* Modelo Hipsométrico */}
-              <div>
-                <label className="input-label" style={{ fontWeight: 'bold', fontSize: '11.5px', color: 'var(--text-muted)' }}>ETAPA 1: Selecionar Modelo Hipsométrico (Altura)</label>
-                <select
-                  className="input-field"
-                  style={{ marginBottom: 0, marginTop: '4px', fontSize: '13px', height: '38px' }}
-                  value={selectedHeightModelId}
-                  onChange={e => setSelectedHeightModelId(e.target.value)}
-                >
-                  <option value="none">Não utilizar modelo (ignorar estimativa)</option>
-                  {heightModels.map(m => (
-                    <option key={m.id} value={m.id}>
-                      {m.nome} ({m.especie} | {m.regiao})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Modelo Volumétrico */}
-              <div>
-                <label className="input-label" style={{ fontWeight: 'bold', fontSize: '11.5px', color: 'var(--text-muted)' }}>ETAPA 2: Selecionar Modelo Volumétrico (Volume)</label>
-                <select
-                  className="input-field"
-                  style={{ marginBottom: 0, marginTop: '4px', fontSize: '13px', height: '38px' }}
-                  value={selectedVolumeModelId}
-                  onChange={e => setSelectedVolumeModelId(e.target.value)}
-                >
-                  <option value="legacy">Fator de Forma Comercial (Legacy)</option>
-                  {volumeModels.map(m => (
-                    <option key={m.id} value={m.id}>
-                      {m.nome} ({m.especie} | {m.regiao})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Fator de Forma (se selecionado legacy) */}
-              {selectedVolumeModelId === 'legacy' && (
-                <div>
-                  <label className="input-label" style={{ fontWeight: 'bold', fontSize: '11.5px', color: 'var(--text-muted)' }}>Fator de Forma Comercial (Legacy) *</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    className="input-field"
-                    style={{ marginBottom: 0, marginTop: '4px', fontSize: '13px', height: '38px' }}
-                    value={processingFatorForma}
-                    onChange={e => setProcessingFatorForma(e.target.value)}
-                  />
-                </div>
-              )}
-            </div>
-
-            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
-              <button 
-                className="btn btn-secondary" 
-                style={{ width: 'auto' }}
-                onClick={() => {
-                  setShowBatchProcessModal(false);
-                }}
-                disabled={isBatchProcessing}
-              >
-                Cancelar
-              </button>
+              <button className="btn btn-secondary" style={{ borderRadius: '6px' }} onClick={() => setShowStratumModal(false)}>Cancelar</button>
               <button 
                 className="btn btn-primary" 
-                style={{ 
-                  width: 'auto',
-                  background: 'linear-gradient(135deg, #00e676 0%, #082815 100%)', 
-                  border: 'none',
-                  color: '#ffffff',
-                  fontWeight: '800',
-                  boxShadow: '0 4px 14px rgba(0, 230, 118, 0.25)'
-                }}
-                onClick={handleBatchProcess}
-                disabled={isBatchProcessing}
-              >
-                {isBatchProcessing ? 'Processando...' : 'Executar Processamento'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Google Sheets Integration Modal */}
-      {showSheetsModal && activeFw && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100000, padding: '20px', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
-          <div className="glass-card" style={{ width: '100%', maxWidth: '550px', margin: 0, maxHeight: '90vh', overflowY: 'auto', padding: '24px' }}>
-            <h3 style={{ margin: 0, fontSize: '18px', color: 'var(--primary-hover)', fontWeight: '800' }}>Vincular Google Planilhas</h3>
-            <p style={{ color: 'var(--text-muted)', fontSize: '12.5px', marginTop: '6px', marginBottom: '16px', lineHeight: '1.4' }}>
-              Vincule este Trabalho de Campo a uma planilha do Google Sheets para enviar seus dados estruturados com um clique.
-            </p>
-            
-            <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)', fontSize: '12.5px', color: '#e0e0e0', marginBottom: '16px' }}>
-              <strong style={{ color: '#fff', display: 'block', marginBottom: '8px' }}>Instruções de Configuração:</strong>
-              <ol style={{ paddingLeft: '20px', margin: 0, display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <li>Crie uma nova planilha vazia no Google Planilhas (<a href="https://sheets.new" target="_blank" rel="noreferrer" style={{ color: 'var(--primary-hover)', textDecoration: 'underline' }}>sheets.new</a>).</li>
-                <li>No menu superior, acesse <strong>Extensões</strong> &gt; <strong>Apps Script</strong>.</li>
-                <li>Apague todo o código existente na janela e cole o script abaixo.</li>
-                <li>Clique no ícone de salvar (disquete) e depois clique em <strong>Implantar</strong> &gt; <strong>Nova implantação</strong>.</li>
-                <li>Clique na engrenagem de "Tipo", escolha <strong>App da Web</strong>. Em "Quem pode acessar", mude para <strong>Qualquer pessoa</strong>.</li>
-                <li>Clique em Implantar, conceda as permissões se solicitado, copie a <strong>URL do App da Web</strong> gerada e cole no campo de texto abaixo.</li>
-              </ol>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
-              <label style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Código do Google Apps Script:</label>
-              <textarea 
-                readOnly 
-                className="input-field" 
-                style={{ height: '140px', fontFamily: 'monospace', fontSize: '11px', background: 'rgba(0,0,0,0.5)', color: '#81c784', padding: '10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)', cursor: 'text' }} 
-                value={`function doPost(e) {
-  try {
-    var data = JSON.parse(e.postData.contents);
-    var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-    sheet.clear();
-    
-    if (data.headers && data.headers.length > 0) {
-      sheet.appendRow(data.headers);
-    }
-    
-    if (data.rows && data.rows.length > 0) {
-      var range = sheet.getRange(2, 1, data.rows.length, data.headers.length);
-      var values = data.rows.map(function(row) {
-        return data.headers.map(function(header) {
-          return row[header] !== undefined ? row[header] : "";
-        });
-      });
-      range.setValues(values);
-    }
-    
-    return ContentService.createTextOutput(JSON.stringify({ status: "success", message: "Dados sincronizados com sucesso! Total: " + (data.rows ? data.rows.length : 0) + " linhas." }))
-      .setMimeType(ContentService.MimeType.JSON);
-  } catch (error) {
-    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: error.toString() }))
-      .setMimeType(ContentService.MimeType.JSON);
-  }
-}`}
-              />
-              <button 
-                type="button" 
-                className="btn btn-secondary" 
-                style={{ width: 'auto', padding: '6px 12px', fontSize: '11px', alignSelf: 'flex-start' }}
-                onClick={() => {
-                  navigator.clipboard.writeText(`function doPost(e) {
-  try {
-    var data = JSON.parse(e.postData.contents);
-    var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-    sheet.clear();
-    
-    if (data.headers && data.headers.length > 0) {
-      sheet.appendRow(data.headers);
-    }
-    
-    if (data.rows && data.rows.length > 0) {
-      var range = sheet.getRange(2, 1, data.rows.length, data.headers.length);
-      var values = data.rows.map(function(row) {
-        return data.headers.map(function(header) {
-          return row[header] !== undefined ? row[header] : "";
-        });
-      });
-      range.setValues(values);
-    }
-    
-    return ContentService.createTextOutput(JSON.stringify({ status: "success", message: "Dados sincronizados com sucesso! Total: " + (data.rows ? data.rows.length : 0) + " linhas." }))
-      .setMimeType(ContentService.MimeType.JSON);
-  } catch (error) {
-    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: error.toString() }))
-      .setMimeType(ContentService.MimeType.JSON);
-  }
-}`);
-                  alert("Código copiado para a área de transferência!");
-                }}
-              >
-                Copiar Script
-              </button>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '20px' }}>
-              <label style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>URL do App da Web:</label>
-              <input 
-                type="url" 
-                className="input-field" 
-                placeholder="https://script.google.com/macros/s/.../exec" 
-                value={googleSheetsUrlInput} 
-                onChange={e => setGoogleSheetsUrlInput(e.target.value)} 
-                style={{ marginBottom: 0 }}
-              />
-            </div>
-
-            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
-              <button 
-                className="btn btn-secondary" 
-                style={{ width: 'auto' }}
-                onClick={() => {
-                  setShowSheetsModal(false);
-                }}
-              >
-                Cancelar
-              </button>
-              <button 
-                className="btn btn-primary" 
-                style={{ width: 'auto' }}
+                style={{ borderRadius: '6px' }}
                 onClick={async () => {
-                  if (googleSheetsUrlInput.trim() && !googleSheetsUrlInput.startsWith('https://script.google.com')) {
-                    return alert('Por favor, insira uma URL válida do Google Apps Script.');
+                  if (!newStratumName) return alert('Por favor, informe o nome do estrato.');
+                  const areaNum = parseFloat(newStratumArea);
+                  if (isNaN(areaNum) || areaNum <= 0) return alert('Por favor, informe uma área válida maior que zero.');
+                  try {
+                    await createStratum({
+                      fieldWorkId: activeFwId,
+                      nome: newStratumName,
+                      area: areaNum,
+                      descricao: newStratumDesc
+                    });
+                    setNewStratumName('');
+                    setNewStratumArea('');
+                    setNewStratumDesc('');
+                    setShowStratumModal(false);
+                  } catch (err: any) {
+                    alert("Erro ao criar estrato: " + err.message);
                   }
-                  
-                  // Save to Firebase
-                  await createFieldWork({
-                    ...activeFw,
-                    googleSheetsUrl: googleSheetsUrlInput.trim() || undefined
-                  });
-
-                  alert('Configurações de sincronização salvas com sucesso!');
-                  setShowSheetsModal(false);
                 }}
               >
-                Salvar Configurações
+                Cadastrar
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Embedded Sub-dashboards */}
-      {showProjectDashboard && filteredParcelsList.length > 0 && (
-        <StatisticalDashboard 
-          inventories={filteredParcelsList} 
-          onClose={() => setShowProjectDashboard(false)} 
-        />
-      )}
-
-      {talhaoDashboardId && (
-        <StatisticalDashboard 
-          inventories={activeParcels.filter(p => p.talhaoId === talhaoDashboardId)} 
-          onClose={() => setTalhaoDashboardId(null)} 
-        />
-      )}
-
-      {stratumDashboardId && (
-        <StatisticalDashboard 
-          inventories={activeParcels.filter(p => p.stratumId === stratumDashboardId)} 
-          onClose={() => setStratumDashboardId(null)} 
-        />
-      )}
-
-      {showParcelDashboardId && (
-        <StatisticalDashboard 
-          inventories={activeParcels.filter(p => p.id === showParcelDashboardId)} 
-          onClose={() => setShowParcelDashboardId(null)} 
-        />
-      )}
-
-    {/* Modal de Configurações Unificado */}
-      {showSettingsModal && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100000, padding: '20px', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
-          <div className="glass-card" style={{ width: '100%', maxWidth: '440px', marginBottom: 0, display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ color: 'var(--primary-hover)', fontSize: '20px', fontWeight: '800', margin: 0 }}>Configurações</h3>
-              <button onClick={() => setShowSettingsModal(false)} style={{ background: 'transparent', color: 'white', border: 'none', fontSize: '24px', cursor: 'pointer' }}>×</button>
-            </div>
-            
-            {/* User Profile Info */}
-            <div style={{ background: 'rgba(255,255,255,0.02)', padding: '12px 16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-              <span style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Conta</span>
-              <span style={{ fontSize: '15px', color: '#fff', fontWeight: 'bold', display: 'block', marginTop: '4px' }}>{currentUser?.displayName || 'Escritório'}</span>
-              <span style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block' }}>{currentUser?.email}</span>
-            </div>
-
-            {/* Theme Toggle Button */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '12px 16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-              <div>
-                <span style={{ fontSize: '13px', color: '#fff', fontWeight: 'bold', display: 'block' }}>Tema do Aplicativo</span>
-                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Alternar entre modo claro e escuro</span>
-              </div>
-              <button 
-                className="btn btn-secondary" 
-                onClick={toggleTheme}
-                style={{ 
-                  width: 'auto', 
-                  padding: '6px 14px', 
-                  fontSize: '11.5px', 
-                  borderColor: theme === 'dark' ? '#ffb74d' : '#f57c00', 
-                  color: theme === 'dark' ? '#ffb74d' : '#f57c00',
-                  background: 'rgba(255, 255, 255, 0.02)'
-                }}
-              >
-                {theme === 'dark' ? 'Modo Claro' : 'Modo Escuro'}
-              </button>
-            </div>
-
-            {/* Action List */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              
-              {/* Minha Equipe (Only if owner or active) */}
-              {currentUser && (
-                <button 
-                  className="btn btn-secondary" 
-                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', borderColor: 'var(--primary-color)', color: 'var(--primary-color)' }}
-                  onClick={() => {
-                    setShowTeamModal(true);
-                  }}
-                >
-                  <span>Minha Equipe</span>
-                  <span style={{ fontSize: '11px', opacity: 0.7 }}>{collaborators.length} membros</span>
-                </button>
-              )}
-
-              {/* Modelos de Altura e Volume */}
-              {currentUser && (
-                <button 
-                  className="btn btn-secondary" 
-                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', borderColor: '#a5d6a7', color: '#a5d6a7' }}
-                  onClick={() => {
-                    setShowSettingsModal(false);
-                    navigate('/modelos');
-                  }}
-                >
-                  <span>Modelos (Altura / Volume)</span>
-                  <span style={{ fontSize: '11px', opacity: 0.7 }}>Gerenciar</span>
-                </button>
-              )}
-
-              {/* Modo Campo Switch */}
-              <button 
-                className="btn btn-secondary" 
-                style={{ display: 'flex', justifyContent: 'flex-start', width: '100%', borderColor: '#00e676', color: '#00e676', background: 'rgba(0, 230, 118, 0.08)' }}
-                onClick={() => {
-                  localStorage.setItem('preferredMode', 'field');
-                  navigate('/');
-                }}
-              >
-                Ir para Modo Campo
-              </button>
-
-              {/* Painel Admin (If Admin) */}
-              {status === 'admin' && (
-                <button 
-                  className="btn btn-secondary" 
-                  style={{ display: 'flex', justifyContent: 'flex-start', width: '100%', borderColor: '#ffb74d', color: '#ffb74d' }}
-                  onClick={() => {
-                    navigate('/admin');
-                  }}
-                >
-                  🛡️ Painel de Administrador
-                </button>
-              )}
-
-            </div>
-
-            <div style={{ display: 'flex', gap: '12px', marginTop: '12px' }}>
-              <button 
-                className="btn btn-danger" 
-                style={{ flex: 1 }}
-                onClick={() => {
-                  signOut();
-                  setShowSettingsModal(false);
-                }}
-              >
-                Sair da Conta
-              </button>
-              <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setShowSettingsModal(false)}>Fechar</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Team management modal inside office view */}
-      {showTeamModal && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100001, padding: '20px', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
-            <div className="glass-card" style={{ width: '100%', maxWidth: '460px', marginBottom: 0 }}>
-              {isOwner ? (
-                <>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                    <h3 style={{ color: 'var(--primary-hover)', fontSize: '20px', fontWeight: '800', margin: 0 }}>Minha Equipe</h3>
-                    <button onClick={() => setShowTeamModal(false)} style={{ background: 'transparent', color: 'white', border: 'none', fontSize: '24px', cursor: 'pointer' }}>×</button>
-                  </div>
-                  <p style={{ color: 'var(--text-muted)', fontSize: '13px', lineHeight: 1.5, marginBottom: '20px' }}>
-                    {status === 'admin' 
-                      ? 'Adicione colaboradores pelo e-mail do Google. Eles terão acesso completo para visualizar, criar e coletar dados na sua mesma conta simultaneamente.'
-                      : 'Adicione até 2 colaboradores pelo e-mail do Google. Eles terão acesso completo para visualizar, criar e coletar dados na sua mesma conta simultaneamente.'}
-                  </p>
-
-                  <div style={{ marginBottom: '20px' }}>
-                    <span style={{ fontSize: '11px', color: 'var(--primary-hover)', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '0.8px', display: 'block', marginBottom: '8px' }}>
-                      {status === 'admin' 
-                        ? `Colaboradores Adicionados (${collaborators.length})`
-                        : `Colaboradores Adicionados (${collaborators.length}/2)`}
-                    </span>
-                    {collaborators.length === 0 ? (
-                      <p style={{ color: 'var(--text-muted)', fontSize: '13px', fontStyle: 'italic', margin: '4px 0' }}>
-                        Nenhum colaborador adicionado ainda.
-                      </p>
-                    ) : (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        {collaborators.map(email => (
-                          <div key={email} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '10px 14px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.06)' }}>
-                            <span style={{ fontSize: '13.5px', color: '#fff' }}>{email}</span>
-                            <button 
-                              className="btn btn-danger" 
-                              style={{ width: 'auto', padding: '4px 10px', fontSize: '10px', height: 'auto' }}
-                              onClick={() => handleRemoveCollaborator(email)}
-                              disabled={isTeamLoading}
-                            >
-                              Remover
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {(status === 'admin' || collaborators.length < 2) && (
-                    <div style={{ marginBottom: '16px' }}>
-                      <label className="input-label">Adicionar Colaborador (E-mail Google)</label>
-                      <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
-                        <input 
-                          type="email"
-                          className="input-field" 
-                          placeholder="Ex: joao.silva@gmail.com" 
-                          value={newEmail} 
-                          onChange={e => setNewEmail(e.target.value)} 
-                          style={{ marginBottom: 0, flex: 1 }} 
-                        />
-                        <button 
-                          className="btn btn-primary" 
-                          style={{ width: 'auto', padding: '0 18px', height: '42px', fontSize: '12px' }}
-                          onClick={handleAddCollaborator}
-                          disabled={isTeamLoading}
-                        >
-                          Adicionar
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '24px' }}>
-                    <button className="btn btn-secondary" style={{ width: 'auto' }} onClick={() => setShowTeamModal(false)}>Fechar</button>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                    <h3 style={{ color: 'var(--primary-hover)', fontSize: '20px', fontWeight: '800', margin: 0 }}>Gerenciamento de Equipe</h3>
-                    <button onClick={() => setShowTeamModal(false)} style={{ background: 'transparent', color: 'white', border: 'none', fontSize: '24px', cursor: 'pointer' }}>×</button>
-                  </div>
-                  <div style={{ height: '3px', background: 'var(--primary-color)', width: '48px', marginBottom: '20px', borderRadius: '4px' }}></div>
-                  <p style={{ color: '#fff', fontSize: '14.5px', fontWeight: 'bold', lineHeight: 1.5, marginBottom: '12px' }}>
-                    Recurso Exclusivo para Contas Ativas
-                  </p>
-                  <p style={{ color: 'var(--text-muted)', fontSize: '13px', lineHeight: 1.5, marginBottom: '24px' }}>
-                    A funcionalidade de adicionar e gerenciar colaboradores é exclusiva para o administrador principal da equipe (contas ativas).
-                    <br/><br/>
-                    Como colaborador, você já tem acesso total aos talhões e dados da sua equipe, mas não pode gerenciar outros colaboradores.
-                    Se você deseja ativar uma conta própria para gerenciar sua equipe mestre, entre em contato conosco.
-                  </p>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    <a 
-                      href="https://wa.me/5547920022746?text=Olá!%20Gostaria%20de%20ativar%20uma%20conta%20mestre%20no%20LeafTag%20para%20gerenciar%20minha%20própria%20equipe."
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="btn"
-                      style={{ 
-                        textDecoration: 'none', 
-                        display: 'inline-flex', 
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                        backgroundColor: 'rgba(37, 211, 102, 0.15)', 
-                        border: '1px solid rgba(37, 211, 102, 0.45)', 
-                        color: '#25D366',
-                        boxShadow: '0 4px 15px rgba(37, 211, 102, 0.1)',
-                        fontWeight: 'bold',
-                        padding: '12px 16px'
-                      }}
-                    >
-                      Falar no WhatsApp
-                    </a>
-                    <button className="btn btn-secondary" style={{ width: '100%' }} onClick={() => setShowTeamModal(false)}>Fechar</button>
-                  </div>
-                </>
-              )}
-            </div>
-         </div>
-      )}
-
-      {/* Desktop Stem & Taper Visualizer Modal */}
       {selectedVisualizerTree && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100000, padding: '20px', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
           <div style={{ 
@@ -7483,7 +3190,7 @@ export const OfficeDashboard = () => {
             padding: '24px',
             background: 'rgba(10, 18, 12, 0.98)',
             border: '1px solid rgba(255, 255, 255, 0.08)',
-            borderRadius: '24px',
+            borderRadius: '12px', // Clamped to 12px
             boxShadow: '0 20px 40px rgba(0, 0, 0, 0.5)'
           }}>
             
@@ -7492,172 +3199,88 @@ export const OfficeDashboard = () => {
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <h3 style={{ color: '#ffffff', fontSize: '20px', fontWeight: '800', margin: 0 }}>
-                    Árvore #{selectedVisualizerTree.numeroIndividuo}
+                    Árvore # {selectedVisualizerTree.numeroIndividuo}
                   </h3>
-                  <span style={{
-                    padding: '3px 8px',
-                    borderRadius: '6px',
-                    fontSize: '11px',
-                    fontWeight: 'bold',
-                    background: 'rgba(0, 230, 118, 0.12)',
-                    color: '#00e676',
-                    textTransform: 'uppercase'
-                  }}>
-                    {selectedVisualizerTree.modoColeta}
-                  </span>
                 </div>
-                <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-                  Sessão: {selectedVisualizerTree.sessionName}
-                </span>
+                <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: 'var(--text-muted)' }}>
+                  Modelo hipsométrico e cubagem rigorosa de fustes seccionais
+                </p>
               </div>
               <button 
                 onClick={() => setSelectedVisualizerTree(null)} 
-                style={{ background: 'transparent', color: 'white', border: 'none', fontSize: '28px', cursor: 'pointer', lineHeight: 1 }}
+                style={{ background: 'rgba(255,255,255,0.05)', color: 'white', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '18px' }}
               >
                 &times;
               </button>
             </div>
 
-            {/* Three Column Side-by-Side Content */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr', gap: '24px', alignItems: 'start' }}>
+            {/* Visualizer content grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr 1.2fr', gap: '20px' }}>
               
-              {/* Left Column: Metrics & interactive reading */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                
-                {/* General KPI Card */}
-                <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.06)' }}>
-                  <h4 style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--primary-hover)', fontWeight: 'bold', marginBottom: '12px', letterSpacing: '0.5px' }}>
-                    Dados Fisiográficos & Volume
-                  </h4>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                    <div style={{ padding: '8px 12px', background: 'rgba(0,0,0,0.2)', borderRadius: '8px' }}>
-                      <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Espécie</span>
-                      <div style={{ fontSize: '14px', fontWeight: 'bold', fontStyle: 'italic', marginTop: '2px' }}>{selectedVisualizerTree.especie || 'N/A'}</div>
-                    </div>
-                    <div style={{ padding: '8px 12px', background: 'rgba(0,0,0,0.2)', borderRadius: '8px' }}>
-                      <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Altura Total</span>
-                      <div style={{ fontSize: '14px', fontWeight: 'bold', marginTop: '2px' }}>{selectedVisualizerTree.alturaTotal ? `${selectedVisualizerTree.alturaTotal.toFixed(2)} m` : 'N/A'}</div>
-                    </div>
-                    <div style={{ padding: '8px 12px', background: 'rgba(0,0,0,0.2)', borderRadius: '8px' }}>
-                      <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Volume Com Casca</span>
-                      <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#00e676', marginTop: '2px' }}>
-                        {selectedVisualizerTree.volumeTotal ? `${selectedVisualizerTree.volumeTotal.toFixed(4)} m³` : '0,0000 m³'}
-                      </div>
-                    </div>
-                    <div style={{ padding: '8px 12px', background: 'rgba(0,0,0,0.2)', borderRadius: '8px' }}>
-                      <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Volume Sem Casca</span>
-                      <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#00b0ff', marginTop: '2px' }}>
-                        {selectedVisualizerTree.volumeTotalSemCasca ? `${selectedVisualizerTree.volumeTotalSemCasca.toFixed(4)} m³` : '0,0000 m³'}
-                      </div>
-                    </div>
-                  </div>
-                  <div style={{ marginTop: '12px', padding: '8px 12px', background: 'rgba(255,255,255,0.01)', border: '1px dashed rgba(255,255,255,0.08)', borderRadius: '8px', fontSize: '12px', color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between' }}>
-                    <span>Cálculo: <strong style={{ color: '#fff', textTransform: 'capitalize' }}>{selectedVisualizerTree.metodoCalculo}</strong></span>
-                    <span>Status: <strong style={{ color: selectedVisualizerTree.status === 'Concluído' ? '#00e676' : '#ff9800' }}>{selectedVisualizerTree.status || 'N/A'}</strong></span>
+              {/* Left Column: Stats & selector */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                  <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Metadados do Indivíduo</span>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '8px', fontSize: '12.5px' }}>
+                    <div>Espécie: <strong style={{ color: '#fff' }}>{selectedVisualizerTree.nomePopular || 'Desconhecida'}</strong></div>
+                    <div>DAP: <strong style={{ color: '#fff' }}>{getDapOfTreeOrStem(selectedVisualizerTree).toFixed(1)} cm</strong></div>
+                    <div>Altura H: <strong style={{ color: '#fff' }}>{(selectedVisualizerTree.alturaUtilizada || 0).toFixed(1)} m</strong></div>
+                    <div>Volume CC: <strong style={{ color: '#00e676' }}>{(selectedVisualizerTree.volumeCalculado || 0).toFixed(4)} m³</strong></div>
                   </div>
                 </div>
 
-                {/* Detail card of selected point/section */}
-                {selectedVisualizerTree.modoColeta === 'relativo' ? (
-                  <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(0, 230, 118, 0.2)', minHeight: '140px' }}>
-                    <h4 style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--primary-hover)', fontWeight: 'bold', marginBottom: '8px' }}>
-                      Ponto Selecionado: {selectedVisualizerPoint}
-                    </h4>
-                    {selectedVisualizerTree.dadosRelativos?.[selectedVisualizerPoint] ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13.5px' }}>
-                          <span style={{ color: 'var(--text-muted)' }}>Diâmetro:</span>
-                          <strong style={{ color: '#fff' }}>{selectedVisualizerTree.dadosRelativos[selectedVisualizerPoint]} cm</strong>
+                <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                  <label style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>Selecione a Seção</label>
+                  <select 
+                    className="input-field" 
+                    style={{ marginTop: '6px', marginBottom: 0, borderRadius: '6px' }}
+                    value={selectedVisualizerPoint}
+                    onChange={(e) => {
+                      const pt = e.target.value;
+                      setSelectedVisualizerPoint(pt);
+                      if (selectedVisualizerTree.secoes) {
+                        const matchedSec = selectedVisualizerTree.secoes.find((s: any) => s.pontoMedicao === pt);
+                        setSelectedVisualizerSectionId(matchedSec ? matchedSec.id : null);
+                      }
+                    }}
+                  >
+                    {PONTOS_RELATIVOS.map(pt => (
+                      <option key={pt} value={pt}>{pt}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {(() => {
+                  const currentSec = selectedVisualizerTree.secoes?.find((s: any) => s.pontoMedicao === selectedVisualizerPoint);
+                  return currentSec ? (
+                    <div style={{ background: 'rgba(0, 230, 118, 0.03)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(0, 230, 118, 0.15)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <span style={{ fontSize: '10px', color: '#00e676', textTransform: 'uppercase', fontWeight: 'bold' }}>Seção Inspecionada ({selectedVisualizerPoint})</span>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '12.5px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span style={{ color: 'var(--text-muted)' }}>Diâmetro CC:</span>
+                          <strong style={{ color: '#fff' }}>{(currentSec.diametroComCasca || 0).toFixed(2)} cm</strong>
                         </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13.5px' }}>
-                          <span style={{ color: 'var(--text-muted)' }}>Espessura Casca:</span>
-                          <strong style={{ color: '#00b0ff' }}>
-                            {selectedVisualizerTree.cascaRelativos?.[selectedVisualizerPoint] 
-                              ? `${selectedVisualizerTree.cascaRelativos[selectedVisualizerPoint]} mm` 
-                              : 'Não informada'}
-                          </strong>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span style={{ color: 'var(--text-muted)' }}>Diâmetro SC:</span>
+                          <strong style={{ color: '#fff' }}>{(currentSec.diametroSemCasca || 0).toFixed(2)} cm</strong>
                         </div>
-                        {selectedVisualizerTree.alturaTotal && (
-                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13.5px' }}>
-                            <span style={{ color: 'var(--text-muted)' }}>Altura do Ponto:</span>
-                            <strong style={{ color: '#fff' }}>
-                              {(selectedVisualizerPoint === 'Base' ? 0.3 : 
-                                selectedVisualizerPoint === 'Topo' ? selectedVisualizerTree.alturaTotal : 
-                                selectedVisualizerPoint === '10%' ? selectedVisualizerTree.alturaTotal * 0.1 : 
-                                selectedVisualizerPoint === '20%' ? selectedVisualizerTree.alturaTotal * 0.2 : 
-                                selectedVisualizerPoint === '30%' ? selectedVisualizerTree.alturaTotal * 0.3 : 
-                                selectedVisualizerPoint === '40%' ? selectedVisualizerTree.alturaTotal * 0.4 : 
-                                selectedVisualizerPoint === '50%' ? selectedVisualizerTree.alturaTotal * 0.5 : 
-                                selectedVisualizerPoint === '60%' ? selectedVisualizerTree.alturaTotal * 0.6 : 
-                                selectedVisualizerPoint === '70%' ? selectedVisualizerTree.alturaTotal * 0.7 : 
-                                selectedVisualizerPoint === '80%' ? selectedVisualizerTree.alturaTotal * 0.8 : 
-                                selectedVisualizerPoint === '90%' ? selectedVisualizerTree.alturaTotal * 0.9 : 0.3).toFixed(2)} m
-                            </strong>
-                          </div>
-                        )}
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span style={{ color: 'var(--text-muted)' }}>Volume Secional CC:</span>
+                          <strong style={{ color: '#00e676' }}>{(currentSec.volumeComCasca || 0).toFixed(4)} m³</strong>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span style={{ color: 'var(--text-muted)' }}>Volume Secional SC:</span>
+                          <strong style={{ color: '#00b0ff' }}>{(currentSec.volumeSemCasca || 0).toFixed(4)} m³</strong>
+                        </div>
                       </div>
-                    ) : (
-                      <p style={{ color: 'var(--text-muted)', fontSize: '12.5px', fontStyle: 'italic', margin: '12px 0 0 0' }}>
-                        Sem dados medidos neste ponto.
-                      </p>
-                    )}
-                  </div>
-                ) : (
-                  <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(0, 230, 118, 0.2)', minHeight: '140px' }}>
-                    {(() => {
-                      const currentSecIdx = (selectedVisualizerTree.secoes || []).findIndex((s: any) => s.id === selectedVisualizerSectionId);
-                      const currentSec = (selectedVisualizerTree.secoes || [])[currentSecIdx];
-                      return currentSec ? (
-                        <>
-                          <h4 style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--primary-hover)', fontWeight: 'bold', marginBottom: '8px' }}>
-                            Seção Selecionada: S{currentSecIdx + 1}
-                          </h4>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '12.5px', marginTop: '10px' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                              <span style={{ color: 'var(--text-muted)' }}>Comprimento:</span>
-                              <strong>{currentSec.comprimento} m</strong>
-                            </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                              <span style={{ color: 'var(--text-muted)' }}>Diâmetro Inicial:</span>
-                              <strong>{currentSec.dInicial ? `${currentSec.dInicial} cm` : '-'}</strong>
-                            </div>
-                            {currentSec.dMedio && (
-                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                <span style={{ color: 'var(--text-muted)' }}>Diâmetro Médio:</span>
-                                <strong>{currentSec.dMedio} cm</strong>
-                              </div>
-                            )}
-                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                              <span style={{ color: 'var(--text-muted)' }}>Diâmetro Final:</span>
-                              <strong>{currentSec.dFinal ? `${currentSec.dFinal} cm` : '-'}</strong>
-                            </div>
-                            {(currentSec.eInicial || currentSec.eMedio || currentSec.eFinal) && (
-                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                <span style={{ color: 'var(--text-muted)' }}>Casca (Ini/Med/Fin):</span>
-                                <strong style={{ color: '#00b0ff' }}>
-                                  {currentSec.eInicial || '0'} / {currentSec.eMedio || '0'} / {currentSec.eFinal || '0'} mm
-                                </strong>
-                              </div>
-                            )}
-                            <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '6px', marginTop: '4px' }}>
-                              <span style={{ color: 'var(--text-muted)' }}>Volume Secional CC:</span>
-                              <strong style={{ color: '#00e676' }}>{(currentSec.volume || 0).toFixed(4)} m³</strong>
-                            </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                              <span style={{ color: 'var(--text-muted)' }}>Volume Secional SC:</span>
-                              <strong style={{ color: '#00b0ff' }}>{(currentSec.volumeSemCasca || 0).toFixed(4)} m³</strong>
-                            </div>
-                          </div>
-                        </>
-                      ) : (
-                        <p style={{ color: 'var(--text-muted)', fontSize: '12.5px', fontStyle: 'italic', margin: '12px 0 0 0' }}>
-                          Clique em uma seção no desenho do tronco para ver os detalhes seccionais.
-                        </p>
-                      );
-                    })()}
-                  </div>
-                )}
-                
+                    </div>
+                  ) : (
+                    <p style={{ color: 'var(--text-muted)', fontSize: '12.5px', fontStyle: 'italic', margin: '12px 0 0 0' }}>
+                      Clique em uma seção no desenho do tronco para ver os detalhes seccionais.
+                    </p>
+                  );
+                })()}
+
                 <span style={{ fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center', marginTop: '8px' }}>
                   {selectedVisualizerTree.modoColeta === 'relativo' 
                     ? 'Use os pontos do tronco para navegar e ver detalhes.' 
@@ -7668,7 +3291,7 @@ export const OfficeDashboard = () => {
               </div>
 
               {/* Middle Column: SVG Stem drawing */}
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', background: 'rgba(0,0,0,0.15)', padding: '20px', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.05)' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', background: 'rgba(0,0,0,0.15)', padding: '20px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
                 <h4 style={{ fontSize: '12px', textTransform: 'uppercase', color: 'var(--primary-hover)', fontWeight: 'bold', marginBottom: '12px', letterSpacing: '0.5px' }}>
                   Esquema Tridimensional do Fuste
                 </h4>
@@ -7676,7 +3299,7 @@ export const OfficeDashboard = () => {
               </div>
 
               {/* Right Column: Taper graph plot */}
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', background: 'rgba(0,0,0,0.15)', padding: '20px', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.05)' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', background: 'rgba(0,0,0,0.15)', padding: '20px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
                 {renderTaperVisualizerGraph(selectedVisualizerTree)}
               </div>
 
@@ -7686,7 +3309,7 @@ export const OfficeDashboard = () => {
             <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid rgba(255, 255, 255, 0.08)', paddingTop: '14px', marginTop: '8px' }}>
               <button 
                 className="btn btn-secondary" 
-                style={{ width: 'auto', padding: '10px 24px' }} 
+                style={{ width: 'auto', padding: '10px 24px', borderRadius: '6px' }} 
                 onClick={() => setSelectedVisualizerTree(null)}
               >
                 Fechar Visualização
@@ -7699,14 +3322,14 @@ export const OfficeDashboard = () => {
 
       {editingFw && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100000, padding: '20px', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
-           <div className="glass-card" style={{ width: '100%', maxWidth: '400px', background: '#141c18', border: '1px solid rgba(255, 255, 255, 0.12)', boxShadow: '0 20px 40px rgba(0,0,0,0.6)', borderRadius: '16px', padding: '24px' }}>
+           <div className="glass-card" style={{ width: '100%', maxWidth: '400px', background: '#141c18', border: '1px solid rgba(255, 255, 255, 0.12)', boxShadow: '0 20px 40px rgba(0,0,0,0.6)', borderRadius: '12px', padding: '24px' }}>
               <h3 style={{ margin: 0, fontSize: '18px', color: 'var(--primary-hover)', fontWeight: '800' }}>Editar Trabalho</h3>
-              <input className="input-field" placeholder="Nome (Ex: Inventário 2026)" value={editName} onChange={e => setEditName(e.target.value)} style={{ marginTop: '16px' }} />
-              <input className="input-field" placeholder="Local / Fazenda" value={editLocal} onChange={e => setEditLocal(e.target.value)} />
-              <input type="date" className="input-field" value={editDate} onChange={e => setEditDate(e.target.value)} />
+              <input className="input-field" placeholder="Nome (Ex: Inventário 2026)" value={editName} onChange={e => setEditName(e.target.value)} style={{ marginTop: '16px', borderRadius: '6px' }} />
+              <input className="input-field" placeholder="Local / Fazenda" value={editLocal} onChange={e => setEditLocal(e.target.value)} style={{ borderRadius: '6px' }} />
+              <input type="date" className="input-field" value={editDate} onChange={e => setEditDate(e.target.value)} style={{ borderRadius: '6px' }} />
               <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
-                <button className="btn btn-secondary" onClick={() => setEditingFw(null)}>Cancelar</button>
-                <button className="btn btn-primary" onClick={handleUpdateFw}>Salvar</button>
+                <button className="btn btn-secondary" style={{ borderRadius: '6px' }} onClick={() => setEditingFw(null)}>Cancelar</button>
+                <button className="btn btn-primary" style={{ borderRadius: '6px' }} onClick={handleUpdateFw}>Salvar</button>
               </div>
            </div>
         </div>
@@ -7715,7 +3338,7 @@ export const OfficeDashboard = () => {
       {/* COLETA MODAL: LISTA DE PARCELAS */}
       {showColetaModal && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100000, padding: '20px', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
-          <div className="glass-card" style={{ width: '100%', maxWidth: '800px', background: '#0e1511', border: '1px solid rgba(255, 255, 255, 0.12)', boxShadow: '0 20px 40px rgba(0,0,0,0.6)', borderRadius: '24px', padding: '28px', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
+          <div className="glass-card" style={{ width: '100%', maxWidth: '800px', background: '#0e1511', border: '1px solid rgba(255, 255, 255, 0.12)', boxShadow: '0 20px 40px rgba(0,0,0,0.6)', borderRadius: '12px', padding: '28px', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '16px', marginBottom: '20px' }}>
               <div>
                 <h3 style={{ margin: 0, fontSize: '20px', color: 'var(--primary-hover)', fontWeight: '800' }}>Status de Coleta por Parcela</h3>
@@ -7766,7 +3389,7 @@ export const OfficeDashboard = () => {
                           <td style={{ textAlign: 'center' }}>
                             <button
                               className="btn btn-secondary"
-                              style={{ width: 'auto', padding: '6px 12px', fontSize: '11px', height: '30px' }}
+                              style={{ width: 'auto', padding: '6px 12px', fontSize: '11px', height: '30px', borderRadius: '6px' }}
                               onClick={() => {
                                 setShowColetaModal(false);
                                 setActiveTab('parcelas');
@@ -7784,7 +3407,7 @@ export const OfficeDashboard = () => {
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid rgba(255, 255, 255, 0.08)', paddingTop: '16px', marginTop: '20px' }}>
-              <button className="btn btn-secondary" style={{ width: 'auto', padding: '10px 24px' }} onClick={() => setShowColetaModal(false)}>Fechar</button>
+              <button className="btn btn-secondary" style={{ width: 'auto', padding: '10px 24px', borderRadius: '6px' }} onClick={() => setShowColetaModal(false)}>Fechar</button>
             </div>
           </div>
         </div>
@@ -7793,7 +3416,7 @@ export const OfficeDashboard = () => {
       {/* RELATÓRIO MODAL: EXPORTAÇÃO E DOWNLOADS */}
       {showRelatorioModal && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100000, padding: '20px', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
-          <div className="glass-card" style={{ width: '100%', maxWidth: '550px', background: '#0e1511', border: '1px solid rgba(255, 255, 255, 0.12)', boxShadow: '0 20px 40px rgba(0,0,0,0.6)', borderRadius: '24px', padding: '28px' }}>
+          <div className="glass-card" style={{ width: '100%', maxWidth: '550px', background: '#0e1511', border: '1px solid rgba(255, 255, 255, 0.12)', boxShadow: '0 20px 40px rgba(0,0,0,0.6)', borderRadius: '12px', padding: '28px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '16px', marginBottom: '20px' }}>
               <div>
                 <h3 style={{ margin: 0, fontSize: '20px', color: 'var(--primary-hover)', fontWeight: '800' }}>Relatórios e Exportações</h3>
@@ -7809,7 +3432,7 @@ export const OfficeDashboard = () => {
 
             {latestOfficialProcessing ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <div style={{ padding: '16px', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: '12px' }}>
+                <div style={{ padding: '16px', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: '8px' }}>
                   <h4 style={{ fontSize: '14px', margin: '0 0 8px 0', color: 'var(--primary-hover)' }}>Processamento Oficial Ativo</h4>
                   <div style={{ fontSize: '13px', color: 'var(--text-muted)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 16px' }}>
                     <div>Nome: <strong style={{ color: '#fff' }}>{latestOfficialProcessing.nomeProcessamento}</strong></div>
@@ -7826,10 +3449,10 @@ export const OfficeDashboard = () => {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   <button 
                     className="btn btn-primary" 
-                    style={{ justifyContent: 'flex-start', padding: '12px 16px' }}
+                    style={{ justifyContent: 'flex-start', padding: '12px 16px', borderRadius: '6px' }}
                     onClick={() => {
                       handleExportAdvancedXLSX(latestOfficialProcessing);
-                      localStorage.setItem(`report_generated_${activeFwId}`, 'true');
+                      localStorage.setItem('report_generated_' + activeFwId, 'true');
                       setReportGenerated(true);
                       setShowRelatorioModal(false);
                     }}
@@ -7840,10 +3463,10 @@ export const OfficeDashboard = () => {
 
                   <button 
                     className="btn btn-secondary" 
-                    style={{ justifyContent: 'flex-start', padding: '12px 16px' }}
+                    style={{ justifyContent: 'flex-start', padding: '12px 16px', borderRadius: '6px' }}
                     onClick={() => {
                       handleExportAllProcessed();
-                      localStorage.setItem(`report_generated_${activeFwId}`, 'true');
+                      localStorage.setItem('report_generated_' + activeFwId, 'true');
                       setReportGenerated(true);
                       setShowRelatorioModal(false);
                     }}
@@ -7854,11 +3477,11 @@ export const OfficeDashboard = () => {
 
                   <button 
                     className="btn btn-secondary" 
-                    style={{ justifyContent: 'flex-start', padding: '12px 16px' }}
+                    style={{ justifyContent: 'flex-start', padding: '12px 16px', borderRadius: '6px' }}
                     onClick={() => {
                       if (activeFw) {
                         handleExportFieldWork(activeFw);
-                        localStorage.setItem(`report_generated_${activeFwId}`, 'true');
+                        localStorage.setItem('report_generated_' + activeFwId, 'true');
                         setReportGenerated(true);
                         setShowRelatorioModal(false);
                       }
@@ -7871,7 +3494,7 @@ export const OfficeDashboard = () => {
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', textAlign: 'center' }}>
-                <div style={{ padding: '24px', background: 'rgba(239, 35, 60, 0.08)', border: '1px solid rgba(239, 35, 60, 0.2)', borderRadius: '16px', color: '#ff4d6d' }}>
+                <div style={{ padding: '24px', background: 'rgba(239, 35, 60, 0.08)', border: '1px solid rgba(239, 35, 60, 0.2)', borderRadius: '12px', color: '#ff4d6d' }}>
                   <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: '12px' }}><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
                   <h4 style={{ fontSize: '15px', fontWeight: 'bold', margin: '0 0 6px 0' }}>Processamento Oficial Pendente</h4>
                   <p style={{ fontSize: '12.5px', margin: 0, opacity: 0.85, lineHeight: '1.4' }}>
@@ -7880,10 +3503,10 @@ export const OfficeDashboard = () => {
                 </div>
 
                 <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
-                  <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setShowRelatorioModal(false)}>Fechar</button>
+                  <button className="btn btn-secondary" style={{ flex: 1, borderRadius: '6px' }} onClick={() => setShowRelatorioModal(false)}>Fechar</button>
                   <button 
                     className="btn btn-primary" 
-                    style={{ flex: 1 }} 
+                    style={{ flex: 1, borderRadius: '6px' }} 
                     onClick={() => {
                       setShowRelatorioModal(false);
                       setActiveTab('processamentos');
@@ -7897,7 +3520,7 @@ export const OfficeDashboard = () => {
 
             {latestOfficialProcessing && (
               <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid rgba(255, 255, 255, 0.08)', paddingTop: '16px', marginTop: '20px' }}>
-                <button className="btn btn-secondary" style={{ width: 'auto', padding: '10px 24px' }} onClick={() => setShowRelatorioModal(false)}>Fechar</button>
+                <button className="btn btn-secondary" style={{ width: 'auto', padding: '10px 24px', borderRadius: '6px' }} onClick={() => setShowRelatorioModal(false)}>Fechar</button>
               </div>
             )}
           </div>

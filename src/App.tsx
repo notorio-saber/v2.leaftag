@@ -38,6 +38,7 @@ const Home = () => {
   const [newFwLocal, setNewFwLocal] = useState('');
   // Utilizando formato YYYY-MM-DD para o input type="date"
   const [newFwDate, setNewFwDate] = useState(new Date().toISOString().split('T')[0]);
+  const [newFwModo, setNewFwModo] = useState<'parcelas' | 'censo'>('parcelas');
   const [searchQuery, setSearchQuery] = useState('');
 
   const [showTeamModal, setShowTeamModal] = useState(false);
@@ -120,7 +121,8 @@ const Home = () => {
         if (ind.multipleStems && ind.stems) {
            ind.stems.forEach((stem: any, i: number) => {
              baseData[`Fuste_${i+1}_CAP`] = stem.cap;
-             baseData[`Fuste_${i+1}_Altura`] = stem.altura;
+             baseData[`Fuste_${i+1}_AlturaComercial`] = stem.alturaComercial || '';
+             baseData[`Fuste_${i+1}_AlturaTotal`] = stem.alturaTotal || stem.altura || '';
            });
         }
         allData.push(baseData);
@@ -232,12 +234,14 @@ const Home = () => {
       nome: newFwName,
       local: newFwLocal || 'Não especificado',
       dataInicio: formattedDate,
-      status: 'Aberto'
+      status: 'Aberto',
+      modoInventario: newFwModo
     });
     setShowModal(false);
     setNewFwName('');
     setNewFwLocal('');
     setNewFwDate(new Date().toISOString().split('T')[0]); 
+    setNewFwModo('parcelas');
   };
 
   // Lógica de busca global unificada
@@ -669,7 +673,28 @@ const Home = () => {
               <input className="input-field" placeholder="Nome (Ex: Inventário 2026)" value={newFwName} onChange={e => setNewFwName(e.target.value)} style={{ marginTop: '16px' }} />
               <input className="input-field" placeholder="Local / Fazenda" value={newFwLocal} onChange={e => setNewFwLocal(e.target.value)} />
               <input type="date" className="input-field" value={newFwDate} onChange={e => setNewFwDate(e.target.value)} />
-              <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
+              
+              <div style={{ marginTop: '16px' }}>
+                <label style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '8px', display: 'block' }}>Tipo de Inventário</label>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button 
+                    className="btn" 
+                    style={{ flex: 1, padding: '8px', fontSize: '13px', background: newFwModo === 'parcelas' ? 'rgba(46, 125, 50, 0.15)' : 'rgba(255,255,255,0.05)', border: newFwModo === 'parcelas' ? '1px solid var(--primary-color)' : '1px solid rgba(255,255,255,0.1)' }}
+                    onClick={() => setNewFwModo('parcelas')}
+                  >
+                    Por Parcelas
+                  </button>
+                  <button 
+                    className="btn" 
+                    style={{ flex: 1, padding: '8px', fontSize: '13px', background: newFwModo === 'censo' ? 'rgba(46, 125, 50, 0.15)' : 'rgba(255,255,255,0.05)', border: newFwModo === 'censo' ? '1px solid var(--primary-color)' : '1px solid rgba(255,255,255,0.1)' }}
+                    onClick={() => setNewFwModo('censo')}
+                  >
+                    Censo (100%)
+                  </button>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
                 <button className="btn btn-secondary" onClick={() => setShowModal(false)}>Cancelar</button>
                 <button className="btn btn-primary" onClick={handleCreateFw}>Criar</button>
               </div>

@@ -73,3 +73,98 @@ export function calculatePielouIndex(shannonIndex: number, speciesCount: number)
   if (speciesCount <= 1 || shannonIndex === 0) return 0;
   return shannonIndex / Math.log(speciesCount);
 }
+
+// Helper para obter DAP a partir de cap ou dap
+export function getDapOfTreeOrStem(item: any): number {
+  if (item.dap !== undefined && item.dap !== null && item.dap !== '') {
+    const dVal = parseFloat(item.dap);
+    if (!isNaN(dVal)) return dVal;
+  }
+  if (item.cap !== undefined && item.cap !== null && item.cap !== '') {
+    const cVal = parseFloat(item.cap);
+    if (!isNaN(cVal)) return cVal / Math.PI;
+  }
+  return 0;
+}
+
+// Helper para limpar resultados de cálculo
+export function cleanResult(val: number): number {
+  if (isNaN(val) || !isFinite(val)) return 0;
+  return Math.max(0, val);
+}
+
+// Avalia modelo hipsométrico (retorna H em metros)
+export function evaluateHeightModel(model: any, dap: number): number {
+  if (dap <= 0) return 0;
+  const { beta0, beta1, beta2, expressaoCustom } = model.coeficientes;
+  
+  switch (model.tipoModelo) {
+    case 'linear':
+      return beta0 + beta1 * dap;
+    case 'logaritmico':
+    case 'henriksen':
+      return beta0 + beta1 * Math.log(dap);
+    case 'curtis':
+      return Math.exp(beta0 + beta1 / dap);
+    case 'trorey':
+      return beta0 + beta1 * dap + (beta2 || 0) * Math.pow(dap, 2);
+    case 'personalizado':
+      if (!expressaoCustom) return 0;
+      try {
+        const vars = {
+          DAP: dap,
+          beta0: beta0,
+          beta1: beta1 || 0,
+          beta2: beta2 || 0,
+          beta3: model.coeficientes.beta3 || 0
+        };
+        const fn = new Function(...Object.keys(vars), `return ${expressaoCustom}`);
+        return fn(...Object.values(vars));
+      } catch (err) {
+        console.error('Erro ao avaliar modelo hipsométrico personalizado:', err);
+        return 0;
+      }
+    default:
+      return 0;
+  }
+}
+
+// Avalia modelo volumétrico (retorna V em m³)
+export function evaluateVolumeModel(model: any, dap: number, h: number): number {
+  if (dap <= 0) return 0;
+  const { beta0, beta1, beta2, beta3, expressaoCustom } = model.coeficientes;
+
+  switch (model.tipoModelo) {
+    case 'fator_forma':
+      const g = (Math.PI * Math.pow(dap / 100, 2)) / 4;
+      return g * h * beta0;
+    case 'schumacher_hall':
+      if (h <= 0) return 0;
+      return beta0 * Math.pow(dap, beta1 || 0) * Math.pow(h, beta2 || 0);
+    case 'spurr':
+      return beta0 + (beta1 || 0) * Math.pow(dap, 2) * h;
+    case 'stoate':
+      return beta0 + (beta1 || 0) * Math.pow(dap, 2) + (beta2 || 0) * Math.pow(dap, 2) * h + (beta3 || 0) * h;
+    case 'husch':
+      return beta0 * Math.pow(dap, beta1 || 0);
+    case 'personalizado':
+      if (!expressaoCustom) return 0;
+      try {
+        const vars = {
+          DAP: dap,
+          H: h,
+          beta0: beta0,
+          beta1: beta1 || 0,
+          beta2: beta2 || 0,
+          beta3: beta3 || 0
+        };
+        const fn = new Function(...Object.keys(vars), `return ${expressaoCustom}`);
+        return fn(...Object.values(vars));
+      } catch (err) {
+        console.error('Erro ao avaliar modelo volumétrico personalizado:', err);
+        return 0;
+      }
+    default:
+      return 0;
+  }
+}

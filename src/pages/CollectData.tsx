@@ -43,7 +43,7 @@ const PhotoThumbnails = ({ individualId, inventoryId }: { individualId: string; 
 
 export const CollectData = () => {
   const navigate = useNavigate();
-  const { currentInventory, saveInventory, setCurrentInventory, isSynced } = useInventory();
+  const { currentInventory, saveInventory, setCurrentInventory, isSynced, fieldWorks } = useInventory();
   
   const [stepIndex, setStepIndex] = useState(0);
   const [formData, setFormData] = useState<any>({});
@@ -54,7 +54,7 @@ export const CollectData = () => {
 
   const [isGpsLoading, setIsGpsLoading] = useState(false);
   const [multiStems, setMultiStems] = useState(false);
-  const [stems, setStems] = useState([{ id: Date.now().toString(), cap: '', altura: '' }]);
+  const [stems, setStems] = useState([{ id: Date.now().toString(), cap: '', alturaComercial: '', alturaTotal: '' }]);
 
   // Previous individual review modal states
   const [showPrevIndModal, setShowPrevIndModal] = useState(false);
@@ -298,7 +298,11 @@ export const CollectData = () => {
           const fileName = `Inv${currentInventory.id}_Ind${currentIdx}_${col.id}_${i+1}.jpg`;
           
           try {
-            const base64Data = await compressImage(file, 1200, 0.6);
+            const fw = fieldWorks ? fieldWorks.find((f: any) => f.id === currentInventory.fieldWorkId) : null;
+            const projName = fw ? fw.nome : 'Desconhecido';
+            const coordsStr = processedFormData.coordenadas || 'N/A';
+            const watermarkText = `Indivíduo #${currentIdx}\nProjeto: ${projName}\nÁrea/Parcela: ${currentInventory.nome}\nGPS: ${coordsStr}\nData: ${new Date().toLocaleDateString('pt-BR')}`;
+            const base64Data = await compressImage(file, 1200, 0.6, watermarkText);
             await savePhoto({
               inventoryId: currentInventory.id,
               individualId: individualId,
@@ -320,7 +324,7 @@ export const CollectData = () => {
       numeroIndividuo: currentIdx,
       timestamp: new Date().toLocaleString('pt-BR'),
       multipleStems: multiStems,
-      ...(multiStems && { stems: stems.map(s => ({id: s.id, cap: parseFloat(s.cap||'0'), altura: parseFloat(s.altura||'0')})) }),
+      ...(multiStems && { stems: stems.map((s: any) => ({id: s.id, cap: parseFloat(s.cap||'0'), alturaComercial: parseFloat(s.alturaComercial||'0'), alturaTotal: parseFloat(s.alturaTotal||'0')})) }),
       ...processedFormData
     };
     
@@ -333,7 +337,7 @@ export const CollectData = () => {
     // reset entire wizard
     setFormData({});
     setMultiStems(false);
-    setStems([{ id: Date.now().toString(), cap: '', altura: '' }]);
+    setStems([{ id: Date.now().toString(), cap: '', alturaComercial: '', alturaTotal: '' }]);
     setStepIndex(0);
   };
 
@@ -453,6 +457,20 @@ export const CollectData = () => {
           <div style={{ marginBottom: '24px', textAlign: 'center' }}>
             <span style={{ fontSize: '10px', color: 'var(--primary-hover)', textTransform: 'uppercase', letterSpacing: '1.5px', fontWeight: 'bold' }}>Campo {stepIndex + 1} de {columns.length}</span>
             <h1 style={{ fontSize: '22px', margin: '6px 0', color: '#ffffff', fontWeight: '800' }}>{currentCol.nome}</h1>
+            
+            {(() => {
+               if (currentIdx > 1 && currentInventory.dados && currentInventory.dados.length > 0 && !['foto', 'coordenadas'].includes(currentCol.id)) {
+                 const lastValue = currentInventory.dados[currentInventory.dados.length - 1][currentCol.id];
+                 if (lastValue !== undefined && lastValue !== '') {
+                   return (
+                     <div style={{ fontSize: '11.5px', color: 'rgba(255, 255, 255, 0.4)', marginTop: '4px', fontStyle: 'italic' }}>
+                       Último preenchido: {lastValue}
+                     </div>
+                   );
+                 }
+               }
+               return null;
+            })()}
           </div>
 
           <div style={{ maxWidth: '400px', margin: '0 auto', width: '100%' }}>
@@ -716,12 +734,13 @@ export const CollectData = () => {
                     borderLeft: '3px solid var(--primary-color)' 
                   }}>
                     <h4 style={{ marginBottom: '12px', color: 'var(--primary-hover)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 'bold' }}>Medições de Fustes</h4>
-                    {stems.map((stem, i) => {
+                    {stems.map((stem: any, i) => {
                       const isCapActive = activeNumField !== null && activeNumField.title === `CAP do Fuste #${i+1}`;
-                      const isAltActive = activeNumField !== null && activeNumField.title === `Altura do Fuste #${i+1}`;
+                      const isAltComercialActive = activeNumField !== null && activeNumField.title === `Altura Comercial Fuste #${i+1}`;
+                      const isAltTotalActive = activeNumField !== null && activeNumField.title === `Altura Total Fuste #${i+1}`;
                       
                       return (
-                        <div key={stem.id} style={{ display: 'flex', gap: '8px', marginBottom: '10px', alignItems: 'center' }}>
+                        <div key={stem.id} style={{ display: 'flex', gap: '4px', marginBottom: '10px', alignItems: 'center' }}>
                           <div 
                             onClick={() => setActiveNumField({
                               title: `CAP do Fuste #${i+1}`,
@@ -733,12 +752,12 @@ export const CollectData = () => {
                               }
                             })}
                             style={{
-                              flex: 1,
+                              flex: 1.2,
                               padding: '10px 0px',
                               background: isCapActive ? 'rgba(46, 125, 50, 0.05)' : 'transparent',
                               borderBottom: isCapActive ? '1px solid var(--primary-hover)' : '1px solid rgba(255, 255, 255, 0.1)',
                               color: 'var(--text-main)',
-                              fontSize: '14.5px',
+                              fontSize: '13px',
                               fontFamily: "'Inter', sans-serif",
                               textAlign: 'center',
                               cursor: 'pointer',
@@ -767,21 +786,21 @@ export const CollectData = () => {
 
                           <div 
                             onClick={() => setActiveNumField({
-                              title: `Altura do Fuste #${i+1}`,
-                              value: stem.altura.toString(),
+                              title: `Altura Comercial Fuste #${i+1}`,
+                              value: stem.alturaComercial.toString(),
                               onSave: (val) => {
                                 const s = [...stems];
-                                s[i].altura = val;
+                                s[i].alturaComercial = val;
                                 setStems(s);
                               }
                             })}
                             style={{
                               flex: 1,
                               padding: '10px 0px',
-                              background: isAltActive ? 'rgba(46, 125, 50, 0.05)' : 'transparent',
-                              borderBottom: isAltActive ? '1px solid var(--primary-hover)' : '1px solid rgba(255, 255, 255, 0.1)',
+                              background: isAltComercialActive ? 'rgba(46, 125, 50, 0.05)' : 'transparent',
+                              borderBottom: isAltComercialActive ? '1px solid var(--primary-hover)' : '1px solid rgba(255, 255, 255, 0.1)',
                               color: 'var(--text-main)',
-                              fontSize: '14.5px',
+                              fontSize: '13px',
                               fontFamily: "'Inter', sans-serif",
                               textAlign: 'center',
                               cursor: 'pointer',
@@ -794,24 +813,67 @@ export const CollectData = () => {
                               transition: 'all 0.3s ease'
                             }}
                           >
-                            {isAltActive ? (
-                              stem.altura ? (
+                            {isAltComercialActive ? (
+                              stem.alturaComercial ? (
                                 <>
-                                  {stem.altura.toString().replace('.', ',')}
+                                  {stem.alturaComercial.toString().replace('.', ',')}
                                   <span className="blinking-cursor" />
                                 </>
                               ) : (
                                 <span className="blinking-cursor" />
                               )
                             ) : (
-                              stem.altura ? stem.altura.toString().replace('.', ',') : <span style={{ color: 'rgba(255,255,255,0.15)' }}>Altura (m)</span>
+                              stem.alturaComercial ? stem.alturaComercial.toString().replace('.', ',') : <span style={{ color: 'rgba(255,255,255,0.15)' }}>Alt. Com</span>
+                            )}
+                          </div>
+
+                          <div 
+                            onClick={() => setActiveNumField({
+                              title: `Altura Total Fuste #${i+1}`,
+                              value: stem.alturaTotal.toString(),
+                              onSave: (val) => {
+                                const s = [...stems];
+                                s[i].alturaTotal = val;
+                                setStems(s);
+                              }
+                            })}
+                            style={{
+                              flex: 1,
+                              padding: '10px 0px',
+                              background: isAltTotalActive ? 'rgba(46, 125, 50, 0.05)' : 'transparent',
+                              borderBottom: isAltTotalActive ? '1px solid var(--primary-hover)' : '1px solid rgba(255, 255, 255, 0.1)',
+                              color: 'var(--text-main)',
+                              fontSize: '13px',
+                              fontFamily: "'Inter', sans-serif",
+                              textAlign: 'center',
+                              cursor: 'pointer',
+                              minHeight: '36px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              userSelect: 'none',
+                              borderRadius: '0px',
+                              transition: 'all 0.3s ease'
+                            }}
+                          >
+                            {isAltTotalActive ? (
+                              stem.alturaTotal ? (
+                                <>
+                                  {stem.alturaTotal.toString().replace('.', ',')}
+                                  <span className="blinking-cursor" />
+                                </>
+                              ) : (
+                                <span className="blinking-cursor" />
+                              )
+                            ) : (
+                              stem.alturaTotal ? stem.alturaTotal.toString().replace('.', ',') : <span style={{ color: 'rgba(255,255,255,0.15)' }}>Alt. Tot</span>
                             )}
                           </div>
                           
                           {stems.length > 1 && (
                             <button 
                               className="btn btn-secondary" 
-                              style={{ width: '36px', padding: 0, height: '32px', minHeight: '32px', flexShrink: 0, borderRadius: '8px' }} 
+                              style={{ width: '28px', padding: 0, height: '28px', minHeight: '28px', flexShrink: 0, borderRadius: '6px' }} 
                               onClick={() => setStems(stems.filter(x => x.id !== stem.id))}
                             >
                               ×
@@ -820,7 +882,7 @@ export const CollectData = () => {
                         </div>
                       );
                     })}
-                    <button className="btn btn-secondary" style={{ marginTop: '10px', borderStyle: 'dashed', padding: '8px' }} onClick={() => setStems([...stems, { id: Date.now().toString(), cap: '', altura: '' }])}>
+                    <button className="btn btn-secondary" style={{ marginTop: '10px', borderStyle: 'dashed', padding: '8px' }} onClick={() => setStems([...stems, { id: Date.now().toString(), cap: '', alturaComercial: '', alturaTotal: '' }])}>
                       + Adicionar Fuste
                     </button>
                   </div>

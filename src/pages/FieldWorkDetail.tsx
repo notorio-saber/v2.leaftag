@@ -35,6 +35,7 @@ export const FieldWorkDetail = () => {
   const [activeSubTab, setActiveSubTab] = useState<'inventario' | 'cubagem'>('inventario');
 
   const fw = fieldWorks.find(f => f.id === id);
+  const isCenso = fw?.modoInventario === 'censo';
 
   useEffect(() => {
     if (fw) {
@@ -178,7 +179,8 @@ export const FieldWorkDetail = () => {
         if (ind.multipleStems && ind.stems) {
            ind.stems.forEach((stem: any, i: number) => {
              baseData[`Fuste_${i+1}_CAP`] = stem.cap;
-             baseData[`Fuste_${i+1}_Altura`] = stem.altura;
+             baseData[`Fuste_${i+1}_AlturaComercial`] = stem.alturaComercial || '';
+             baseData[`Fuste_${i+1}_AlturaTotal`] = stem.alturaTotal || stem.altura || '';
            });
         }
         allData.push(baseData);
@@ -215,7 +217,8 @@ export const FieldWorkDetail = () => {
         if (ind.multipleStems && ind.stems) {
            ind.stems.forEach((stem: any, i: number) => {
              baseData[`Fuste_${i+1}_CAP`] = stem.cap;
-             baseData[`Fuste_${i+1}_Altura`] = stem.altura;
+             baseData[`Fuste_${i+1}_AlturaComercial`] = stem.alturaComercial || '';
+             baseData[`Fuste_${i+1}_AlturaTotal`] = stem.alturaTotal || stem.altura || '';
            });
         }
         allData.push(baseData);
@@ -280,7 +283,8 @@ export const FieldWorkDetail = () => {
         if (ind.multipleStems && ind.stems) {
            ind.stems.forEach((stem: any, i: number) => {
              baseData[`Fuste_${i+1}_CAP`] = stem.cap;
-             baseData[`Fuste_${i+1}_Altura`] = stem.altura;
+             baseData[`Fuste_${i+1}_AlturaComercial`] = stem.alturaComercial || '';
+             baseData[`Fuste_${i+1}_AlturaTotal`] = stem.alturaTotal || stem.altura || '';
            });
         }
         allData.push(baseData);
@@ -394,7 +398,7 @@ export const FieldWorkDetail = () => {
             outline: 'none'
           }}
         >
-          Parcelas e Talhões ({parcels.length})
+          {isCenso ? `Áreas de Censo (${parcels.length})` : `Parcelas e Talhões (${parcels.length})`}
         </button>
         <button 
           onClick={() => setActiveSubTab('cubagem')}
@@ -420,7 +424,7 @@ export const FieldWorkDetail = () => {
           {/* Title / Summary */}
       <div style={{ margin: '28px 0 16px' }}>
         <h2 style={{ fontSize: '16px', fontWeight: '700', letterSpacing: '-0.02em', margin: 0 }}>
-          Talhões ({fwTalhoes.length}) • Parcelas ({parcels.length})
+          {isCenso ? `Áreas de Censo (${parcels.length})` : `Talhões (${fwTalhoes.length}) • Parcelas (${parcels.length})`}
         </h2>
         {isFilterActive && (
           <span style={{ fontSize: '12px', color: 'var(--primary-hover)', fontWeight: 'bold', display: 'block', marginTop: '4px' }}>
@@ -495,12 +499,21 @@ export const FieldWorkDetail = () => {
             )}
           </>
         )}
-        <button 
-          className={`btn btn-primary ${isProjectOdd ? 'btn-span-2' : ''}`} 
-          onClick={() => setShowTalhaoModal(true)}
-        >
-          + Novo Talhão
-        </button>
+        {isCenso ? (
+          <button 
+            className={`btn btn-primary ${isProjectOdd ? 'btn-span-2' : ''}`} 
+            onClick={() => navigate(`/setup/${fw.id}`)}
+          >
+            + Nova Área
+          </button>
+        ) : (
+          <button 
+            className={`btn btn-primary ${isProjectOdd ? 'btn-span-2' : ''}`} 
+            onClick={() => setShowTalhaoModal(true)}
+          >
+            + Novo Talhão
+          </button>
+        )}
       </div>
 
       {/* Expanded Filter Panel */}
@@ -613,42 +626,154 @@ export const FieldWorkDetail = () => {
       )}
 
       {/* Main Talhões hierarchical layout */}
-      {filteredTalhoesList.length === 0 && legacyParcels.length === 0 ? (
-        <div className="glass-card" style={{ textAlign: 'center', padding: '48px 32px' }}>
-          {isFilterActive ? (
-            <>
-              <h3 style={{ color: 'var(--text-muted)', marginBottom: '8px' }}>Nenhum resultado</h3>
-              <p style={{ color: '#888', fontSize: '14px', marginBottom: '24px' }}>Nenhum talhão ou parcela corresponde aos filtros ativos.</p>
-              <button className="btn btn-secondary" style={{ maxWidth: '240px', margin: '0 auto' }} onClick={() => {
-                setDateFilter('');
-                setTalhaoFilter('');
-                setStratumFilter('');
-                setStatusFilter('');
-              }}>
-                Limpar Filtros
-              </button>
-            </>
-          ) : (
-            <>
-              <h3 style={{ color: 'var(--text-muted)', marginBottom: '8px' }}>Nenhum talhão criado</h3>
-              <p style={{ color: '#888', fontSize: '14px', marginBottom: '24px' }}>Comece adicionando seu primeiro talhão de manejo!</p>
-              <button className="btn btn-primary" style={{ maxWidth: '240px', margin: '0 auto' }} onClick={() => setShowTalhaoModal(true)}>
-                Criar Primeiro Talhão
-              </button>
-            </>
-          )}
-        </div>
+      {isCenso ? (
+        parcels.length === 0 ? (
+          <div className="glass-card" style={{ textAlign: 'center', padding: '48px 32px' }}>
+             <h3 style={{ color: 'var(--text-muted)', marginBottom: '8px' }}>Nenhuma área de censo criada</h3>
+             <p style={{ color: '#888', fontSize: '14px', marginBottom: '24px' }}>Comece adicionando sua primeira área de censo 100%!</p>
+             <button className="btn btn-primary" style={{ maxWidth: '240px', margin: '0 auto' }} onClick={() => navigate(`/setup/${fw.id}`)}>
+               Criar Área de Censo
+             </button>
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '16px' }}>
+            {parcels.map(renderParcelCard)}
+          </div>
+        )
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
-          {/* List all talhões */}
-          {filteredTalhoesList.map(talhao => {
-            const talhaoParcels = parcelsByTalhao.filter(p => p.talhaoId === talhao.id);
-            return (
+        filteredTalhoesList.length === 0 && legacyParcels.length === 0 ? (
+          <div className="glass-card" style={{ textAlign: 'center', padding: '48px 32px' }}>
+            {isFilterActive ? (
+              <>
+                <h3 style={{ color: 'var(--text-muted)', marginBottom: '8px' }}>Nenhum resultado</h3>
+                <p style={{ color: '#888', fontSize: '14px', marginBottom: '24px' }}>Nenhum talhão ou parcela corresponde aos filtros ativos.</p>
+                <button className="btn btn-secondary" style={{ maxWidth: '240px', margin: '0 auto' }} onClick={() => {
+                  setDateFilter('');
+                  setTalhaoFilter('');
+                  setStratumFilter('');
+                  setStatusFilter('');
+                }}>
+                  Limpar Filtros
+                </button>
+              </>
+            ) : (
+              <>
+                <h3 style={{ color: 'var(--text-muted)', marginBottom: '8px' }}>Nenhum talhão criado</h3>
+                <p style={{ color: '#888', fontSize: '14px', marginBottom: '24px' }}>Comece adicionando seu primeiro talhão de manejo!</p>
+                <button className="btn btn-primary" style={{ maxWidth: '240px', margin: '0 auto' }} onClick={() => setShowTalhaoModal(true)}>
+                  Criar Primeiro Talhão
+                </button>
+              </>
+            )}
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
+            {/* List all talhões */}
+            {filteredTalhoesList.map(talhao => {
+              const talhaoParcels = parcelsByTalhao.filter(p => p.talhaoId === talhao.id);
+              return (
+                <div 
+                  key={talhao.id} 
+                  className="glass-card"
+                  style={{ 
+                    borderLeft: '4px solid var(--primary-color) !important',
+                    padding: '24px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '16px',
+                    marginBottom: 0
+                  }}
+                >
+                  {/* Talhao Header Block */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <h3 style={{ color: '#ffffff', fontSize: '18px', fontWeight: '800', margin: 0 }}>{talhao.nome}</h3>
+                        {talhao.area !== undefined && (
+                          <span style={{ 
+                            background: 'rgba(0, 230, 118, 0.12)', 
+                            border: '1px solid rgba(0, 230, 118, 0.35)', 
+                            borderRadius: '8px', 
+                            padding: '3px 8px', 
+                            fontSize: '11px', 
+                            fontWeight: '800',
+                            color: '#00e676',
+                            display: 'inline-block'
+                          }}>
+                            {talhao.area.toFixed(2)} ha
+                          </span>
+                        )}
+                      </div>
+                      <span style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginTop: '4px' }}>{talhaoParcels.length} parcelas cadastradas</span>
+                      {talhao.observacoes && (
+                        <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: '6px 0 0 0', fontStyle: 'italic', wordBreak: 'break-all' }}>
+                          Obs: {talhao.observacoes}
+                        </p>
+                      )}
+                    </div>
+                    <div className="talhao-actions-grid">
+                      <button 
+                        className="btn btn-secondary btn-span-2" 
+                        onClick={() => navigate(`/setup/${fw.id}/${talhao.id}`)}
+                      >
+                        + Parcela
+                      </button>
+                      {talhaoParcels.length > 0 && (
+                        <>
+                          <button 
+                            className="btn btn-secondary" 
+                            style={{ borderColor: '#2e7d32', color: '#a5d6a7', background: 'rgba(46, 125, 50, 0.08)' }}
+                            onClick={() => setTalhaoDashboardId(talhao.id)}
+                          >
+                            Dashboard
+                          </button>
+                          <button 
+                            className="btn btn-secondary" 
+                            style={{ borderColor: '#00838f', color: '#80deea', background: 'rgba(0, 131, 143, 0.08)' }}
+                            onClick={() => handleExportTalhao(talhao.id, talhao.nome)}
+                          >
+                            Excel
+                          </button>
+                        </>
+                      )}
+                      <button 
+                        className="btn btn-secondary" 
+                        style={{ borderColor: 'var(--primary-hover)', color: 'var(--primary-hover)' }}
+                        onClick={() => handleEditTalhao(talhao)}
+                      >
+                        Editar
+                      </button>
+                      <button 
+                        className="btn btn-danger" 
+                        onClick={() => handleDeleteTalhao(talhao.id, talhao.nome)}
+                      >
+                        Excluir
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="divider-dashed" style={{ margin: '6px 0 12px' }}></div>
+
+                  {/* Talhao parcels grid */}
+                  {talhaoParcels.length === 0 ? (
+                    <p style={{ color: 'var(--text-muted)', fontSize: '13.5px', fontStyle: 'italic', margin: '4px 0' }}>
+                      Nenhuma parcela cadastrada neste talhão. Clique em "+ Nova Parcela" acima.
+                    </p>
+                  ) : (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '16px' }}>
+                      {talhaoParcels.map(renderParcelCard)}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
+            {/* Legacy unassigned parcels block */}
+            {legacyParcels.length > 0 && (
               <div 
-                key={talhao.id} 
                 className="glass-card"
                 style={{ 
-                  borderLeft: '4px solid var(--primary-color) !important',
+                  borderLeft: '4px solid #fbc02d !important',
                   padding: '24px',
                   display: 'flex',
                   flexDirection: 'column',
@@ -656,116 +781,20 @@ export const FieldWorkDetail = () => {
                   marginBottom: 0
                 }}
               >
-                {/* Talhao Header Block */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <h3 style={{ color: '#ffffff', fontSize: '18px', fontWeight: '800', margin: 0 }}>{talhao.nome}</h3>
-                      {talhao.area !== undefined && (
-                        <span style={{ 
-                          background: 'rgba(0, 230, 118, 0.12)', 
-                          border: '1px solid rgba(0, 230, 118, 0.35)', 
-                          borderRadius: '8px', 
-                          padding: '3px 8px', 
-                          fontSize: '11px', 
-                          fontWeight: '800',
-                          color: '#00e676',
-                          display: 'inline-block'
-                        }}>
-                          {talhao.area.toFixed(2)} ha
-                        </span>
-                      )}
-                    </div>
-                    <span style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginTop: '4px' }}>{talhaoParcels.length} parcelas cadastradas</span>
-                    {talhao.observacoes && (
-                      <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: '6px 0 0 0', fontStyle: 'italic', wordBreak: 'break-all' }}>
-                        Obs: {talhao.observacoes}
-                      </p>
-                    )}
-                  </div>
-                  <div className="talhao-actions-grid">
-                    <button 
-                      className="btn btn-secondary btn-span-2" 
-                      onClick={() => navigate(`/setup/${fw.id}/${talhao.id}`)}
-                    >
-                      + Parcela
-                    </button>
-                    {talhaoParcels.length > 0 && (
-                      <>
-                        <button 
-                          className="btn btn-secondary" 
-                          style={{ borderColor: '#2e7d32', color: '#a5d6a7', background: 'rgba(46, 125, 50, 0.08)' }}
-                          onClick={() => setTalhaoDashboardId(talhao.id)}
-                        >
-                          Dashboard
-                        </button>
-                        <button 
-                          className="btn btn-secondary" 
-                          style={{ borderColor: '#00838f', color: '#80deea', background: 'rgba(0, 131, 143, 0.08)' }}
-                          onClick={() => handleExportTalhao(talhao.id, talhao.nome)}
-                        >
-                          Excel
-                        </button>
-                      </>
-                    )}
-                    <button 
-                      className="btn btn-secondary" 
-                      style={{ borderColor: 'var(--primary-hover)', color: 'var(--primary-hover)' }}
-                      onClick={() => handleEditTalhao(talhao)}
-                    >
-                      Editar
-                    </button>
-                    <button 
-                      className="btn btn-danger" 
-                      onClick={() => handleDeleteTalhao(talhao.id, talhao.nome)}
-                    >
-                      Excluir
-                    </button>
+                    <h3 style={{ color: '#fbc02d', fontSize: '17px', fontWeight: '800' }}>Parcelas sem Talhão (Legado)</h3>
+                    <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Cadastradas antes da atualização dos talhões</span>
                   </div>
                 </div>
-
                 <div className="divider-dashed" style={{ margin: '6px 0 12px' }}></div>
-
-                {/* Talhao parcels grid */}
-                {talhaoParcels.length === 0 ? (
-                  <p style={{ color: 'var(--text-muted)', fontSize: '13.5px', fontStyle: 'italic', margin: '4px 0' }}>
-                    Nenhuma parcela cadastrada neste talhão. Clique em "+ Nova Parcela" acima.
-                  </p>
-                ) : (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '16px' }}>
-                    {talhaoParcels.map(renderParcelCard)}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-
-          {/* Legacy unassigned parcels block */}
-          {legacyParcels.length > 0 && (
-            <div 
-              className="glass-card"
-              style={{ 
-                borderLeft: '4px solid #fbc02d !important',
-                padding: '24px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '16px',
-                marginBottom: 0
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <h3 style={{ color: '#fbc02d', fontSize: '17px', fontWeight: '800' }}>Parcelas sem Talhão (Legado)</h3>
-                  <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Cadastradas antes da atualização dos talhões</span>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '16px' }}>
+                  {legacyParcels.map(renderParcelCard)}
                 </div>
               </div>
-              <div className="divider-dashed" style={{ margin: '6px 0 12px' }}></div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '16px' }}>
-                {legacyParcels.map(renderParcelCard)}
-              </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        )
       )}
         </>
       )}

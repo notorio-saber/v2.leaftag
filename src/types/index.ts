@@ -11,6 +11,8 @@ export interface StemData {
   id: string;
   cap?: number;
   altura?: number;
+  alturaComercial?: number;
+  alturaTotal?: number;
   alturaProcessada?: number;
   alturaMedidaOuEstimada?: 'medida' | 'estimada';
   volumeProcessado?: number;
@@ -81,6 +83,7 @@ export interface FieldWork {
   dataInicio: string;
   status: string;
   googleSheetsUrl?: string;
+  modoInventario?: 'parcelas' | 'censo';
 }
 
 export interface Talhao {
@@ -89,6 +92,10 @@ export interface Talhao {
   nome: string;
   observacoes?: string;
   area?: number;
+  // GIS: polígono desenhado no mapa — array de [lat, lng]
+  polygon?: [number, number][];
+  // GIS: área calculada automaticamente pelo polígono (ha)
+  calculatedArea?: number;
 }
 
 export interface Stratum {

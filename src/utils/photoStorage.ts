@@ -75,7 +75,7 @@ export const deletePhotosForIndividual = async (individualId: string): Promise<v
 };
 
 // Canvas-based client-side compression
-export const compressImage = (file: File, maxWidth = 1200, quality = 0.6): Promise<string> => {
+export const compressImage = (file: File, maxWidth = 1200, quality = 0.6, watermarkText?: string): Promise<string> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.readAsDataURL(file);
@@ -98,6 +98,33 @@ export const compressImage = (file: File, maxWidth = 1200, quality = 0.6): Promi
         if (!ctx) return reject(new Error("Canvas context failed"));
         
         ctx.drawImage(img, 0, 0, width, height);
+
+        // Add Watermark if provided
+        if (watermarkText) {
+          const fontSize = Math.max(14, Math.floor(width * 0.03));
+          ctx.font = `bold ${fontSize}px sans-serif`;
+          
+          const padding = fontSize;
+          const textX = padding;
+          const textY = height - padding;
+          
+          const lines = watermarkText.split('\n');
+          const lineHeight = fontSize * 1.5;
+          const rectHeight = (lines.length * lineHeight) + padding;
+          
+          // Draw semi-transparent background for text visibility
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+          ctx.fillRect(0, height - rectHeight, width, rectHeight);
+          
+          // Draw text lines
+          ctx.fillStyle = 'white';
+          ctx.textBaseline = 'bottom';
+          lines.forEach((line, index) => {
+             const yOffset = height - padding - ((lines.length - 1 - index) * lineHeight);
+             ctx.fillText(line, textX, yOffset);
+          });
+        }
+
         // Emits base64 JPEG format payload drastically reduced byte-count
         const dataUrl = canvas.toDataURL('image/jpeg', quality);
         resolve(dataUrl);
