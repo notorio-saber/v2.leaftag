@@ -189,20 +189,43 @@ const LongPressButton: React.FC<{
     if (variants && variants.length > 0) {
       pressTimer.current = setTimeout(() => {
         setShowPopup(true);
-      }, 400); // 400ms delay to show popup
+      }, 300); // Faster popup delay for fluidity
     }
   };
 
-  const endPress = (e: React.TouchEvent | React.MouseEvent) => {
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (showPopup) {
+      e.preventDefault(); // Prevent scrolling while sliding over variants
+    }
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    e.preventDefault();
+    if (pressTimer.current) clearTimeout(pressTimer.current);
+
+    if (showPopup) {
+      const touch = e.changedTouches[0];
+      const elem = document.elementFromPoint(touch.clientX, touch.clientY);
+      if (elem && elem.hasAttribute('data-variant')) {
+        const v = elem.getAttribute('data-variant')!;
+        onPress(isUppercase ? v.toUpperCase() : v);
+      }
+      // Always close popup on release (forces slide UX instead of tap)
+      setShowPopup(false);
+    } else {
+      onPress(isUppercase ? char.toUpperCase() : char);
+    }
+  };
+
+  const handleMouseUp = (e: React.MouseEvent) => {
     e.preventDefault();
     if (pressTimer.current) clearTimeout(pressTimer.current);
     if (!showPopup) {
       onPress(isUppercase ? char.toUpperCase() : char);
     }
-    // Don't close popup on touch end if it was just opened
   };
 
-  const handleVariantPress = (v: string, e: React.MouseEvent | React.TouchEvent) => {
+  const handleVariantClick = (v: string, e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
     onPress(isUppercase ? v.toUpperCase() : v);
@@ -213,15 +236,38 @@ const LongPressButton: React.FC<{
     const handleClickOutside = () => setShowPopup(false);
     if (showPopup) {
       document.addEventListener('click', handleClickOutside);
-      document.addEventListener('touchstart', handleClickOutside);
     }
     return () => {
       document.removeEventListener('click', handleClickOutside);
-      document.removeEventListener('touchstart', handleClickOutside);
     };
   }, [showPopup]);
 
   const displayChar = isUppercase ? char.toUpperCase() : char;
+
+  let popupStyle: React.CSSProperties = {
+    position: 'absolute',
+    bottom: '120%',
+    background: '#1a1a1a',
+    border: '1px solid var(--primary-hover)',
+    borderRadius: '8px',
+    display: 'flex',
+    gap: '6px',
+    padding: '8px',
+    zIndex: 99999,
+    boxShadow: '0 8px 24px rgba(0,0,0,0.9)'
+  };
+
+  const c = char.toLowerCase();
+  if (['a', 'q', 'z'].includes(c)) {
+    popupStyle.left = '0';
+    popupStyle.transform = 'none';
+  } else if (['p', 'l', 'm'].includes(c)) {
+    popupStyle.right = '0';
+    popupStyle.transform = 'none';
+  } else {
+    popupStyle.left = '50%';
+    popupStyle.transform = 'translateX(-50%)';
+  }
 
   return (
     <div style={{ position: 'relative', flex: 1, display: 'flex' }}>
@@ -230,41 +276,26 @@ const LongPressButton: React.FC<{
         className="keyboard-key" 
         style={keyStyle} 
         onMouseDown={startPress}
-        onMouseUp={endPress}
+        onMouseUp={handleMouseUp}
         onMouseLeave={() => {
            if (pressTimer.current) clearTimeout(pressTimer.current);
         }}
         onTouchStart={startPress}
-        onTouchEnd={endPress}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
       >
         {displayChar}
       </button>
 
       {showPopup && variants && (
-        <div 
-          onPointerDown={(e) => e.stopPropagation()}
-          onTouchStart={(e) => e.stopPropagation()}
-          style={{
-          position: 'absolute',
-          bottom: '120%',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          background: '#1a1a1a', // Solid non-transparent background
-          border: '1px solid var(--primary-hover)',
-          borderRadius: '8px',
-          display: 'flex',
-          gap: '6px',
-          padding: '8px',
-          zIndex: 99999, // Very high z-index
-          boxShadow: '0 8px 24px rgba(0,0,0,0.9)'
-        }}>
+        <div style={popupStyle}>
           {variants.map(v => {
             const vDisplay = isUppercase ? v.toUpperCase() : v;
             return (
               <button 
-                key={v} 
-                onClick={(e) => handleVariantPress(v, e)}
-                onTouchEnd={(e) => handleVariantPress(v, e)}
+                key={v}
+                data-variant={v}
+                onClick={(e) => handleVariantClick(v, e)}
                 style={{
                   ...keyStyle,
                   flex: 'none',
