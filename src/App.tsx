@@ -949,6 +949,7 @@ function App() {
         {/* Rotas Protegidas */}
         <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
         <Route path="/fieldwork/:id" element={<ProtectedRoute><FieldWorkDetail /></ProtectedRoute>} />
+        <Route path="/setup/:fieldWorkId" element={<ProtectedRoute><InventorySetup /></ProtectedRoute>} />
         <Route path="/setup/:fieldWorkId/:talhaoId" element={<ProtectedRoute><InventorySetup /></ProtectedRoute>} />
         <Route path="/collect" element={<ProtectedRoute><CollectData /></ProtectedRoute>} />
         <Route path="/detail/:id" element={<ProtectedRoute><InventoryDetail /></ProtectedRoute>} />

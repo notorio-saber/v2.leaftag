@@ -14,6 +14,7 @@ export const TextKeyboardModal: React.FC<TextKeyboardModalProps> = ({
   onClose
 }) => {
   const [isUppercase, setIsUppercase] = useState(value === '');
+  const [isSymbols, setIsSymbols] = useState(false);
 
   // Automatically force uppercase when text is cleared or empty
   useEffect(() => {
@@ -70,9 +71,9 @@ export const TextKeyboardModal: React.FC<TextKeyboardModalProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [value, onChange]);
 
-  const row1 = ['q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p'];
-  const row2 = ['a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l'];
-  const row3 = ['z', 'x', 'c', 'v', 'b', 'n', 'm'];
+  const row1 = isSymbols ? ['á', 'ã', 'â', 'é', 'ê', 'í', 'ó', 'ô', 'õ', 'ú'] : ['q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p'];
+  const row2 = isSymbols ? ['ç', '-', '/', '.', ',', ':', ';', '(', ')'] : ['a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l'];
+  const row3 = isSymbols ? ['@', '#', '&', '*', '+', '=', '!', '?'] : ['z', 'x', 'c', 'v', 'b', 'n', 'm'];
 
   return (
     <div style={{
@@ -120,12 +121,18 @@ export const TextKeyboardModal: React.FC<TextKeyboardModalProps> = ({
 
         {/* Row 3 */}
         <div style={rowStyle}>
-          <button type="button" className="keyboard-key" style={shiftKeyStyle(isUppercase)} onClick={() => setIsUppercase(!isUppercase)}>
-            Caps
+          <button type="button" className="keyboard-key" style={shiftKeyStyle(isUppercase)} onClick={() => {
+            if (isSymbols) {
+              setIsSymbols(false);
+            } else {
+              setIsUppercase(!isUppercase);
+            }
+          }}>
+            {isSymbols ? 'ABC' : 'Caps'}
           </button>
           {row3.map(char => (
             <button key={char} type="button" className="keyboard-key" style={keyStyle} onClick={() => handleKeyPress(char)}>
-              {isUppercase ? char.toUpperCase() : char.toLowerCase()}
+              {isUppercase && !isSymbols ? char.toUpperCase() : char}
             </button>
           ))}
           <button type="button" className="keyboard-key" style={actionKeyStyle()} onClick={handleBackspace}>
@@ -135,6 +142,9 @@ export const TextKeyboardModal: React.FC<TextKeyboardModalProps> = ({
 
         {/* Row 4: Clean Bottom Navigation (Limpar, Espaço) */}
         <div style={rowStyle}>
+          <button type="button" className="keyboard-key" style={clearStyle} onClick={() => setIsSymbols(!isSymbols)}>
+            {isSymbols ? 'ABC' : '?123'}
+          </button>
           <button type="button" className="keyboard-key" style={clearStyle} onClick={handleClear}>Limpar</button>
           <button type="button" className="keyboard-key" style={{ ...keyStyle, flex: 4, background: 'var(--border-color)' }} onClick={handleSpace}>Espaço</button>
         </div>
