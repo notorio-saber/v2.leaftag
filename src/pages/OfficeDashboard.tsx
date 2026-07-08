@@ -3156,6 +3156,7 @@ export const OfficeDashboard = () => {
                   if (isNaN(areaNum) || areaNum <= 0) return alert('Por favor, informe uma área válida maior que zero.');
                   try {
                     await createStratum({
+                      id: Date.now().toString(),
                       fieldWorkId: activeFwId,
                       nome: newStratumName,
                       area: areaNum,

@@ -106,7 +106,6 @@ export const compressImage = (file: File, maxWidth = 1200, quality = 0.6, waterm
           
           const padding = fontSize;
           const textX = padding;
-          const textY = height - padding;
           
           const lines = watermarkText.split('\n');
           const lineHeight = fontSize * 1.5;

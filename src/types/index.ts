@@ -84,6 +84,9 @@ export interface FieldWork {
   status: string;
   googleSheetsUrl?: string;
   modoInventario?: 'parcelas' | 'censo';
+  selectedHeightModelId?: string;
+  selectedVolumeModelId?: string;
+  defaultFatorForma?: string | number;
 }
 
 export interface Talhao {
