@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useInventory } from '../context/InventoryContext';
 import { getCurrentPosition } from '../utils/gpsOperations';
@@ -43,7 +43,7 @@ const PhotoThumbnails = ({ individualId, inventoryId }: { individualId: string; 
 
 export const CollectData = () => {
   const navigate = useNavigate();
-  const { currentInventory, saveInventory, setCurrentInventory, isSynced, fieldWorks } = useInventory();
+  const { currentInventory, saveInventory, setCurrentInventory, isSynced, fieldWorks, inventories } = useInventory();
   
   const [stepIndex, setStepIndex] = useState(0);
   const [formData, setFormData] = useState<any>({});
@@ -81,6 +81,21 @@ export const CollectData = () => {
     value: string;
     onSave: (val: string) => void;
   } | null>(null);
+
+  const textSuggestions = useMemo(() => {
+    if (!activeTextField || !['Nome Popular', 'Nome Científico', 'Família'].includes(activeTextField.title)) return [];
+    
+    const set = new Set<string>();
+    const propName = activeTextField.title === 'Nome Popular' ? 'nomePopular' : 
+                     activeTextField.title === 'Nome Científico' ? 'nomeCientifico' : 'familia';
+    
+    inventories.forEach((inv: any) => {
+      inv.dados?.forEach((ind: any) => {
+        if (ind[propName]) set.add(ind[propName].trim());
+      });
+    });
+    return Array.from(set).sort();
+  }, [inventories, activeTextField]);
 
   if (!currentInventory) {
     navigate('/');
@@ -917,6 +932,7 @@ export const CollectData = () => {
               }}
               onConfirm={handleNext}
               onClose={() => {}}
+              suggestions={textSuggestions}
             />
           )}
 

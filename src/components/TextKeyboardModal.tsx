@@ -15,16 +15,29 @@ interface TextKeyboardModalProps {
   onChange: (val: string) => void;
   onConfirm: () => void;
   onClose: () => void;
+  suggestions?: string[];
 }
 
 export const TextKeyboardModal: React.FC<TextKeyboardModalProps> = ({
   value,
   onChange,
   onConfirm,
-  onClose
+  onClose,
+  suggestions
 }) => {
   const [isUppercase, setIsUppercase] = useState(value === '');
   const [isSymbols, setIsSymbols] = useState(false);
+  const [filteredSuggestions, setFilteredSuggestions] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!suggestions || value.trim().length === 0) {
+      setFilteredSuggestions([]);
+      return;
+    }
+    const valLower = value.trim().toLowerCase();
+    const matched = suggestions.filter(s => s.toLowerCase().includes(valLower) && s.toLowerCase() !== valLower).slice(0, 15);
+    setFilteredSuggestions(matched);
+  }, [value, suggestions]);
 
   // Automatically force uppercase when text is cleared or empty
   useEffect(() => {
@@ -104,6 +117,41 @@ export const TextKeyboardModal: React.FC<TextKeyboardModalProps> = ({
     }}>
       {/* Keyboard Keypad Layout */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '100%' }}>
+        {/* Autocomplete Suggestions */}
+        {filteredSuggestions.length > 0 && (
+          <div style={{ 
+            display: 'flex', 
+            overflowX: 'auto', 
+            gap: '8px', 
+            padding: '4px 0px 8px 0px',
+            scrollbarWidth: 'none',
+            WebkitOverflowScrolling: 'touch' 
+          }}>
+            {filteredSuggestions.map(s => (
+              <button 
+                key={s} 
+                onClick={(e) => { e.preventDefault(); onChange(s + ' '); }} 
+                type="button"
+                style={{
+                  background: 'rgba(46, 125, 50, 0.25)',
+                  color: 'var(--primary-hover)',
+                  border: '1px solid var(--primary-hover)',
+                  borderRadius: '16px',
+                  padding: '8px 16px',
+                  fontSize: '14px',
+                  fontWeight: 'bold',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0,
+                  outline: 'none',
+                  cursor: 'pointer'
+                }}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Row 0: Scientific Suffixes / Shortcuts */}
         <div style={rowStyle}>
           <button type="button" className="keyboard-key" style={shortcutStyle} onClick={handleSpShort}>sp.</button>
@@ -212,8 +260,9 @@ const LongPressButton: React.FC<{
         const v = elem.getAttribute('data-variant')!;
         onPress(isUppercase ? v.toUpperCase() : v);
       }
-      // Always close popup on release (forces slide UX instead of tap)
-      setShowPopup(false);
+      
+      // Delay closing popup so synthesized mouseUp doesn't output base letter
+      setTimeout(() => setShowPopup(false), 50);
     } else {
       onPress(isUppercase ? char.toUpperCase() : char);
     }
