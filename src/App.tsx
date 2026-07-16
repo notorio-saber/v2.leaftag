@@ -118,14 +118,25 @@ const Home = () => {
         inv.colunas.forEach(col => {
            baseData[col.nome] = ind[col.id] || '';
         });
-        if (ind.multipleStems && ind.stems) {
+        if (ind.multipleStems && ind.stems && ind.stems.length > 0) {
            ind.stems.forEach((stem: any, i: number) => {
-             baseData[`Fuste_${i+1}_CAP`] = stem.cap;
-             baseData[`Fuste_${i+1}_AlturaComercial`] = stem.alturaComercial || '';
-             baseData[`Fuste_${i+1}_AlturaTotal`] = stem.alturaTotal || stem.altura || '';
+             const stemData = { ...baseData };
+             stemData['Número'] = `${ind.numeroIndividuo}${String.fromCharCode(65 + i)}`;
+             
+             const capCol = inv.colunas.find((c: any) => c.id === 'cap');
+             if (capCol) stemData[capCol.nome] = stem.cap || '';
+
+             const hcCol = inv.colunas.find((c: any) => c.id === 'hc');
+             if (hcCol) stemData[hcCol.nome] = stem.alturaComercial || stem.altura || '';
+             
+             const htCol = inv.colunas.find((c: any) => c.id === 'ht');
+             if (htCol) stemData[htCol.nome] = stem.alturaTotal || stem.altura || '';
+             
+             allData.push(stemData);
            });
+        } else {
+           allData.push(baseData);
         }
-        allData.push(baseData);
       });
     });
 

@@ -274,13 +274,25 @@ export const OfficeDashboard = () => {
         inv.colunas.forEach(col => {
            baseData[col.nome] = ind[col.id] || '';
         });
-        if (ind.multipleStems && ind.stems) {
+        if (ind.multipleStems && ind.stems && ind.stems.length > 0) {
            ind.stems.forEach((stem: any, i: number) => {
-             baseData[`Fuste_${i+1}_CAP`] = stem.cap;
-             baseData[`Fuste_${i+1}_Altura`] = stem.altura;
+             const stemData = { ...baseData };
+             stemData['Número'] = `${ind.numeroIndividuo}${String.fromCharCode(65 + i)}`;
+             
+             const capCol = inv.colunas.find((c: any) => c.id === 'cap');
+             if (capCol) stemData[capCol.nome] = stem.cap || '';
+
+             const hcCol = inv.colunas.find((c: any) => c.id === 'hc');
+             if (hcCol) stemData[hcCol.nome] = stem.alturaComercial || stem.altura || '';
+             
+             const htCol = inv.colunas.find((c: any) => c.id === 'ht');
+             if (htCol) stemData[htCol.nome] = stem.alturaTotal || stem.altura || '';
+             
+             allData.push(stemData);
            });
+        } else {
+           allData.push(baseData);
         }
-        allData.push(baseData);
       });
     });
 
@@ -1989,13 +2001,25 @@ export const OfficeDashboard = () => {
         inv.colunas.forEach(col => {
            baseData[col.nome] = ind[col.id] || '';
         });
-        if (ind.multipleStems && ind.stems) {
+        if (ind.multipleStems && ind.stems && ind.stems.length > 0) {
            ind.stems.forEach((stem: any, i: number) => {
-             baseData[`Fuste_${i+1}_CAP`] = stem.cap;
-             baseData[`Fuste_${i+1}_Altura`] = stem.altura;
+             const stemData = { ...baseData };
+             stemData['Número'] = `${ind.numeroIndividuo}${String.fromCharCode(65 + i)}`;
+             
+             const capCol = inv.colunas.find((c: any) => c.id === 'cap');
+             if (capCol) stemData[capCol.nome] = stem.cap || '';
+
+             const hcCol = inv.colunas.find((c: any) => c.id === 'hc');
+             if (hcCol) stemData[hcCol.nome] = stem.alturaComercial || stem.altura || '';
+             
+             const htCol = inv.colunas.find((c: any) => c.id === 'ht');
+             if (htCol) stemData[htCol.nome] = stem.alturaTotal || stem.altura || '';
+             
+             allData.push(stemData);
            });
+        } else {
+           allData.push(baseData);
         }
-        allData.push(baseData);
       });
     });
 
@@ -2058,16 +2082,44 @@ export const OfficeDashboard = () => {
         }
 
         // Tratamento para fustes múltiplos / bifurcados
-        if (ind.multipleStems && ind.stems) {
+        if (ind.multipleStems && ind.stems && ind.stems.length > 0) {
           ind.stems.forEach((stem: any, i: number) => {
-            baseData[`Fuste_${i+1}_CAP`] = stem.cap || '';
-            baseData[`Fuste_${i+1}_Altura_Calc`] = stem.alturaProcessada !== undefined ? stem.alturaProcessada : (stem.altura || '');
-            baseData[`Fuste_${i+1}_Medida/Estimada`] = stem.alturaMedidaOuEstimada === 'medida' ? 'Medida' : 'Estimada';
-            baseData[`Fuste_${i+1}_Volume`] = stem.volumeProcessado !== undefined ? stem.volumeProcessado : '';
-          });
-        }
+             const stemData = { ...baseData };
+             stemData['Número'] = `${ind.numeroIndividuo}${String.fromCharCode(65 + i)}`;
+             
+             const capCol = inv.colunas.find((c: any) => c.id === 'cap');
+             if (capCol) stemData[capCol.nome] = stem.cap || '';
 
-        allData.push(baseData);
+             const hcCol = inv.colunas.find((c: any) => c.id === 'hc');
+             if (hcCol) stemData[hcCol.nome] = stem.alturaComercial || stem.altura || '';
+             
+             const htCol = inv.colunas.find((c: any) => c.id === 'ht');
+             if (htCol) stemData[htCol.nome] = stem.alturaTotal || stem.altura || '';
+
+             stemData['DAP_Equivalente (cm)'] = stem.cap ? (parseFloat(stem.cap) / Math.PI).toFixed(2) : '0';
+             
+             const g = calculateBasalArea(parseFloat(stem.cap || 0));
+             stemData['Area_Basal (m2)'] = g.toFixed(4);
+
+             if (stem.alturaProcessada !== undefined) {
+               stemData['Altura Utilizada (m)'] = stem.alturaProcessada;
+               stemData['Altura Medida/Estimada'] = stem.alturaMedidaOuEstimada === 'medida' ? 'Medida' : 'Estimada';
+             } else {
+               stemData['Altura Utilizada (m)'] = parseFloat((stem.altura || 0).toString());
+               stemData['Altura Medida/Estimada'] = 'Medida';
+             }
+
+             if (stem.volumeProcessado !== undefined) {
+               stemData['Volume Calculado (m3)'] = stem.volumeProcessado;
+             } else {
+               stemData['Volume Calculado (m3)'] = calculateVolume(g, stemData['Altura Utilizada (m)'], 0.7);
+             }
+
+             allData.push(stemData);
+          });
+        } else {
+          allData.push(baseData);
+        }
       });
     });
 
@@ -2098,13 +2150,25 @@ export const OfficeDashboard = () => {
         inv.colunas.forEach(col => {
            baseData[col.nome] = ind[col.id] || '';
         });
-        if (ind.multipleStems && ind.stems) {
+        if (ind.multipleStems && ind.stems && ind.stems.length > 0) {
            ind.stems.forEach((stem: any, i: number) => {
-             baseData[`Fuste_${i+1}_CAP`] = stem.cap;
-             baseData[`Fuste_${i+1}_Altura`] = stem.altura;
+             const stemData = { ...baseData };
+             stemData['Número'] = `${ind.numeroIndividuo}${String.fromCharCode(65 + i)}`;
+             
+             const capCol = inv.colunas.find((c: any) => c.id === 'cap');
+             if (capCol) stemData[capCol.nome] = stem.cap || '';
+
+             const hcCol = inv.colunas.find((c: any) => c.id === 'hc');
+             if (hcCol) stemData[hcCol.nome] = stem.alturaComercial || stem.altura || '';
+             
+             const htCol = inv.colunas.find((c: any) => c.id === 'ht');
+             if (htCol) stemData[htCol.nome] = stem.alturaTotal || stem.altura || '';
+             
+             allData.push(stemData);
            });
+        } else {
+           allData.push(baseData);
         }
-        allData.push(baseData);
       });
     });
 
@@ -2164,13 +2228,25 @@ export const OfficeDashboard = () => {
         inv.colunas.forEach(col => {
            baseData[col.nome] = ind[col.id] || '';
         });
-        if (ind.multipleStems && ind.stems) {
+        if (ind.multipleStems && ind.stems && ind.stems.length > 0) {
            ind.stems.forEach((stem: any, i: number) => {
-             baseData[`Fuste_${i+1}_CAP`] = stem.cap;
-             baseData[`Fuste_${i+1}_Altura`] = stem.altura;
+             const stemData = { ...baseData };
+             stemData['Número'] = `${ind.numeroIndividuo}${String.fromCharCode(65 + i)}`;
+             
+             const capCol = inv.colunas.find((c: any) => c.id === 'cap');
+             if (capCol) stemData[capCol.nome] = stem.cap || '';
+
+             const hcCol = inv.colunas.find((c: any) => c.id === 'hc');
+             if (hcCol) stemData[hcCol.nome] = stem.alturaComercial || stem.altura || '';
+             
+             const htCol = inv.colunas.find((c: any) => c.id === 'ht');
+             if (htCol) stemData[htCol.nome] = stem.alturaTotal || stem.altura || '';
+             
+             allData.push(stemData);
            });
+        } else {
+           allData.push(baseData);
         }
-        allData.push(baseData);
       });
     });
 

@@ -221,7 +221,7 @@ export const InventoryDetail = () => {
   }
 
   const handleExportRaw = () => {
-    const data = inventory.dados.map(ind => {
+    const data = inventory.dados.flatMap(ind => {
       let baseData: any = {
         'Talhão': talhao ? talhao.nome : 'Sem Talhão',
         'Talhão Observações': talhao?.observacoes || '',
@@ -236,13 +236,24 @@ export const InventoryDetail = () => {
         baseData[col.nome] = ind[col.id] || '';
       });
 
-      if (ind.multipleStems && ind.stems) {
-         ind.stems.forEach((stem: any, i: number) => {
-           baseData[`Fuste_${i+1}_CAP`] = stem.cap;
-           baseData[`Fuste_${i+1}_Altura`] = stem.altura;
+      if (ind.multipleStems && ind.stems && ind.stems.length > 0) {
+         return ind.stems.map((stem: any, i: number) => {
+           const stemData = { ...baseData };
+           stemData['Número'] = `${ind.numeroIndividuo}${String.fromCharCode(65 + i)}`;
+           
+           const capCol = inventory.colunas.find(c => c.id === 'cap');
+           if (capCol) stemData[capCol.nome] = stem.cap || '';
+
+           const hcCol = inventory.colunas.find(c => c.id === 'hc');
+           if (hcCol) stemData[hcCol.nome] = stem.alturaComercial || stem.altura || '';
+           
+           const htCol = inventory.colunas.find(c => c.id === 'ht');
+           if (htCol) stemData[htCol.nome] = stem.alturaTotal || stem.altura || '';
+           
+           return stemData;
          });
       }
-      return baseData;
+      return [baseData];
     });
 
     const worksheet = XLSX.utils.json_to_sheet(data);
@@ -252,7 +263,7 @@ export const InventoryDetail = () => {
   };
 
   const handleExportProcessed = () => {
-    const data = inventory.dados.map(ind => {
+    const data = inventory.dados.flatMap(ind => {
       let baseData: any = {
         'Talhão': talhao ? talhao.nome : 'Sem Talhão',
         'Talhão Observações': talhao?.observacoes || '',
@@ -274,81 +285,87 @@ export const InventoryDetail = () => {
       delete baseData.volumeCalculado;
       delete baseData.modeloUtilizado;
 
-      let maxCap = ind.cap;
+      if (ind.multipleStems && ind.stems && ind.stems.length > 0) {
+         return ind.stems.map((stem: any, i: number) => {
+           const stemData = { ...baseData };
+           stemData['Número'] = `${ind.numeroIndividuo}${String.fromCharCode(65 + i)}`;
 
-      if (selectedCalcs.fustes && ind.multipleStems && ind.stems) {
-        baseData['Qtd Fustes'] = ind.stems.length;
-        let areaBasalTotal = 0;
-        let volumeTotal = 0;
-        ind.stems.forEach((stem: any, i: number) => {
-          baseData[`Fuste_${i+1}_CAP`] = stem.cap;
-          
-          if (stem.alturaProcessada !== undefined) {
-            baseData[`Fuste_${i+1}_Altura`] = stem.alturaProcessada;
-            baseData[`Fuste_${i+1}_Altura_MedidaOuEstimada`] = stem.alturaMedidaOuEstimada === 'medida' ? 'Medida' : 'Estimada';
-          } else {
-            baseData[`Fuste_${i+1}_Altura`] = stem.altura;
-          }
+           const capCol = inventory.colunas.find(c => c.id === 'cap');
+           if (capCol) stemData[capCol.nome] = stem.cap || '';
 
-          if (selectedCalcs.areaBasal) {
-            const capNum = parseFloat(stem.cap || '0');
-            const g = calculateBasalArea(capNum);
-            baseData[`Fuste_${i+1}_AreaBasal`] = g.toFixed(4);
-            areaBasalTotal += g;
-            if(capNum > (maxCap||0)) maxCap = capNum;
-          }
+           const hcCol = inventory.colunas.find(c => c.id === 'hc');
+           if (hcCol) stemData[hcCol.nome] = stem.alturaComercial || stem.altura || '';
+           
+           const htCol = inventory.colunas.find(c => c.id === 'ht');
+           if (htCol) stemData[htCol.nome] = stem.alturaTotal || stem.altura || '';
 
-          if (selectedCalcs.volume) {
-            if (stem.volumeProcessado !== undefined) {
-              baseData[`Fuste_${i+1}_Volume`] = stem.volumeProcessado;
-              volumeTotal += stem.volumeProcessado;
-            } else {
-              const capNum = parseFloat(stem.cap || '0');
-              const g = calculateBasalArea(capNum);
-              const stemVol = calculateVolume(g, parseFloat(stem.altura || '0'), parseFloat(fatorForma));
-              baseData[`Fuste_${i+1}_Volume`] = stemVol.toFixed(4);
-              volumeTotal += stemVol;
-            }
-          }
-        });
-        if (selectedCalcs.areaBasal) baseData['Area_Basal_Total (m2)'] = areaBasalTotal.toFixed(4);
-        if (selectedCalcs.volume) {
-          baseData['Volume_Total (m3)'] = ind.volumeCalculado !== undefined ? ind.volumeCalculado : volumeTotal.toFixed(4);
-        }
-      } else if (ind.cap || ind.dap) {
-        const treeDap = getDapOfTreeOrStem(ind);
-        const g = (Math.PI * Math.pow(treeDap / 100, 2)) / 4;
+           if (stem.alturaProcessada !== undefined) {
+             stemData['Altura Utilizada (m)'] = stem.alturaProcessada;
+             stemData['Altura Medida/Estimada'] = stem.alturaMedidaOuEstimada === 'medida' ? 'Medida' : 'Estimada';
+           }
 
-        if (selectedCalcs.areaBasal) {
-          baseData['Area_Basal (m2)'] = g.toFixed(4);
-        }
+           if (selectedCalcs.areaBasal) {
+             const capNum = parseFloat(stem.cap || '0');
+             const g = calculateBasalArea(capNum);
+             stemData['Area_Basal (m2)'] = g.toFixed(4);
+           }
 
-        if (selectedCalcs.volume) {
-          if (ind.volumeCalculado !== undefined) {
-            baseData['Volume (m3)'] = ind.volumeCalculado;
-          } else {
-            baseData['Volume (m3)'] = calculateVolume(g, parseFloat(ind.ht || 0), parseFloat(fatorForma)).toFixed(4);
-          }
-        }
+           if (selectedCalcs.volume) {
+             if (stem.volumeProcessado !== undefined) {
+               stemData['Volume (m3)'] = stem.volumeProcessado;
+             } else {
+               const capNum = parseFloat(stem.cap || '0');
+               const g = calculateBasalArea(capNum);
+               const stemVol = calculateVolume(g, parseFloat(stem.altura || '0'), parseFloat(fatorForma));
+               stemData['Volume (m3)'] = stemVol.toFixed(4);
+             }
+           }
+
+           if (selectedCalcs.dapEquivalente) {
+             const capNum = parseFloat(stem.cap || '0');
+             stemData['DAP_Equivalente (cm)'] = (capNum / Math.PI).toFixed(2);
+           }
+
+           if (ind.modeloUtilizado) {
+             stemData['Modelo Utilizado'] = ind.modeloUtilizado;
+           }
+
+           return stemData;
+         });
+      } else {
+         if (ind.cap || ind.dap) {
+           const treeDap = getDapOfTreeOrStem(ind);
+           const g = (Math.PI * Math.pow(treeDap / 100, 2)) / 4;
+
+           if (selectedCalcs.areaBasal) {
+             baseData['Area_Basal (m2)'] = g.toFixed(4);
+           }
+
+           if (selectedCalcs.volume) {
+             if (ind.volumeCalculado !== undefined) {
+               baseData['Volume (m3)'] = ind.volumeCalculado;
+             } else {
+               baseData['Volume (m3)'] = calculateVolume(g, parseFloat(ind.ht || 0), parseFloat(fatorForma)).toFixed(4);
+             }
+           }
+         }
+
+         if (selectedCalcs.dapEquivalente && (ind.cap || ind.dap)) {
+           baseData['DAP_Equivalente (cm)'] = getDapOfTreeOrStem(ind).toFixed(2);
+         }
+
+         if (ind.alturaUtilizada !== undefined) {
+           baseData['Altura Utilizada (m)'] = ind.alturaUtilizada;
+           baseData['Altura Medida/Estimada'] = ind.alturaMedidaOuEstimada === 'medida' ? 'Medida' : 'Estimada';
+         }
+         if (ind.volumeCalculado !== undefined) {
+           baseData['Volume Calculado (m3)'] = ind.volumeCalculado;
+         }
+         if (ind.modeloUtilizado) {
+           baseData['Modelo Utilizado'] = ind.modeloUtilizado;
+         }
+         return [baseData];
       }
-
-      if (selectedCalcs.dapEquivalente && (ind.cap || ind.dap)) {
-        baseData['DAP_Equivalente (cm)'] = getDapOfTreeOrStem(ind).toFixed(2);
-      }
-
-      // Adicionar colunas de processamento oficial formatadas
-      if (ind.alturaUtilizada !== undefined) {
-        baseData['Altura Utilizada (m)'] = ind.alturaUtilizada;
-        baseData['Altura Medida/Estimada'] = ind.alturaMedidaOuEstimada === 'medida' ? 'Medida' : 'Estimada';
-      }
-      if (ind.volumeCalculado !== undefined) {
-        baseData['Volume Calculado (m3)'] = ind.volumeCalculado;
-      }
-      if (ind.modeloUtilizado) {
-        baseData['Modelo Utilizado'] = ind.modeloUtilizado;
-      }
-
-      return baseData;
     });
 
     const worksheet = XLSX.utils.json_to_sheet(data);
