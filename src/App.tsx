@@ -903,6 +903,7 @@ const Home = () => {
                   className="btn btn-secondary" 
                   style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', borderColor: 'var(--primary-color)', color: 'var(--primary-color)' }}
                   onClick={() => {
+                    setShowSettingsModal(false);
                     setShowTeamModal(true);
                   }}
                 >
