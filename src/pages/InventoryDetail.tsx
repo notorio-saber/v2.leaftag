@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import * as XLSX from 'xlsx';
 import JSZip from 'jszip';
 import { calculateBasalArea, calculateVolume } from '../utils/forestryCalculations';
-import { getPhotosForInventory, deletePhotosForIndividual, uploadPhotosToStorage, getCloudPhotosCount, getCloudPhotosBlobs } from '../utils/photoStorage';
+import { getPhotosForInventory, deletePhotosForIndividual, uploadPhotosToStorage, getCloudPhotosCount, getCloudPhotosBlobs, getCloudPhotosUrls } from '../utils/photoStorage';
 import { StatisticalDashboard } from '../components/StatisticalDashboard';
 import { getCurrentPosition } from '../utils/gpsOperations';
 
@@ -410,6 +410,36 @@ export const InventoryDetail = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isCheckingPhotos, setIsCheckingPhotos] = useState(true);
+  
+  const [viewingPhotoUrl, setViewingPhotoUrl] = useState<string | null>(null);
+  const [isLoadingPhotoId, setIsLoadingPhotoId] = useState<string | null>(null);
+
+  const handleViewPhoto = async (indId: string) => {
+    setIsLoadingPhotoId(indId);
+    try {
+      const localPhotos = await getPhotosForInventory(inventory.id);
+      const photo = localPhotos.find(p => p.individualId === indId);
+      if (photo) {
+        setViewingPhotoUrl(photo.base64Data);
+        setIsLoadingPhotoId(null);
+        return;
+      }
+      if (navigator.onLine && uidToUse) {
+        const cloudUrls = await getCloudPhotosUrls(inventory.id, uidToUse);
+        const cloudPhoto = cloudUrls.find(p => p.fileName.includes(`_Ind${indId}_`));
+        if (cloudPhoto) {
+          setViewingPhotoUrl(cloudPhoto.url);
+          setIsLoadingPhotoId(null);
+          return;
+        }
+      }
+      alert("Nenhuma foto encontrada para este indivíduo.");
+    } catch (err) {
+      console.error(err);
+      alert("Erro ao buscar a foto.");
+    }
+    setIsLoadingPhotoId(null);
+  };
 
   useEffect(() => {
     if (inventory && uidToUse) {
@@ -824,6 +854,7 @@ export const InventoryDetail = () => {
               <thead>
                 <tr>
                   <th style={{ width: '50px', textAlign: 'center' }}>Editar</th>
+                  <th style={{ width: '50px', textAlign: 'center' }}>Foto</th>
                   <th style={{ width: '60px' }}>Nº</th>
                   {inventory.colunas.map(col => (
                     <th key={col.id}>{col.nome}</th>
@@ -853,6 +884,34 @@ export const InventoryDetail = () => {
                           <path d="M12 20h9"></path>
                           <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
                         </svg>
+                      </button>
+                    </td>
+                    <td style={{ textAlign: 'center' }}>
+                      <button 
+                        className="btn btn-secondary" 
+                        style={{ 
+                          padding: '6px', 
+                          borderRadius: '8px', 
+                          width: '32px', 
+                          height: '32px', 
+                          display: 'inline-flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'center',
+                          border: '1px solid rgba(255,255,255,0.1)'
+                        }} 
+                        onClick={() => handleViewPhoto(ind.id)}
+                        title="Ver Foto"
+                        disabled={isLoadingPhotoId === ind.id}
+                      >
+                        {isLoadingPhotoId === ind.id ? (
+                          <span style={{ fontSize: '10px' }}>...</span>
+                        ) : (
+                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                            <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                            <polyline points="21 15 16 10 5 21"></polyline>
+                          </svg>
+                        )}
                       </button>
                     </td>
                     <td style={{ fontWeight: 'bold' }}>{ind.numeroIndividuo}</td>
@@ -1157,6 +1216,20 @@ export const InventoryDetail = () => {
             <polyline points="20 6 9 17 4 12"></polyline>
           </svg>
           {toast}
+        </div>
+      )}
+
+      {/* Photo Viewer Modal */}
+      {viewingPhotoUrl && (
+        <div style={{ 
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
+          background: 'rgba(0,0,0,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center', 
+          zIndex: 1100, padding: '20px'
+        }} onClick={() => setViewingPhotoUrl(null)}>
+          <div style={{ position: 'relative', maxWidth: '100%', maxHeight: '100%' }} onClick={e => e.stopPropagation()}>
+             <img src={viewingPhotoUrl} alt="Foto do Indivíduo" style={{ maxWidth: '100%', maxHeight: '90vh', borderRadius: '12px', objectFit: 'contain' }} />
+             <button onClick={() => setViewingPhotoUrl(null)} style={{ position: 'absolute', top: '-40px', right: 0, background: 'transparent', color: 'white', border: 'none', fontSize: '32px', cursor: 'pointer' }}>&times;</button>
+          </div>
         </div>
       )}
     </div>

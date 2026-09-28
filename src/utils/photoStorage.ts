@@ -46,6 +46,23 @@ export const getCloudPhotosBlobs = async (inventoryId: number, uid: string): Pro
   return items;
 };
 
+import { getDownloadURL } from 'firebase/storage';
+
+export const getCloudPhotosUrls = async (inventoryId: number, uid: string): Promise<{fileName: string, url: string}[]> => {
+  const listRef = ref(storage, `users/${uid}/inventories/${inventoryId}`);
+  try {
+    const res = await listAll(listRef);
+    const items = [];
+    for (const item of res.items) {
+      const url = await getDownloadURL(item);
+      items.push({ fileName: item.name, url });
+    }
+    return items;
+  } catch (e) {
+    return [];
+  }
+};
+
 
 export const initPhotoDB = (): Promise<IDBDatabase> => {
   return new Promise((resolve, reject) => {
