@@ -409,10 +409,12 @@ export const InventoryDetail = () => {
   const [cloudPhotosCount, setCloudPhotosCount] = useState<number>(0);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [isCheckingPhotos, setIsCheckingPhotos] = useState(true);
 
   useEffect(() => {
     if (inventory && uidToUse) {
       const checkPhotos = async () => {
+        setIsCheckingPhotos(true);
         try {
           const local = await getPhotosForInventory(inventory.id);
           setLocalPhotosCount(local.length);
@@ -423,6 +425,7 @@ export const InventoryDetail = () => {
         } catch (err) {
           console.error(err);
         }
+        setIsCheckingPhotos(false);
       };
       checkPhotos();
     }
