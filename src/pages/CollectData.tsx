@@ -117,14 +117,24 @@ export const CollectData = () => {
   let prevData: any = {};
   
   if (isPermanente && currentMedicaoId) {
-    const prevMedicaoIndex = medicoes.findIndex(m => m.id === currentMedicaoId) - 1;
-    const prevMedicaoId = prevMedicaoIndex >= 0 ? medicoes[prevMedicaoIndex].id : null;
+    const currentMedIndex = medicoes.findIndex(m => m.id === currentMedicaoId);
     
     targetTree = currentInventory.dados.find(d => !d.medicoes?.[currentMedicaoId] && !d.isDead);
     if (targetTree) {
       currentIdx = targetTree.numeroIndividuo;
-      if (prevMedicaoId && targetTree.medicoes?.[prevMedicaoId]) {
-         prevData = targetTree.medicoes[prevMedicaoId];
+      
+      // Buscar prevData da medição imediatamente anterior que possua dados
+      for (let i = currentMedIndex - 1; i >= 0; i--) {
+        const mId = medicoes[i].id;
+        if (targetTree.medicoes?.[mId]) {
+          prevData = targetTree.medicoes[mId];
+          break;
+        }
+      }
+      
+      // Se não achou no histórico de medições, tenta pegar da raiz (legado)
+      if (Object.keys(prevData).length === 0) {
+        prevData = targetTree;
       }
     } else {
       currentIdx = currentInventory.dados.length + 1; // Ingresso
@@ -204,6 +214,22 @@ export const CollectData = () => {
   };
 
   const handleNext = (updatedFormData?: any) => {
+    if (isPermanente && prevData && prevData[currentCol.id]) {
+      const isNumericCol = ['cap', 'dap', 'ht', 'hc', 'altura', 'alturaComercial', 'alturaTotal'].includes(currentCol.id);
+      if (isNumericCol) {
+        let currentValRaw = updatedFormData ? updatedFormData[currentCol.id] : formData[currentCol.id];
+        if (currentValRaw !== undefined && currentValRaw !== '') {
+          const currentVal = parseFloat(currentValRaw.toString().replace(',', '.'));
+          const prevVal = parseFloat(prevData[currentCol.id].toString().replace(',', '.'));
+          
+          if (!isNaN(currentVal) && !isNaN(prevVal) && currentVal < prevVal) {
+            alert(`ATENÇÃO: O valor de ${currentCol.nome} (${currentValRaw}) não pode ser MENOR que a medição anterior (${prevData[currentCol.id]}). Árvores não diminuem!`);
+            return;
+          }
+        }
+      }
+    }
+
     const nextIdx = getNextStepIndex(stepIndex);
     if (nextIdx < columns.length) {
       setStepIndex(nextIdx);
