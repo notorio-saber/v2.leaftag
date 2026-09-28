@@ -408,7 +408,7 @@ export const InventoryDetail = () => {
     try {
       const photos = await getPhotosForInventory(inventory.id);
       if (photos.length === 0) {
-        alert("Nenhuma foto encontrada para esta parcela no banco offline.");
+        alert("Nenhuma foto encontrada neste dispositivo.\n\nComo as fotos são pesadas, elas ficam armazenadas offline (apenas no celular que realizou a coleta) para economizar dados e funcionar no campo.\n\nPor favor, acesse o aplicativo através do celular utilizado no campo para baixar o ZIP das fotos.");
         setIsZipping(false);
         return;
       }
@@ -555,6 +555,10 @@ export const InventoryDetail = () => {
             {isZipping ? "Gerando ZIP..." : "Galeria de Fotos (ZIP)"}
           </button>
         </div>
+        
+        <p style={{ marginTop: '8px', fontSize: '11.5px', color: 'var(--text-muted)', textAlign: 'center', lineHeight: 1.4 }}>
+          * As fotos são salvas <strong>offline no dispositivo de coleta</strong>. Para baixar o ZIP, acesse o app pelo mesmo celular utilizado no campo e nos envie pelo WhatsApp ou computador.
+        </p>
 
         {showExportOptions && (
           <div style={{ 
