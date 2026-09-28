@@ -1,6 +1,5 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { BarChart, Bar, AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
-import html2canvas from 'html2canvas';
 import type { Inventory, IndividualData } from '../types';
 import { useInventory } from '../context/InventoryContext';
 import { useAuth } from '../context/AuthContext';
@@ -57,7 +56,6 @@ export const StatisticalDashboard: React.FC<DashboardProps> = ({ inventories, on
   const [alturaInterval, setAlturaInterval] = useState<number>(5);
   const [fatorForma, setFatorForma] = useState<number>(0.7);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [isExporting, setIsExporting] = useState(false);
 
   const [viewType, setViewType] = useState<'trabalho' | 'talhao' | 'estrato' | 'parcela' | 'especie'>('trabalho');
   
@@ -750,26 +748,6 @@ export const StatisticalDashboard: React.FC<DashboardProps> = ({ inventories, on
     };
   }, [stats, totalSampleAreaHa, areaHa]);
 
-  const handleExportSnapshot = async () => {
-    if (!containerRef.current) return;
-    setIsExporting(true);
-    try {
-      const canvas = await html2canvas(containerRef.current, { 
-        backgroundColor: document.body.classList.contains('light-theme') ? '#f4f6f4' : '#020503', 
-        scale: 2 
-      });
-      const url = canvas.toDataURL('image/png');
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `Laudo_Fitossociologico_${Date.now()}.png`;
-      link.click();
-    } catch (err) {
-      console.error(err);
-      alert('Erro ao gerar print dos gráficos.');
-    } finally {
-      setIsExporting(false);
-    }
-  };
 
   const TopStatCard = ({ title, value, sub, color, icon }: { title: string, value: string, sub: string, color: string, icon: React.ReactNode }) => {
     const contrastColor = getContrastColor(color, isLight);
@@ -1022,36 +1000,6 @@ export const StatisticalDashboard: React.FC<DashboardProps> = ({ inventories, on
                 onChange={e => setAlturaInterval(parseInt(e.target.value) || 5)} 
               />
             </div>
-            <button 
-              className="btn btn-primary" 
-              style={{ 
-                height: '42px', 
-                borderRadius: '12px', 
-                fontSize: '12px', 
-                fontWeight: 'bold', 
-                textTransform: 'uppercase',
-                letterSpacing: '0.5px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px'
-              }} 
-              onClick={handleExportSnapshot} 
-              disabled={isExporting}
-            >
-              {isExporting ? (
-                'Processando...'
-              ) : (
-                <>
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                    <polyline points="7 10 12 15 17 10"></polyline>
-                    <line x1="12" y1="15" x2="12" y2="3"></line>
-                  </svg>
-                  Gerar Laudo (PNG)
-                </>
-              )}
-            </button>
           </div>
 
           {/* View Selector Row */}

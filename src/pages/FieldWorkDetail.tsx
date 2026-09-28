@@ -1081,16 +1081,62 @@ export const FieldWorkDetail = () => {
               </div>
            </div>
         </div>
+        </div>
       )}
 
-      {showMap && <MapVisualization inventories={parcels} onClose={() => setShowMap(false)} />}
-      {showDashboard && <StatisticalDashboard inventories={parcels} onClose={() => setShowDashboard(false)} />}
-      {talhaoDashboardId && (
-        <StatisticalDashboard 
-          inventories={parcels.filter(p => p.talhaoId === talhaoDashboardId)} 
-          onClose={() => setTalhaoDashboardId(null)} 
-        />
-      )}
+      {(() => {
+        const dashboardParcels = !isPermanente || !activeMedicaoId ? parcels : parcels.map(inv => {
+          if (!inv.dados) return inv;
+          const staticFields = ['nomePopular', 'nomeCientifico', 'familia', 'coordenadas', 'observacoes'];
+          
+          const newDados = inv.dados.map((ind: any) => {
+            const medKeys = Object.keys(ind.medicoes || {});
+            const firstMedicaoIndex = fw?.medicoes?.findIndex(m => medKeys.includes(m.id)) ?? -1;
+            const currentMedicaoIndex = fw?.medicoes?.findIndex(m => m.id === activeMedicaoId) ?? -1;
+            
+            if (firstMedicaoIndex !== -1 && firstMedicaoIndex > currentMedicaoIndex) return null;
+
+            const med = ind.medicoes?.[activeMedicaoId];
+            const isDeadInThisOrPast = ind.isDead && (ind.deadAtMedicaoId === activeMedicaoId || (fw?.medicoes?.findIndex(m=>m.id===ind.deadAtMedicaoId) ?? 999) <= currentMedicaoIndex);
+            
+            const dynamicFieldsToClear = (inv.colunas || [])
+              .map((c: any) => c.id)
+              .filter((id: string) => !staticFields.includes(id));
+
+            const processedInd = { ...ind };
+            if (!med) {
+              dynamicFieldsToClear.forEach((field: string) => {
+                delete processedInd[field];
+              });
+              delete processedInd.stems;
+              delete processedInd.multipleStems;
+            }
+
+            const isMissing = !med && !isDeadInThisOrPast;
+            if (isMissing) return null;
+
+            return {
+              ...processedInd,
+              ...(med || {}),
+            };
+          }).filter(Boolean);
+
+          return { ...inv, dados: newDados };
+        });
+
+        return (
+          <>
+            {showMap && <MapVisualization inventories={dashboardParcels} onClose={() => setShowMap(false)} />}
+            {showDashboard && <StatisticalDashboard inventories={dashboardParcels} onClose={() => setShowDashboard(false)} />}
+            {talhaoDashboardId && (
+              <StatisticalDashboard 
+                inventories={dashboardParcels.filter(p => p.talhaoId === talhaoDashboardId)} 
+                onClose={() => setTalhaoDashboardId(null)} 
+              />
+            )}
+          </>
+        );
+      })()}
 
       {/* Google Sheets Integration Modal */}
       {showSheetsModal && (

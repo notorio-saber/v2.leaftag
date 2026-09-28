@@ -1262,7 +1262,7 @@ export const InventoryDetail = () => {
         </div>
       )}
 
-      {showDashboard && <StatisticalDashboard inventories={[inventory]} onClose={() => setShowDashboard(false)} />}
+      {showDashboard && <StatisticalDashboard inventories={[{ ...inventory, dados: displayDados.filter((d: any) => !d._isMissing) }]} onClose={() => setShowDashboard(false)} />}
 
       {toast && (
         <div style={{
