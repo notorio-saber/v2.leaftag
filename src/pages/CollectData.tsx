@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useInventory } from '../context/InventoryContext';
 import { getCurrentPosition } from '../utils/gpsOperations';
 import { compressImage, savePhoto, getPhotosForInventory, deletePhotosForIndividual } from '../utils/photoStorage';
@@ -43,6 +43,7 @@ const PhotoThumbnails = ({ individualId, inventoryId }: { individualId: string; 
 
 export const CollectData = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { currentInventory, saveInventory, setCurrentInventory, isSynced, fieldWorks, inventories } = useInventory();
   
   const [stepIndex, setStepIndex] = useState(0);
@@ -107,7 +108,8 @@ export const CollectData = () => {
   const isPermanente = fw?.modoInventario === 'permanente';
   const medicoes = fw?.medicoes || [];
   
-  const [currentMedicaoId, setCurrentMedicaoId] = useState<string>(medicoes.length > 0 ? medicoes[medicoes.length - 1].id : '');
+  const urlMedicaoId = searchParams.get('medicaoId');
+  const [currentMedicaoId, setCurrentMedicaoId] = useState<string>(urlMedicaoId || (medicoes.length > 0 ? medicoes[medicoes.length - 1].id : ''));
 
   // Calculate target tree logic for permanent plots
   let targetTree: any = null;
@@ -129,7 +131,16 @@ export const CollectData = () => {
     }
   }
 
-  const columns = currentInventory.colunas;
+  const columns = useMemo(() => {
+    let cols = currentInventory.colunas;
+    // Pula campos estáticos se for uma re-medição (targetTree existe)
+    if (isPermanente && currentMedicaoId && targetTree) {
+      const staticFields = ['nomePopular', 'nomeCientifico', 'familia', 'coordenadas'];
+      cols = cols.filter((c: any) => !staticFields.includes(c.id));
+    }
+    return cols;
+  }, [currentInventory, isPermanente, currentMedicaoId, targetTree]);
+
   const currentCol = columns[stepIndex];
 
   const isNumActive = activeNumField !== null && activeNumField.title === currentCol?.nome;
@@ -452,20 +463,6 @@ export const CollectData = () => {
           <div className="app-header" style={{ marginBottom: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
             <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
               <h2 style={{ color: '#ffffff', fontSize: '17px', fontWeight: '800', margin: 0, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{currentInventory.nome}</h2>
-              {isPermanente && medicoes.length > 0 && (
-                <select 
-                  value={currentMedicaoId} 
-                  onChange={e => {
-                    setCurrentMedicaoId(e.target.value);
-                    setStepIndex(0);
-                    setFormData({});
-                  }}
-                  style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', borderRadius: '4px', padding: '2px 4px', fontSize: '12px', outline: 'none' }}
-                >
-                  {medicoes.map((m: any) => <option key={m.id} value={m.id} style={{color: '#000'}}>{m.nome}</option>)}
-                </select>
-              )}
-              
               {/* Cloud Sync Icon */}
               <div 
                 style={{
@@ -497,27 +494,6 @@ export const CollectData = () => {
               </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-              {isPermanente && targetTree && (
-                <button 
-                  className="btn btn-danger" 
-                  style={{ width: 'auto', padding: '6px 10px', fontSize: '10px', height: '30px' }} 
-                  onClick={() => {
-                    if(confirm(`Tem certeza que deseja marcar a árvore #${currentIdx} como MORTA?`)) {
-                      const freshInv = JSON.parse(JSON.stringify(currentInventory));
-                      const idx = freshInv.dados.findIndex((d: any) => d.id === targetTree.id);
-                      freshInv.dados[idx].isDead = true;
-                      freshInv.dados[idx].deadAtMedicaoId = currentMedicaoId;
-                      freshInv.ultimaColeta = new Date().toLocaleDateString('pt-BR');
-                      setCurrentInventory(freshInv);
-                      saveInventory(freshInv);
-                      setFormData({});
-                      setStepIndex(0);
-                    }
-                  }}
-                >
-                  Marcar Morta
-                </button>
-              )}
               <div style={{
                 background: 'rgba(46, 125, 50, 0.15)',
                 border: '1px solid rgba(46, 125, 50, 0.45)',
@@ -537,6 +513,30 @@ export const CollectData = () => {
               </button>
             </div>
           </div>
+
+          {isPermanente && targetTree && (
+            <div style={{ marginBottom: '16px' }}>
+              <button 
+                className="btn btn-danger" 
+                style={{ width: '100%', padding: '10px', fontSize: '13px', fontWeight: 'bold' }} 
+                onClick={() => {
+                  if(confirm(`Tem certeza que deseja marcar a árvore #${currentIdx} como MORTA?`)) {
+                    const freshInv = JSON.parse(JSON.stringify(currentInventory));
+                    const idx = freshInv.dados.findIndex((d: any) => d.id === targetTree.id);
+                    freshInv.dados[idx].isDead = true;
+                    freshInv.dados[idx].deadAtMedicaoId = currentMedicaoId;
+                    freshInv.ultimaColeta = new Date().toLocaleDateString('pt-BR');
+                    setCurrentInventory(freshInv);
+                    saveInventory(freshInv);
+                    setFormData({});
+                    setStepIndex(0);
+                  }
+                }}
+              >
+                ☠️ Marcar Árvore #{currentIdx} como Morta
+              </button>
+            </div>
+          )}
 
           <div style={{ width: '100%', height: '4px', background: 'rgba(255,255,255,0.06)', borderRadius: '100px', overflow: 'hidden', marginBottom: '16px' }}>
             <div style={{ width: `${((stepIndex + 1) / columns.length) * 100}%`, height: '100%', background: 'linear-gradient(90deg, var(--primary-color) 0%, var(--primary-hover) 100%)', transition: 'width 0.3s ease' }}></div>

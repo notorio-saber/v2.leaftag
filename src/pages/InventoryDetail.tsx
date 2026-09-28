@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useInventory } from '../context/InventoryContext';
 import { useAuth } from '../context/AuthContext';
 import * as XLSX from 'xlsx';
@@ -12,6 +12,8 @@ import { getCurrentPosition } from '../utils/gpsOperations';
 export const InventoryDetail = () => {
   const navigate = useNavigate();
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
+  const urlMedicaoId = searchParams.get('medicaoId');
   const { inventories, deleteInventory, setCurrentInventory, fieldWorks, saveInventory, talhoes, isSynced } = useInventory();
   const { uidToUse } = useAuth();
   
@@ -32,7 +34,7 @@ export const InventoryDetail = () => {
 
   const isPermanente = fieldwork?.modoInventario === 'permanente';
   const medicoes = fieldwork?.medicoes || [];
-  const [selectedMedicaoId, setSelectedMedicaoId] = useState<string>(medicoes.length > 0 ? medicoes[medicoes.length - 1].id : '');
+  const [selectedMedicaoId, setSelectedMedicaoId] = useState<string>(urlMedicaoId || (medicoes.length > 0 ? medicoes[medicoes.length - 1].id : ''));
 
   const displayDados = useMemo(() => {
     if (!inventory || !inventory.dados) return [];
