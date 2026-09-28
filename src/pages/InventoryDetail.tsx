@@ -41,10 +41,15 @@ export const InventoryDetail = () => {
     if (!isPermanente || !selectedMedicaoId) return inventory.dados;
     
     return inventory.dados.map((ind: any) => {
-      const med = ind.medicoes?.[selectedMedicaoId];
-      if (!med && !ind.isDead) return null; // Árvore não foi medida nesta ocasião
+      const medKeys = Object.keys(ind.medicoes || {});
+      const firstMedicaoIndex = medicoes.findIndex(m => medKeys.includes(m.id));
+      const currentMedicaoIndex = medicoes.findIndex(m => m.id === selectedMedicaoId);
       
-      const isDeadInThisOrPast = ind.isDead && (ind.deadAtMedicaoId === selectedMedicaoId || medicoes.findIndex((m: any)=>m.id===ind.deadAtMedicaoId) <= medicoes.findIndex((m: any)=>m.id===selectedMedicaoId));
+      if (firstMedicaoIndex !== -1 && firstMedicaoIndex > currentMedicaoIndex) return null;
+
+      const med = ind.medicoes?.[selectedMedicaoId];
+      
+      const isDeadInThisOrPast = ind.isDead && (ind.deadAtMedicaoId === selectedMedicaoId || medicoes.findIndex((m: any)=>m.id===ind.deadAtMedicaoId) <= currentMedicaoIndex);
 
       return {
         ...ind,
@@ -599,13 +604,9 @@ export const InventoryDetail = () => {
             <h2 style={{ color: 'var(--primary-hover)', fontSize: '24px', fontWeight: '800', margin: 0 }}>{inventory.nome}</h2>
             
             {isPermanente && medicoes.length > 0 && (
-              <select 
-                value={selectedMedicaoId} 
-                onChange={e => setSelectedMedicaoId(e.target.value)}
-                style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', borderRadius: '4px', padding: '4px 8px', fontSize: '13px', outline: 'none' }}
-              >
-                {medicoes.map((m: any) => <option key={m.id} value={m.id} style={{color: '#000'}}>{m.nome}</option>)}
-              </select>
+              <div style={{ background: 'rgba(255, 152, 0, 0.2)', border: '1px solid rgba(255, 152, 0, 0.5)', color: '#ff9800', borderRadius: '8px', padding: '6px 12px', fontSize: '14px', fontWeight: 'bold' }}>
+                {medicoes.find((m: any) => m.id === selectedMedicaoId)?.nome || 'Medição Ativa'}
+              </div>
             )}
 
             {/* Cloud Sync Icon */}
