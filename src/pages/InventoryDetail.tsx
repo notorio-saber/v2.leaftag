@@ -445,7 +445,7 @@ export const InventoryDetail = () => {
   const [viewingPhotoUrl, setViewingPhotoUrl] = useState<string | null>(null);
   const [isLoadingPhotoId, setIsLoadingPhotoId] = useState<string | null>(null);
 
-  const handleViewPhoto = async (indId: string) => {
+  const handleViewPhoto = async (indId: string, numeroIndividuo: number) => {
     setIsLoadingPhotoId(indId);
     try {
       const localPhotos = await getPhotosForInventory(inventory.id);
@@ -457,7 +457,7 @@ export const InventoryDetail = () => {
       }
       if (navigator.onLine && uidToUse) {
         const cloudUrls = await getCloudPhotosUrls(inventory.id, uidToUse);
-        const cloudPhoto = cloudUrls.find(p => p.fileName.includes(`_Ind${indId}_`));
+        const cloudPhoto = cloudUrls.find(p => p.fileName.includes(`_Ind${numeroIndividuo}_`));
         if (cloudPhoto) {
           setViewingPhotoUrl(cloudPhoto.url);
           setIsLoadingPhotoId(null);
@@ -604,9 +604,30 @@ export const InventoryDetail = () => {
             <h2 style={{ color: 'var(--primary-hover)', fontSize: '24px', fontWeight: '800', margin: 0 }}>{inventory.nome}</h2>
             
             {isPermanente && medicoes.length > 0 && (
-              <div style={{ background: 'rgba(255, 152, 0, 0.2)', border: '1px solid rgba(255, 152, 0, 0.5)', color: '#ff9800', borderRadius: '8px', padding: '6px 12px', fontSize: '14px', fontWeight: 'bold' }}>
-                {medicoes.find((m: any) => m.id === selectedMedicaoId)?.nome || 'Medição Ativa'}
-              </div>
+              <select 
+                value={selectedMedicaoId} 
+                onChange={e => setSelectedMedicaoId(e.target.value)}
+                style={{ 
+                  background: 'rgba(255, 152, 0, 0.2)', 
+                  border: '1px solid rgba(255, 152, 0, 0.5)', 
+                  color: '#ff9800', 
+                  borderRadius: '8px', 
+                  padding: '6px 12px', 
+                  fontSize: '14px', 
+                  fontWeight: 'bold',
+                  outline: 'none',
+                  cursor: 'pointer',
+                  appearance: 'none',
+                  WebkitAppearance: 'none',
+                  MozAppearance: 'none'
+                }}
+              >
+                {medicoes.map((m: any) => (
+                  <option key={m.id} value={m.id} style={{color: '#000'}}>
+                    {m.nome}
+                  </option>
+                ))}
+              </select>
             )}
 
             {/* Cloud Sync Icon */}
@@ -936,7 +957,7 @@ export const InventoryDetail = () => {
                           justifyContent: 'center',
                           border: '1px solid rgba(255,255,255,0.1)'
                         }} 
-                        onClick={() => handleViewPhoto(ind.id)}
+                        onClick={() => handleViewPhoto(ind.id, ind.numeroIndividuo)}
                         title="Ver Foto"
                         disabled={isLoadingPhotoId === ind.id}
                       >

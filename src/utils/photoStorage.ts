@@ -40,8 +40,15 @@ export const getCloudPhotosBlobs = async (inventoryId: number, uid: string): Pro
   const res = await listAll(listRef);
   const items = [];
   for (const item of res.items) {
-    const blob = await getBlob(item);
-    items.push({ fileName: item.name, blob });
+    try {
+      const url = await getDownloadURL(item);
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      const blob = await response.blob();
+      items.push({ fileName: item.name, blob });
+    } catch (e) {
+      console.error(`Erro ao baixar blob de ${item.name}`, e);
+    }
   }
   return items;
 };
