@@ -51,8 +51,22 @@ export const InventoryDetail = () => {
       
       const isDeadInThisOrPast = ind.isDead && (ind.deadAtMedicaoId === selectedMedicaoId || medicoes.findIndex((m: any)=>m.id===ind.deadAtMedicaoId) <= currentMedicaoIndex);
 
+      const staticFields = ['nomePopular', 'nomeCientifico', 'familia', 'coordenadas', 'observacoes'];
+      const dynamicFieldsToClear = inventory.colunas
+        .map((c: any) => c.id)
+        .filter((id: string) => !staticFields.includes(id));
+
+      const processedInd = { ...ind };
+      if (!med) {
+        dynamicFieldsToClear.forEach((field: string) => {
+          delete processedInd[field];
+        });
+        delete processedInd.stems;
+        delete processedInd.multipleStems;
+      }
+
       return {
-        ...ind,
+        ...processedInd,
         ...(med || {}),
         _originalInd: ind,
         _isDeadNow: isDeadInThisOrPast,
