@@ -697,30 +697,30 @@ const Home = () => {
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
            <div className="glass-card" style={{ width: '100%', maxWidth: '400px', background: '#141c18', border: '1px solid rgba(255, 255, 255, 0.12)', boxShadow: '0 20px 40px rgba(0,0,0,0.6)', borderRadius: '16px', padding: '24px' }}>
               <h3 style={{ margin: 0, fontSize: '18px', color: 'var(--primary-hover)', fontWeight: '800', marginBottom: '16px' }}>Novo Trabalho</h3>
-              <input className="input-field" placeholder="Nome (Ex: Inventário 2026)" value={newFwName} onChange={e => setNewFwName(e.target.value)} style={{ marginTop: '16px' }} />
-              <input className="input-field" placeholder="Local / Fazenda" value={newFwLocal} onChange={e => setNewFwLocal(e.target.value)} />
-              <input type="date" className="input-field" value={newFwDate} onChange={e => setNewFwDate(e.target.value)} />
+              <input className="input-field" placeholder="Nome (Ex: Inventário 2026)" value={newFwName} onChange={e => setNewFwName(e.target.value)} style={{ marginTop: '16px', color: '#ffffff' }} />
+              <input className="input-field" placeholder="Local / Fazenda" value={newFwLocal} onChange={e => setNewFwLocal(e.target.value)} style={{ color: '#ffffff' }} />
+              <input type="date" className="input-field" value={newFwDate} onChange={e => setNewFwDate(e.target.value)} style={{ color: '#ffffff' }} />
               
               <div style={{ marginTop: '16px' }}>
                 <label style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '8px', display: 'block' }}>Tipo de Inventário</label>
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <button 
                     className="btn" 
-                    style={{ flex: 1, padding: '8px', fontSize: '13px', background: newFwModo === 'parcelas' ? 'rgba(46, 125, 50, 0.15)' : 'rgba(255,255,255,0.05)', border: newFwModo === 'parcelas' ? '1px solid var(--primary-color)' : '1px solid rgba(255,255,255,0.1)' }}
+                    style={{ flex: 1, padding: '8px', fontSize: '13px', background: newFwModo === 'parcelas' ? 'rgba(46, 125, 50, 0.15)' : 'rgba(255,255,255,0.05)', border: newFwModo === 'parcelas' ? '1px solid var(--primary-color)' : '1px solid rgba(255,255,255,0.1)', color: newFwModo === 'parcelas' ? 'var(--primary-color)' : '#ffffff' }}
                     onClick={() => setNewFwModo('parcelas')}
                   >
                     Por Parcelas
                   </button>
                   <button 
                     className="btn" 
-                    style={{ flex: 1, padding: '8px', fontSize: '13px', background: newFwModo === 'censo' ? 'rgba(46, 125, 50, 0.15)' : 'rgba(255,255,255,0.05)', border: newFwModo === 'censo' ? '1px solid var(--primary-color)' : '1px solid rgba(255,255,255,0.1)' }}
+                    style={{ flex: 1, padding: '8px', fontSize: '13px', background: newFwModo === 'censo' ? 'rgba(46, 125, 50, 0.15)' : 'rgba(255,255,255,0.05)', border: newFwModo === 'censo' ? '1px solid var(--primary-color)' : '1px solid rgba(255,255,255,0.1)', color: newFwModo === 'censo' ? 'var(--primary-color)' : '#ffffff' }}
                     onClick={() => setNewFwModo('censo')}
                   >
                     Censo (100%)
                   </button>
                   <button 
                     className="btn" 
-                    style={{ flex: 1, padding: '8px', fontSize: '13px', background: newFwModo === 'permanente' ? 'rgba(46, 125, 50, 0.15)' : 'rgba(255,255,255,0.05)', border: newFwModo === 'permanente' ? '1px solid var(--primary-color)' : '1px solid rgba(255,255,255,0.1)' }}
+                    style={{ flex: 1, padding: '8px', fontSize: '13px', background: newFwModo === 'permanente' ? 'rgba(46, 125, 50, 0.15)' : 'rgba(255,255,255,0.05)', border: newFwModo === 'permanente' ? '1px solid var(--primary-color)' : '1px solid rgba(255,255,255,0.1)', color: newFwModo === 'permanente' ? 'var(--primary-color)' : '#ffffff' }}
                     onClick={() => setNewFwModo('permanente')}
                   >
                     Parcelas Permanentes
@@ -729,8 +729,8 @@ const Home = () => {
               </div>
 
               <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
-                <button className="btn btn-secondary" onClick={() => setShowModal(false)}>Cancelar</button>
-                <button className="btn btn-primary" onClick={handleCreateFw}>Criar</button>
+                <button className="btn btn-secondary" style={{ color: '#ffffff' }} onClick={() => setShowModal(false)}>Cancelar</button>
+                <button className="btn btn-primary" style={{ color: '#ffffff' }} onClick={handleCreateFw}>Criar</button>
               </div>
            </div>
         </div>
@@ -740,12 +740,12 @@ const Home = () => {
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
            <div className="glass-card" style={{ width: '100%', maxWidth: '400px', background: '#141c18', border: '1px solid rgba(255, 255, 255, 0.12)', boxShadow: '0 20px 40px rgba(0,0,0,0.6)', borderRadius: '16px', padding: '24px' }}>
               <h3 style={{ margin: 0, fontSize: '18px', color: 'var(--primary-hover)', fontWeight: '800' }}>Editar Trabalho</h3>
-              <input className="input-field" placeholder="Nome (Ex: Inventário 2026)" value={editName} onChange={e => setEditName(e.target.value)} style={{ marginTop: '16px' }} />
-              <input className="input-field" placeholder="Local / Fazenda" value={editLocal} onChange={e => setEditLocal(e.target.value)} />
-              <input type="date" className="input-field" value={editDate} onChange={e => setEditDate(e.target.value)} />
+              <input className="input-field" placeholder="Nome (Ex: Inventário 2026)" value={editName} onChange={e => setEditName(e.target.value)} style={{ marginTop: '16px', color: '#ffffff' }} />
+              <input className="input-field" placeholder="Local / Fazenda" value={editLocal} onChange={e => setEditLocal(e.target.value)} style={{ color: '#ffffff' }} />
+              <input type="date" className="input-field" value={editDate} onChange={e => setEditDate(e.target.value)} style={{ color: '#ffffff' }} />
               <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
-                <button className="btn btn-secondary" onClick={() => setEditingFw(null)}>Cancelar</button>
-                <button className="btn btn-primary" onClick={handleUpdateFw}>Salvar</button>
+                <button className="btn btn-secondary" style={{ color: '#ffffff' }} onClick={() => setEditingFw(null)}>Cancelar</button>
+                <button className="btn btn-primary" style={{ color: '#ffffff' }} onClick={handleUpdateFw}>Salvar</button>
               </div>
            </div>
         </div>
