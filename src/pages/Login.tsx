@@ -104,8 +104,7 @@ export const Login = () => {
           lineHeight: 1.6,
           fontFamily: "'Inter', sans-serif"
         }}>
-          Coleta rápida, processamento automático e relatórios analíticos florestais estruturados direto no celular. 
-          Totalmente integrado com inteligência de dados e suficiência amostral.
+          O melhor app para coleta de dados de inventário! Coleta rápida, com foco na experiência do usuário (UX) em campo, e exportação da planilha de dados brutos organizada.
         </p>
 
         <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', justifyContent: 'center', width: '100%', maxWidth: '400px' }}>
@@ -140,19 +139,17 @@ export const Login = () => {
 
           <div className="glass-card">
             <div style={{ height: '3px', background: 'var(--primary-color)', width: '32px', borderRadius: '4px', marginBottom: '20px' }}></div>
-            <h3 style={{ color: 'white', marginBottom: '10px', fontSize: '18px', fontWeight: '700' }}>Processamento Imediato</h3>
+            <h3 style={{ color: 'white', marginBottom: '10px', fontSize: '18px', fontWeight: '700' }}>UX e Fluxo Fluido</h3>
             <p style={{ color: 'var(--text-muted)', fontSize: '13.5px', lineHeight: 1.6 }}>
-              Cálculo imediato de área basal, distribuição diamétrica, volume estimado por fator de forma, e índices de Shannon e Simpson. 
-              Exportação limpa de planilhas formatadas (.xlsx).
+              Informações separadas por tela de forma inteligente. Sem rolagem vertical infinita ou formulários poluídos. O último padrão em fluxo de coleta para máxima velocidade no campo.
             </p>
           </div>
 
           <div className="glass-card">
             <div style={{ height: '3px', background: 'var(--primary-color)', width: '32px', borderRadius: '4px', marginBottom: '20px' }}></div>
-            <h3 style={{ color: 'white', marginBottom: '10px', fontSize: '18px', fontWeight: '700' }}>Curva do Coletor Real-Time</h3>
+            <h3 style={{ color: 'white', marginBottom: '10px', fontSize: '18px', fontWeight: '700' }}>Exportação Imediata</h3>
             <p style={{ color: 'var(--text-muted)', fontSize: '13.5px', lineHeight: 1.6 }}>
-              Validação matemática instantânea da suficiência amostral por estabilização de assíntota de espécies. 
-              Saiba exatamente quando interromper a amostragem em campo.
+              Tudo estruturado desde o início até o momento de exportar sua planilha com os dados brutos (.xlsx). O fim definitivo das pranchetas e retrabalho de digitação.
             </p>
           </div>
         </div>

@@ -27,6 +27,15 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
+const SuperAdminRoute = ({ children }: { children: React.ReactNode }) => {
+  const { currentUser, status, loading } = useAuth();
+  if (loading) return null;
+  if (!currentUser) return <Navigate to="/login" />;
+  if (status === 'pending') return <Navigate to="/pending" />;
+  if (currentUser.uid !== 'GBfcf5uqJNPNgS0FMowUcbPQAkB3') return <Navigate to="/" />;
+  return <>{children}</>;
+};
+
 const Home = () => {
   const { fieldWorks, createFieldWork, talhoes, inventories, isSynced, duplicateFieldWork } = useInventory();
   const { currentUser, signOut, status, uidToUse, theme, toggleTheme } = useAuth();
@@ -154,9 +163,11 @@ const Home = () => {
   useEffect(() => {
     // Se estiver no computador (tela >= 1024px) e não escolheu explicitamente o Modo Campo, vai para o Modo Escritório
     if (window.innerWidth >= 1024 && localStorage.getItem('preferredMode') !== 'field') {
-      navigate('/office');
+      if (currentUser?.uid === 'GBfcf5uqJNPNgS0FMowUcbPQAkB3') {
+        navigate('/office');
+      }
     }
-  }, [navigate]);
+  }, [navigate, currentUser]);
 
   useEffect(() => {
     if (!currentUser || (status !== 'active' && status !== 'admin')) return;
@@ -902,7 +913,7 @@ const Home = () => {
 
 
               {/* Painel do Escritório (Desktop Only) */}
-              {(status === 'active' || status === 'admin') && (
+              {currentUser?.uid === 'GBfcf5uqJNPNgS0FMowUcbPQAkB3' && (status === 'active' || status === 'admin') && (
                 <button 
                   className="btn btn-secondary desktop-only" 
                   style={{ display: 'flex', justifyContent: 'flex-start', width: '100%', borderColor: '#4fc3f7', color: '#4fc3f7', background: 'rgba(79, 195, 247, 0.08)' }}
@@ -965,7 +976,7 @@ function App() {
         <Route path="/collect" element={<ProtectedRoute><CollectData /></ProtectedRoute>} />
         <Route path="/detail/:id" element={<ProtectedRoute><InventoryDetail /></ProtectedRoute>} />
         <Route path="/admin" element={<ProtectedRoute><AdminAccounts /></ProtectedRoute>} />
-        <Route path="/office" element={<ProtectedRoute><OfficeDashboard /></ProtectedRoute>} />
+        <Route path="/office" element={<SuperAdminRoute><OfficeDashboard /></SuperAdminRoute>} />
         <Route path="/cubagem/setup/:fieldWorkId" element={<ProtectedRoute><CubagemSetup /></ProtectedRoute>} />
         <Route path="/cubagem/setup/:fieldWorkId/:talhaoId" element={<ProtectedRoute><CubagemSetup /></ProtectedRoute>} />
         <Route path="/cubagem/collect/:inventoryId" element={<ProtectedRoute><CubagemCollect /></ProtectedRoute>} />
