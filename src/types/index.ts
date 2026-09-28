@@ -37,6 +37,10 @@ export interface IndividualData {
   volumeTotal?: number;
   volumePorSecao?: { secao: number; volume: number }[];
   dataCalculo?: string;
+  // Parcelas Permanentes
+  medicoes?: Record<string, any>; // Guarda os dados dinâmicos por ID da medição
+  isDead?: boolean; // Se a árvore foi marcada como morta
+  deadAtMedicaoId?: string; // Em qual medição ela foi dada como morta
   [key: string]: any; 
 }
 
@@ -83,7 +87,8 @@ export interface FieldWork {
   dataInicio: string;
   status: string;
   googleSheetsUrl?: string;
-  modoInventario?: 'parcelas' | 'censo';
+  modoInventario?: 'parcelas' | 'censo' | 'permanente';
+  medicoes?: { id: string; nome: string; data: string }[]; // Para parcelas permanentes
   selectedHeightModelId?: string;
   selectedVolumeModelId?: string;
   defaultFatorForma?: string | number;

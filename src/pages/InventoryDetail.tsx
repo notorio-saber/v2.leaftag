@@ -30,6 +30,30 @@ export const InventoryDetail = () => {
   const [isZipping, setIsZipping] = useState(false);
   const [showDashboard, setShowDashboard] = useState(false);
 
+  const isPermanente = fieldwork?.modoInventario === 'permanente';
+  const medicoes = fieldwork?.medicoes || [];
+  const [selectedMedicaoId, setSelectedMedicaoId] = useState<string>(medicoes.length > 0 ? medicoes[medicoes.length - 1].id : '');
+
+  const displayDados = useMemo(() => {
+    if (!inventory || !inventory.dados) return [];
+    if (!isPermanente || !selectedMedicaoId) return inventory.dados;
+    
+    return inventory.dados.map((ind: any) => {
+      const med = ind.medicoes?.[selectedMedicaoId];
+      if (!med && !ind.isDead) return null; // Árvore não foi medida nesta ocasião
+      
+      const isDeadInThisOrPast = ind.isDead && (ind.deadAtMedicaoId === selectedMedicaoId || medicoes.findIndex((m: any)=>m.id===ind.deadAtMedicaoId) <= medicoes.findIndex((m: any)=>m.id===selectedMedicaoId));
+
+      return {
+        ...ind,
+        ...(med || {}),
+        _originalInd: ind,
+        _isDeadNow: isDeadInThisOrPast,
+        _isMissing: !med && !isDeadInThisOrPast
+      };
+    }).filter(Boolean);
+  }, [inventory, isPermanente, selectedMedicaoId, medicoes]);
+
 
 
   // Helper para obter DAP a partir de cap ou dap
@@ -100,16 +124,16 @@ export const InventoryDetail = () => {
 
   // Sampling Sufficiency Logic (Assíntota)
   const isSufficiencyReached = (() => {
-    if (!inventory || inventory.dados.length < 30) return false;
+    if (!displayDados || displayDados.length < 30) return false;
     
-    const N = inventory.dados.length;
+    const N = displayDados.length;
     const threshold = Math.max(10, Math.floor(N * 0.2)); // Check at least last 10, or 20% of total
     const cutoffIndex = N - threshold;
 
     const oldSpecies = new Set<string>();
     const newWindowSpecies = new Set<string>();
 
-    inventory.dados.forEach((ind: any, index: number) => {
+    displayDados.forEach((ind: any, index: number) => {
       const sp = (ind.nomePopular || ind.nomeCientifico || 'Não Identificada').trim();
       if (index < cutoffIndex) {
         oldSpecies.add(sp);
@@ -173,9 +197,9 @@ export const InventoryDetail = () => {
 
   // Contagem de indivíduos com altura medida
   const measuredHeightsCount = useMemo(() => {
-    if (!inventory || !inventory.dados) return 0;
-    return inventory.dados.filter(hasHeightMeasured).length;
-  }, [inventory]);
+    if (!displayDados) return 0;
+    return displayDados.filter(hasHeightMeasured).length;
+  }, [displayDados]);
 
   // Auxiliar para obter o diâmetro/circunferência máxima do indivíduo (considera fustes se bifurcado)
   const getTreeMaxThickness = (ind: any) => {
@@ -199,8 +223,8 @@ export const InventoryDetail = () => {
 
   // Retorna os dados ordenados para exibição sem alterar a ordem real do banco de dados
   const sortedDados = (() => {
-    if (!inventory || !inventory.dados) return [];
-    const dadosCopy = [...inventory.dados];
+    if (!displayDados) return [];
+    const dadosCopy = [...displayDados];
     if (sortType === 'height') {
       return dadosCopy.sort((a, b) => getTreeMaxHeight(b) - getTreeMaxHeight(a));
     }
@@ -223,7 +247,7 @@ export const InventoryDetail = () => {
   }
 
   const handleExportRaw = () => {
-    const data = inventory.dados.flatMap(ind => {
+    const data = displayDados.flatMap((ind: any) => {
       let baseData: any = {
         'Talhão': talhao ? talhao.nome : 'Sem Talhão',
         'Talhão Observações': talhao?.observacoes || '',
@@ -265,7 +289,7 @@ export const InventoryDetail = () => {
   };
 
   const handleExportProcessed = () => {
-    const data = inventory.dados.flatMap(ind => {
+    const data = displayDados.flatMap((ind: any) => {
       let baseData: any = {
         'Talhão': talhao ? talhao.nome : 'Sem Talhão',
         'Talhão Observações': talhao?.observacoes || '',
@@ -572,6 +596,16 @@ export const InventoryDetail = () => {
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <h2 style={{ color: 'var(--primary-hover)', fontSize: '24px', fontWeight: '800', margin: 0 }}>{inventory.nome}</h2>
             
+            {isPermanente && medicoes.length > 0 && (
+              <select 
+                value={selectedMedicaoId} 
+                onChange={e => setSelectedMedicaoId(e.target.value)}
+                style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', borderRadius: '4px', padding: '4px 8px', fontSize: '13px', outline: 'none' }}
+              >
+                {medicoes.map((m: any) => <option key={m.id} value={m.id} style={{color: '#000'}}>{m.nome}</option>)}
+              </select>
+            )}
+
             {/* Cloud Sync Icon */}
             <div 
               style={{
@@ -756,7 +790,7 @@ export const InventoryDetail = () => {
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <h3 style={{ margin: 0, fontSize: '17px', fontWeight: '800' }}>Dados Coletados ({inventory.dados.length})</h3>
+              <h3 style={{ margin: 0, fontSize: '17px', fontWeight: '800' }}>Dados Coletados ({displayDados.length})</h3>
               {isSufficiencyReached && (
                 <span style={{ 
                   background: 'rgba(46, 125, 50, 0.15)', 
@@ -774,7 +808,7 @@ export const InventoryDetail = () => {
             </div>
 
             {/* Seletor de Ordenação Glassmórfico */}
-            {inventory.dados.length > 0 && (
+            {displayDados.length > 0 && (
               <div style={{ 
                 display: 'flex', 
                 background: 'rgba(255, 255, 255, 0.03)', 
@@ -847,7 +881,7 @@ export const InventoryDetail = () => {
         </div>
         
         <div style={{ overflowX: 'auto', padding: '8px 16px 20px 16px' }}>
-          {inventory.dados.length === 0 ? (
+          {displayDados.length === 0 ? (
             <p style={{ color: 'var(--text-muted)', padding: '24px 8px', fontSize: '14px' }}>Nenhum indivíduo coletado nesta parcela ainda.</p>
           ) : (
             <table style={{ width: '100%', minWidth: '600px' }}>

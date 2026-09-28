@@ -251,13 +251,18 @@ const Home = () => {
       ? new Date(newFwDate + 'T12:00:00').toLocaleDateString('pt-BR')
       : new Date().toLocaleDateString('pt-BR');
 
+    const initialMedicoes = newFwModo === 'permanente' 
+      ? [{ id: Date.now().toString(), nome: 'Medição 1', data: formattedDate }]
+      : undefined;
+
     createFieldWork({
       id: Date.now().toString(),
       nome: newFwName,
       local: newFwLocal || 'Não especificado',
       dataInicio: formattedDate,
       status: 'Aberto',
-      modoInventario: newFwModo
+      modoInventario: newFwModo,
+      medicoes: initialMedicoes
     });
     setShowModal(false);
     setNewFwName('');
@@ -712,6 +717,13 @@ const Home = () => {
                     onClick={() => setNewFwModo('censo')}
                   >
                     Censo (100%)
+                  </button>
+                  <button 
+                    className="btn" 
+                    style={{ flex: 1, padding: '8px', fontSize: '13px', background: newFwModo === 'permanente' ? 'rgba(46, 125, 50, 0.15)' : 'rgba(255,255,255,0.05)', border: newFwModo === 'permanente' ? '1px solid var(--primary-color)' : '1px solid rgba(255,255,255,0.1)' }}
+                    onClick={() => setNewFwModo('permanente')}
+                  >
+                    Parcelas Permanentes
                   </button>
                 </div>
               </div>

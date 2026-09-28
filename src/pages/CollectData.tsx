@@ -102,8 +102,34 @@ export const CollectData = () => {
     return null;
   }
 
+  const fw = fieldWorks.find(f => f.id === currentInventory.fieldWorkId);
+  const isCenso = fw?.modoInventario === 'censo';
+  const isPermanente = fw?.modoInventario === 'permanente';
+  const medicoes = fw?.medicoes || [];
+  
+  const [currentMedicaoId, setCurrentMedicaoId] = useState<string>(medicoes.length > 0 ? medicoes[medicoes.length - 1].id : '');
+
+  // Calculate target tree logic for permanent plots
+  let targetTree: any = null;
+  let currentIdx = currentInventory.dados.length + 1;
+  let prevData: any = {};
+  
+  if (isPermanente && currentMedicaoId) {
+    const prevMedicaoIndex = medicoes.findIndex(m => m.id === currentMedicaoId) - 1;
+    const prevMedicaoId = prevMedicaoIndex >= 0 ? medicoes[prevMedicaoIndex].id : null;
+    
+    targetTree = currentInventory.dados.find(d => !d.medicoes?.[currentMedicaoId] && !d.isDead);
+    if (targetTree) {
+      currentIdx = targetTree.numeroIndividuo;
+      if (prevMedicaoId && targetTree.medicoes?.[prevMedicaoId]) {
+         prevData = targetTree.medicoes[prevMedicaoId];
+      }
+    } else {
+      currentIdx = currentInventory.dados.length + 1; // Ingresso
+    }
+  }
+
   const columns = currentInventory.colunas;
-  const currentIdx = currentInventory.dados.length + 1;
   const currentCol = columns[stepIndex];
 
   const isNumActive = activeNumField !== null && activeNumField.title === currentCol?.nome;
@@ -334,16 +360,44 @@ export const CollectData = () => {
       }
     }
     
-    const newIndividual = {
-      id: individualId,
-      numeroIndividuo: currentIdx,
-      timestamp: new Date().toLocaleString('pt-BR'),
-      multipleStems: multiStems,
-      ...(multiStems && { stems: stems.map((s: any) => ({id: s.id, cap: parseFloat((s.cap||'0').toString().replace(',', '.')), alturaComercial: parseFloat((s.alturaComercial||'0').toString().replace(',', '.')), alturaTotal: parseFloat((s.alturaTotal||'0').toString().replace(',', '.'))})) }),
-      ...processedFormData
-    };
-    
-    freshInv.dados.push(newIndividual);
+    const processedStems = multiStems ? stems.map((s: any) => ({id: s.id, cap: parseFloat((s.cap||'0').toString().replace(',', '.')), alturaComercial: parseFloat((s.alturaComercial||'0').toString().replace(',', '.')), alturaTotal: parseFloat((s.alturaTotal||'0').toString().replace(',', '.'))})) : undefined;
+    const mergedData = { ...prevData, ...processedFormData };
+    if (multiStems && isPermanente) {
+      mergedData.stems = processedStems;
+    }
+
+    let newIndividual;
+    if (isPermanente && targetTree) {
+       newIndividual = {
+         ...targetTree,
+         multipleStems: multiStems,
+         medicoes: {
+           ...(targetTree.medicoes || {}),
+           [currentMedicaoId]: mergedData
+         }
+       };
+       const idx = freshInv.dados.findIndex((d: any) => d.id === targetTree.id);
+       freshInv.dados[idx] = newIndividual;
+    } else if (isPermanente && !targetTree) {
+       newIndividual = {
+         id: individualId,
+         numeroIndividuo: currentIdx,
+         timestamp: new Date().toLocaleString('pt-BR'),
+         multipleStems: multiStems,
+         medicoes: { [currentMedicaoId]: mergedData }
+       };
+       freshInv.dados.push(newIndividual);
+    } else {
+       newIndividual = {
+         id: individualId,
+         numeroIndividuo: currentIdx,
+         timestamp: new Date().toLocaleString('pt-BR'),
+         multipleStems: multiStems,
+         ...(multiStems && { stems: processedStems }),
+         ...processedFormData
+       };
+       freshInv.dados.push(newIndividual);
+    }
     freshInv.ultimaColeta = new Date().toLocaleDateString('pt-BR');
     
     setCurrentInventory(freshInv);
@@ -395,9 +449,22 @@ export const CollectData = () => {
       >
         {/* Wizard Header & Progress */}
         <div>
-          <div className="app-header" style={{ marginBottom: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'nowrap' }}>
+          <div className="app-header" style={{ marginBottom: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
             <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
               <h2 style={{ color: '#ffffff', fontSize: '17px', fontWeight: '800', margin: 0, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{currentInventory.nome}</h2>
+              {isPermanente && medicoes.length > 0 && (
+                <select 
+                  value={currentMedicaoId} 
+                  onChange={e => {
+                    setCurrentMedicaoId(e.target.value);
+                    setStepIndex(0);
+                    setFormData({});
+                  }}
+                  style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', borderRadius: '4px', padding: '2px 4px', fontSize: '12px', outline: 'none' }}
+                >
+                  {medicoes.map((m: any) => <option key={m.id} value={m.id} style={{color: '#000'}}>{m.nome}</option>)}
+                </select>
+              )}
               
               {/* Cloud Sync Icon */}
               <div 
@@ -430,6 +497,27 @@ export const CollectData = () => {
               </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+              {isPermanente && targetTree && (
+                <button 
+                  className="btn btn-danger" 
+                  style={{ width: 'auto', padding: '6px 10px', fontSize: '10px', height: '30px' }} 
+                  onClick={() => {
+                    if(confirm(`Tem certeza que deseja marcar a árvore #${currentIdx} como MORTA?`)) {
+                      const freshInv = JSON.parse(JSON.stringify(currentInventory));
+                      const idx = freshInv.dados.findIndex((d: any) => d.id === targetTree.id);
+                      freshInv.dados[idx].isDead = true;
+                      freshInv.dados[idx].deadAtMedicaoId = currentMedicaoId;
+                      freshInv.ultimaColeta = new Date().toLocaleDateString('pt-BR');
+                      setCurrentInventory(freshInv);
+                      saveInventory(freshInv);
+                      setFormData({});
+                      setStepIndex(0);
+                    }
+                  }}
+                >
+                  Marcar Morta
+                </button>
+              )}
               <div style={{
                 background: 'rgba(46, 125, 50, 0.15)',
                 border: '1px solid rgba(46, 125, 50, 0.45)',
@@ -473,8 +561,15 @@ export const CollectData = () => {
             <span style={{ fontSize: '10px', color: 'var(--primary-hover)', textTransform: 'uppercase', letterSpacing: '1.5px', fontWeight: 'bold' }}>Campo {stepIndex + 1} de {columns.length}</span>
             <h1 style={{ fontSize: '22px', margin: '6px 0', color: '#ffffff', fontWeight: '800' }}>{currentCol.nome}</h1>
             
+            {isPermanente && prevData && prevData[currentCol.id] && (
+              <div style={{ marginTop: '8px', padding: '6px 12px', background: 'rgba(255, 152, 0, 0.15)', border: '1px solid rgba(255, 152, 0, 0.3)', borderRadius: '8px', display: 'inline-block' }}>
+                <span style={{ fontSize: '11px', color: '#ff9800', fontWeight: 'bold', textTransform: 'uppercase', display: 'block', marginBottom: '2px' }}>Medição Anterior</span>
+                <span style={{ fontSize: '14px', color: '#fff', fontWeight: '500' }}>{prevData[currentCol.id]}</span>
+              </div>
+            )}
+
             {(() => {
-               if (currentIdx > 1 && currentInventory.dados && currentInventory.dados.length > 0 && !['foto', 'coordenadas'].includes(currentCol.id)) {
+               if (!isPermanente && currentIdx > 1 && currentInventory.dados && currentInventory.dados.length > 0 && !['foto', 'coordenadas'].includes(currentCol.id)) {
                  const lastValue = currentInventory.dados[currentInventory.dados.length - 1][currentCol.id];
                  if (lastValue !== undefined && lastValue !== '') {
                    return (

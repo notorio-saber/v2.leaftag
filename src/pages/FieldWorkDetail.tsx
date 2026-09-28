@@ -32,10 +32,11 @@ export const FieldWorkDetail = () => {
   const [showSheetsModal, setShowSheetsModal] = useState(false);
   const [googleSheetsUrlInput, setGoogleSheetsUrlInput] = useState('');
   const [isSyncingSheets, setIsSyncingSheets] = useState(false);
-  const [activeSubTab, setActiveSubTab] = useState<'inventario' | 'cubagem'>('inventario');
+  const [activeSubTab, setActiveSubTab] = useState<'inventario' | 'cubagem' | 'medicoes'>('inventario');
 
   const fw = fieldWorks.find(f => f.id === id);
   const isCenso = fw?.modoInventario === 'censo';
+  const isPermanente = fw?.modoInventario === 'permanente';
 
   useEffect(() => {
     if (fw) {
@@ -109,6 +110,22 @@ export const FieldWorkDetail = () => {
     if (confirm('Tem certeza que deseja apagar este Trabalho de Campo, todos os seus talhões e todas as suas parcelas?')) {
       deleteFieldWork(fw.id);
       navigate('/');
+    }
+  };
+
+  const handleCreateMedicao = () => {
+    const nome = prompt("Nome da nova medição (Ex: Ano 2, Medição 2025):");
+    if (!nome) return;
+    const data = new Date().toLocaleDateString('pt-BR');
+    const newMedicao = { id: Date.now().toString(), nome, data };
+    const newMedicoes = [...(fw.medicoes || []), newMedicao];
+    createFieldWork({ ...fw, medicoes: newMedicoes });
+  };
+
+  const handleDeleteMedicao = (medicaoId: string) => {
+    if (confirm('Atenção: Apagar a medição não apagará os dados já coletados nas árvores. Deseja remover esta medição da lista?')) {
+      const newMedicoes = (fw.medicoes || []).filter(m => m.id !== medicaoId);
+      createFieldWork({ ...fw, medicoes: newMedicoes });
     }
   };
 
@@ -433,6 +450,25 @@ export const FieldWorkDetail = () => {
         >
           {isCenso ? `Áreas de Censo (${parcels.length})` : `Parcelas e Talhões (${parcels.length})`}
         </button>
+        {isPermanente && (
+          <button 
+            onClick={() => setActiveSubTab('medicoes')}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: activeSubTab === 'medicoes' ? '#ff9800' : 'var(--text-muted)',
+              borderBottom: activeSubTab === 'medicoes' ? '3px solid #ff9800' : 'none',
+              padding: '8px 16px',
+              cursor: 'pointer',
+              fontWeight: 'bold',
+              fontSize: '14.5px',
+              transition: 'all 0.2s ease',
+              outline: 'none'
+            }}
+          >
+            Ocasiões / Medições ({(fw.medicoes || []).length})
+          </button>
+        )}
         <button 
           onClick={() => setActiveSubTab('cubagem')}
           style={{
@@ -830,6 +866,51 @@ export const FieldWorkDetail = () => {
         )
       )}
         </>
+      )}
+
+      {activeSubTab === 'medicoes' && isPermanente && (
+        <div style={{ marginTop: '24px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+            <h2 style={{ fontSize: '18px', fontWeight: '800', margin: 0, color: '#ff9800' }}>Campanhas de Medição</h2>
+            <button className="btn btn-primary" style={{ background: '#ff9800', borderColor: '#ff9800' }} onClick={handleCreateMedicao}>
+              + Nova Medição
+            </button>
+          </div>
+          
+          <div className="glass-card" style={{ padding: '0' }}>
+            {(fw.medicoes || []).length === 0 ? (
+              <p style={{ padding: '24px', color: 'var(--text-muted)' }}>Nenhuma medição cadastrada.</p>
+            ) : (
+              <table style={{ width: '100%', minWidth: '400px' }}>
+                <thead>
+                  <tr>
+                    <th>Nome da Medição</th>
+                    <th>Data de Criação</th>
+                    <th style={{ textAlign: 'right' }}>Ações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(fw.medicoes || []).map((m: any, idx: number) => (
+                    <tr key={m.id}>
+                      <td style={{ fontWeight: 'bold' }}>{m.nome}</td>
+                      <td>{m.data}</td>
+                      <td style={{ textAlign: 'right' }}>
+                        {idx > 0 && (
+                          <button className="btn btn-danger" style={{ padding: '6px 12px', fontSize: '12px' }} onClick={() => handleDeleteMedicao(m.id)}>
+                            Excluir
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+          <p style={{ marginTop: '12px', fontSize: '12px', color: 'var(--text-muted)' }}>
+            * Em Parcelas Permanentes, a árvore herda as informações de espécie/localização, permitindo monitoramento de crescimento contínuo, mortalidade e ingressos ao longo dos anos. A "Medição 1" não pode ser excluída.
+          </p>
+        </div>
       )}
 
       {activeSubTab === 'cubagem' && (
