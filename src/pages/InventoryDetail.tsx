@@ -1,10 +1,11 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useInventory } from '../context/InventoryContext';
+import { useAuth } from '../context/AuthContext';
 import * as XLSX from 'xlsx';
 import JSZip from 'jszip';
 import { calculateBasalArea, calculateVolume } from '../utils/forestryCalculations';
-import { getPhotosForInventory, deletePhotosForIndividual } from '../utils/photoStorage';
+import { getPhotosForInventory, deletePhotosForIndividual, uploadPhotosToStorage, getCloudPhotosCount, getCloudPhotosBlobs } from '../utils/photoStorage';
 import { StatisticalDashboard } from '../components/StatisticalDashboard';
 import { getCurrentPosition } from '../utils/gpsOperations';
 
@@ -12,6 +13,7 @@ export const InventoryDetail = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const { inventories, deleteInventory, setCurrentInventory, fieldWorks, saveInventory, talhoes, isSynced } = useInventory();
+  const { uidToUse } = useAuth();
   
   const inventory = inventories.find(i => i.id.toString() === id);
   const fieldwork = fieldWorks.find(f => f.id === inventory?.fieldWorkId);
@@ -403,6 +405,89 @@ export const InventoryDetail = () => {
     setEditingInd(JSON.parse(JSON.stringify(nextInd)));
   };
 
+  const [localPhotosCount, setLocalPhotosCount] = useState<number>(0);
+  const [cloudPhotosCount, setCloudPhotosCount] = useState<number>(0);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+
+  useEffect(() => {
+    if (inventory && uidToUse) {
+      const checkPhotos = async () => {
+        try {
+          const local = await getPhotosForInventory(inventory.id);
+          setLocalPhotosCount(local.length);
+          if (navigator.onLine) {
+            const cloudCount = await getCloudPhotosCount(inventory.id, uidToUse);
+            setCloudPhotosCount(cloudCount);
+          }
+        } catch (err) {
+          console.error(err);
+        }
+      };
+      checkPhotos();
+    }
+  }, [inventory, uidToUse]);
+
+  const handleUploadPhotos = async () => {
+    if (!navigator.onLine) {
+      alert("Você precisa estar conectado à internet para fazer upload para a nuvem.");
+      return;
+    }
+    if (!uidToUse || !inventory) return;
+    
+    setIsUploading(true);
+    setUploadProgress(0);
+    try {
+      await uploadPhotosToStorage(inventory.id, uidToUse, (done, total) => {
+        setUploadProgress(Math.round((done / total) * 100));
+      });
+      alert("Fotos enviadas para a nuvem com sucesso!");
+      const cloudCount = await getCloudPhotosCount(inventory.id, uidToUse);
+      setCloudPhotosCount(cloudCount);
+    } catch (err) {
+      console.error(err);
+      alert("Erro ao fazer upload das fotos: " + err);
+    }
+    setIsUploading(false);
+  };
+
+  const handleDownloadCloudPhotos = async () => {
+    if (!navigator.onLine) {
+      alert("Você precisa estar conectado à internet para baixar fotos da nuvem.");
+      return;
+    }
+    if (!uidToUse || !inventory) return;
+
+    setIsZipping(true);
+    try {
+      const blobs = await getCloudPhotosBlobs(inventory.id, uidToUse);
+      if (blobs.length === 0) {
+        alert("Nenhuma foto encontrada na nuvem.");
+        setIsZipping(false);
+        return;
+      }
+
+      const zip = new JSZip();
+      blobs.forEach(item => {
+        zip.file(item.fileName, item.blob);
+      });
+
+      const content = await zip.generateAsync({ type: 'blob' });
+      const url = window.URL.createObjectURL(content);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `Fotos_${inventory.nome.replace(/\s+/g, '_')}_Nuvem.zip`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+      alert("Erro ao baixar fotos da nuvem: " + err);
+    }
+    setIsZipping(false);
+  };
+
   const handleDownloadPhotos = async () => {
     setIsZipping(true);
     try {
@@ -551,14 +636,39 @@ export const InventoryDetail = () => {
           <button className="btn btn-secondary" style={{ flex: '1 1 180px', borderColor: '#2e7d32', color: '#a5d6a7', background: 'rgba(46, 125, 50, 0.08)' }} onClick={() => setShowDashboard(true)}>
             Dashboard Estatístico
           </button>
-          <button className="btn btn-secondary" style={{ flex: '1 1 180px', borderColor: '#009688', color: '#80cbc4', background: 'rgba(0, 150, 136, 0.08)' }} onClick={handleDownloadPhotos} disabled={isZipping}>
-            {isZipping ? "Gerando ZIP..." : "Galeria de Fotos (ZIP)"}
-          </button>
+
+          {localPhotosCount > 0 && (
+            <>
+              <button className="btn btn-secondary" style={{ flex: '1 1 180px', borderColor: '#009688', color: '#80cbc4', background: 'rgba(0, 150, 136, 0.08)' }} onClick={handleDownloadPhotos} disabled={isZipping || isUploading}>
+                {isZipping ? "Gerando ZIP..." : "Galeria de Fotos (Local)"}
+              </button>
+              <button className="btn btn-secondary" style={{ flex: '1 1 180px', borderColor: '#ff9800', color: '#ffb74d', background: 'rgba(255, 152, 0, 0.08)' }} onClick={handleUploadPhotos} disabled={isUploading || isZipping}>
+                {isUploading ? `Enviando... ${uploadProgress}%` : "Fazer Upload para Nuvem"}
+              </button>
+            </>
+          )}
+
+          {localPhotosCount === 0 && cloudPhotosCount > 0 && (
+            <button className="btn btn-secondary" style={{ flex: '1 1 180px', borderColor: '#03a9f4', color: '#81d4fa', background: 'rgba(3, 169, 244, 0.08)' }} onClick={handleDownloadCloudPhotos} disabled={isZipping}>
+              {isZipping ? "Baixando ZIP da Nuvem..." : "Baixar Fotos (Nuvem)"}
+            </button>
+          )}
         </div>
+
+        {localPhotosCount === 0 && cloudPhotosCount === 0 && !isCheckingPhotos && (
+          <div style={{ marginTop: '12px', padding: '12px', background: 'rgba(255, 152, 0, 0.1)', border: '1px solid rgba(255, 152, 0, 0.3)', borderRadius: '8px' }}>
+            <p style={{ margin: 0, fontSize: '12px', color: '#ffb74d', textAlign: 'center', lineHeight: 1.4 }}>
+              <strong>Atenção:</strong> As fotos deste trabalho ainda estão no dispositivo de campo.<br/>
+              Acesse o aplicativo através do celular utilizado na coleta e faça o upload para a nuvem.
+            </p>
+          </div>
+        )}
         
-        <p style={{ marginTop: '8px', fontSize: '11.5px', color: 'var(--text-muted)', textAlign: 'center', lineHeight: 1.4 }}>
-          * As fotos são salvas <strong>offline no dispositivo de coleta</strong>. Para baixar o ZIP, acesse o app pelo mesmo celular utilizado no campo e nos envie pelo WhatsApp ou computador.
-        </p>
+        {localPhotosCount > 0 && (
+          <p style={{ marginTop: '8px', fontSize: '11.5px', color: 'var(--text-muted)', textAlign: 'center', lineHeight: 1.4 }}>
+            * As fotos são salvas offline para economizar dados. Faça o <strong>Upload para Nuvem</strong> para acessá-las pelo computador.
+          </p>
+        )}
 
         {showExportOptions && (
           <div style={{ 

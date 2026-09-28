@@ -1,4 +1,7 @@
 // IndexedDB wrapper for offline photos
+import { storage } from '../lib/firebase';
+import { ref, uploadString, listAll, getBlob } from 'firebase/storage';
+
 const DB_NAME = 'LeafTagPhotosDB';
 const STORE_NAME = 'photos';
 
@@ -9,6 +12,40 @@ export interface PhotoRecord {
   fileName: string;
   base64Data: string;
 }
+
+export const uploadPhotosToStorage = async (inventoryId: number, uid: string, onProgress?: (done: number, total: number) => void): Promise<void> => {
+  const photos = await getPhotosForInventory(inventoryId);
+  if (photos.length === 0) return;
+  let done = 0;
+  for (const photo of photos) {
+    const storageRef = ref(storage, `users/${uid}/inventories/${inventoryId}/${photo.fileName}`);
+    await uploadString(storageRef, photo.base64Data, 'data_url');
+    done++;
+    if (onProgress) onProgress(done, photos.length);
+  }
+};
+
+export const getCloudPhotosCount = async (inventoryId: number, uid: string): Promise<number> => {
+  const listRef = ref(storage, `users/${uid}/inventories/${inventoryId}`);
+  try {
+    const res = await listAll(listRef);
+    return res.items.length;
+  } catch (e) {
+    return 0;
+  }
+};
+
+export const getCloudPhotosBlobs = async (inventoryId: number, uid: string): Promise<{fileName: string, blob: Blob}[]> => {
+  const listRef = ref(storage, `users/${uid}/inventories/${inventoryId}`);
+  const res = await listAll(listRef);
+  const items = [];
+  for (const item of res.items) {
+    const blob = await getBlob(item);
+    items.push({ fileName: item.name, blob });
+  }
+  return items;
+};
+
 
 export const initPhotoDB = (): Promise<IDBDatabase> => {
   return new Promise((resolve, reject) => {
