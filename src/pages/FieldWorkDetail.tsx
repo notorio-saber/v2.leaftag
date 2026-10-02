@@ -1081,7 +1081,6 @@ export const FieldWorkDetail = () => {
               </div>
            </div>
         </div>
-        </div>
       )}
 
       {(() => {
