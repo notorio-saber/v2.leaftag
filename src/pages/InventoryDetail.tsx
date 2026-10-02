@@ -598,6 +598,107 @@ export const InventoryDetail = () => {
     setIsZipping(false);
   };
 
+  const handleRecoverGhostTrees = async () => {
+    if (!inventory) return;
+    if (!confirm("Esta ferramenta avançada varre o banco local do seu navegador em busca de fotos órfãs (árvores que foram salvas mas se perderam devido a sobrescritas de sincronização). Deseja prosseguir?")) return;
+    
+    try {
+      const db = await new Promise<IDBDatabase>((resolve, reject) => {
+        const request = indexedDB.open('LeafTagPhotosDB', 1);
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => resolve(request.result);
+        request.onupgradeneeded = (e: any) => resolve(e.target.result);
+      });
+      
+      if (!db.objectStoreNames.contains('photos')) {
+        alert("Nenhuma foto encontrada neste dispositivo (banco de fotos não existe).");
+        return;
+      }
+
+      const tx = db.transaction('photos', 'readonly');
+      const store = tx.objectStore('photos');
+      const allPhotos = await new Promise<any[]>((resolve, reject) => {
+        const req = store.getAll();
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+
+      const photosForInv = allPhotos.filter(p => p.inventoryId === inventory.id);
+      
+      if (photosForInv.length === 0) {
+        alert("Nenhuma foto órfã encontrada no banco de dados local para esta parcela.");
+        return;
+      }
+
+      const freshInv = JSON.parse(JSON.stringify(inventory));
+      if (!freshInv.dados) freshInv.dados = [];
+      let recoveredCount = 0;
+
+      const photosByInd = photosForInv.reduce((acc, curr) => {
+        if (!acc[curr.individualId]) acc[curr.individualId] = [];
+        acc[curr.individualId].push(curr);
+        return acc;
+      }, {} as Record<string, any[]>);
+
+      for (const indId of Object.keys(photosByInd)) {
+        const exists = freshInv.dados.find((d:any) => d.id === indId);
+        if (!exists) {
+           const samplePhoto = photosByInd[indId][0];
+           const match = samplePhoto.fileName.match(/_Ind(\d+)_/);
+           const numeroIndividuo = match ? parseInt(match[1]) : freshInv.dados.length + 1;
+
+           const newTree: any = {
+             id: indId,
+             numeroIndividuo: numeroIndividuo,
+             timestamp: new Date().toLocaleString('pt-BR'),
+             observacoes: "ÁRVORE RECUPERADA PELO SISTEMA DE EMERGÊNCIA."
+           };
+           
+           photosByInd[indId].forEach(photo => {
+              const colMatch = photo.fileName.match(/_([^_]+)_\d+\.jpg$/);
+              if (colMatch && colMatch[1]) {
+                const colId = colMatch[1];
+                if (newTree[colId]) {
+                  if (!newTree[colId].includes(photo.fileName)) {
+                    newTree[colId] += `, ${photo.fileName}`;
+                  }
+                } else {
+                  newTree[colId] = photo.fileName;
+                }
+              } else {
+                  if (newTree['foto']) newTree['foto'] += `, ${photo.fileName}`;
+                  else newTree['foto'] = photo.fileName;
+              }
+           });
+
+           if (isPermanente && selectedMedicaoId) {
+             newTree.medicoes = {
+               [selectedMedicaoId]: {
+                 observacoes: "ÁRVORE RECUPERADA PELO SISTEMA DE EMERGÊNCIA.",
+                 ...newTree
+               }
+             };
+           }
+
+           freshInv.dados.push(newTree);
+           recoveredCount++;
+        }
+      }
+
+      if (recoveredCount > 0) {
+        freshInv.dados.sort((a:any, b:any) => a.numeroIndividuo - b.numeroIndividuo);
+        await saveInventory(freshInv);
+        alert(`Sucesso! ${recoveredCount} árvores fantasmas foram resgatadas. Elas aparecerão agora na planilha. Os dados numéricos foram perdidos, mas você pode usar a ferramenta de edição para preenchê-los novamete e visualizar as fotos anexadas.`);
+      } else {
+        alert("Nenhuma árvore fantasma foi encontrada. Todas as árvores cujas fotos estão neste celular já existem na planilha.");
+      }
+
+    } catch (err) {
+      console.error(err);
+      alert("Erro ao tentar recuperar árvores: " + err);
+    }
+  };
+
   return (
     <div className="container" style={{ marginTop: '20px' }}>
       {/* Breadcrumbs Navigation */}
@@ -748,10 +849,14 @@ export const InventoryDetail = () => {
                 {isZipping ? "Gerando ZIP..." : "Galeria de Fotos (Local)"}
               </button>
               <button className="btn btn-secondary" style={{ flex: '1 1 180px', borderColor: '#ff9800', color: '#ffb74d', background: 'rgba(255, 152, 0, 0.08)' }} onClick={handleUploadPhotos} disabled={isUploading || isZipping}>
-                {isUploading ? `Enviando... ${uploadProgress}%` : "Fazer Upload para Nuvem"}
+                {isUploading ? `Enviando... ${uploadProgress}%` : "Backup Nuvem"}
+              </button>
+              <button className="btn btn-secondary" style={{ flex: '1 1 180px', borderColor: '#e91e63', color: '#f48fb1', background: 'rgba(233, 30, 99, 0.08)' }} onClick={handleRecoverGhostTrees}>
+                🆘 Resgatar Árvores
               </button>
             </>
           )}
+
 
           {localPhotosCount === 0 && cloudPhotosCount > 0 && (
             <button className="btn btn-secondary" style={{ flex: '1 1 180px', borderColor: '#03a9f4', color: '#81d4fa', background: 'rgba(3, 169, 244, 0.08)' }} onClick={handleDownloadCloudPhotos} disabled={isZipping}>
