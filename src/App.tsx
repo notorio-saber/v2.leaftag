@@ -18,6 +18,7 @@ import { db } from './lib/firebase';
 import { OfficeDashboard } from './pages/OfficeDashboard';
 import { ModelosManagement } from './pages/ModelosManagement';
 import { Recovery } from './pages/Recovery';
+import { AdminRecovery } from './pages/AdminRecovery';
 
 // Permite apenas admin e active
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -1012,6 +1013,7 @@ function App() {
         <Route path="/cubagem/collect/:inventoryId" element={<ProtectedRoute><CubagemCollect /></ProtectedRoute>} />
         <Route path="/modelos" element={<ProtectedRoute><ModelosManagement /></ProtectedRoute>} />
         <Route path="/recovery" element={<ProtectedRoute><Recovery /></ProtectedRoute>} />
+        <Route path="/admin-recovery" element={<ProtectedRoute><AdminRecovery /></ProtectedRoute>} />
       </Routes>
     </BrowserRouter>
   );
