@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { doc, setDoc } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { ref, uploadString } from 'firebase/storage';
+import { storage } from '../lib/firebase';
 
 export const Recovery = () => {
   const [logs, setLogs] = useState<string[]>([]);
@@ -100,27 +100,20 @@ export const Recovery = () => {
         addLog(`Falha ao ler fotos: ${e.message}`);
       }
 
-      // 3. Enviar para Firestore
-      addLog("Compactando dados para envio seguro ao servidor...");
+      // 3. Enviar para Firebase Storage
+      addLog("Compactando dados para envio seguro ao Storage...");
       const dataStr = JSON.stringify(dumpData);
-      const chunkSize = 800000;
-      const chunks = [];
-      for (let i = 0; i < dataStr.length; i += chunkSize) {
-        chunks.push(dataStr.slice(i, i + chunkSize));
-      }
-      
-      addLog(`Dados divididos em ${chunks.length} partes. Enviando...`);
       
       if (!currentUser) throw new Error("Usuário não logado!");
       
-      for (let i = 0; i < chunks.length; i++) {
-        const docRef = doc(db, `users/${currentUser.uid}/recovery_dumps`, `dump_${Date.now()}_parte_${i}`);
-        await setDoc(docRef, { chunk: chunks[i], index: i, total: chunks.length, timestamp: new Date().toISOString() });
-        addLog(`Parte ${i+1}/${chunks.length} enviada com sucesso!`);
-      }
+      const fileName = `dump_${Date.now()}.json`;
+      const storageRef = ref(storage, `users/${currentUser.uid}/inventories/RECOVERY/${fileName}`);
       
-      addLog("✅ Concluído! O desenvolvedor já pode acessar os dados remotamente.");
-      addLog("Pode voltar para a tela inicial e aguardar o contato dele!");
+      addLog(`Enviando arquivo único (${Math.round(dataStr.length / 1024)} KB)...`);
+      await uploadString(storageRef, dataStr, 'raw', { contentType: 'application/json' });
+      
+      addLog("✅ Concluído! O arquivo foi salvo com sucesso no Firebase Storage.");
+      addLog("Pode voltar para a tela inicial e aguardar o contato do desenvolvedor!");
 
     } catch (e: any) {
       addLog(`❌ ERRO: ${e.message}`);
