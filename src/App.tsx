@@ -299,6 +299,22 @@ const Home = () => {
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <h1 style={{ color: 'var(--primary-color)', fontSize: '20px', whiteSpace: 'nowrap', margin: 0 }}>Trabalhos de Campo</h1>
               
+              <button 
+                onClick={() => navigate('/recovery')}
+                style={{
+                  background: '#d32f2f', 
+                  color: 'white', 
+                  border: 'none', 
+                  borderRadius: '4px', 
+                  padding: '4px 8px', 
+                  fontSize: '12px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  marginLeft: '8px'
+                }}>
+                SOS
+              </button>
+
               {/* Cloud Sync Icon */}
               <div 
                 style={{
