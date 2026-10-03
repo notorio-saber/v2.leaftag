@@ -1,8 +1,12 @@
 import React, { useState } from 'react';
+import { useAuth } from '../context/AuthContext';
+import { doc, setDoc } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 
 export const Recovery = () => {
   const [logs, setLogs] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+  const { currentUser } = useAuth();
 
   const addLog = (msg: string) => {
     setLogs(prev => [...prev, msg]);
@@ -96,18 +100,30 @@ export const Recovery = () => {
         addLog(`Falha ao ler fotos: ${e.message}`);
       }
 
-      // 3. Tentar ler LocalStorage e SessionStorage
-      addLog("Coletando LocalStorage...");
-      dumpData.localStorage = { ...localStorage };
+      // 3. Enviar para Firestore
+      addLog("Compactando dados para envio seguro ao servidor...");
+      const dataStr = JSON.stringify(dumpData);
+      const chunkSize = 800000;
+      const chunks = [];
+      for (let i = 0; i < dataStr.length; i += chunkSize) {
+        chunks.push(dataStr.slice(i, i + chunkSize));
+      }
       
-      addLog("Gerando arquivo de backup...");
-      downloadObjectAsJson(dumpData, `leaftag_recovery_${Date.now()}`);
+      addLog(`Dados divididos em ${chunks.length} partes. Enviando...`);
       
-      addLog("✅ Concluído! Arquivo gerado com sucesso.");
-      addLog("Por favor, envie esse arquivo JSON para o desenvolvedor analisar.");
+      if (!currentUser) throw new Error("Usuário não logado!");
+      
+      for (let i = 0; i < chunks.length; i++) {
+        const docRef = doc(db, `users/${currentUser.uid}/recovery_dumps`, `dump_${Date.now()}_parte_${i}`);
+        await setDoc(docRef, { chunk: chunks[i], index: i, total: chunks.length, timestamp: new Date().toISOString() });
+        addLog(`Parte ${i+1}/${chunks.length} enviada com sucesso!`);
+      }
+      
+      addLog("✅ Concluído! O desenvolvedor já pode acessar os dados remotamente.");
+      addLog("Pode voltar para a tela inicial e aguardar o contato dele!");
 
     } catch (e: any) {
-      addLog(`❌ ERRO FATAL: ${e.message}`);
+      addLog(`❌ ERRO: ${e.message}`);
     }
     setLoading(false);
   };
