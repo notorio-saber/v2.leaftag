@@ -310,7 +310,10 @@ export const CollectData = () => {
   };
 
   const handleDeletePrevInd = async () => {
-    if (!tempPrevIndData || reviewIndIndex === null) return;
+    if (!tempPrevIndData || reviewIndIndex === null || reviewIndIndex < 0 || !currentInventory?.dados || reviewIndIndex >= currentInventory.dados.length) {
+      alert("Erro: Referência inválida para exclusão da árvore.");
+      return;
+    }
     
     const confirmDelete = window.confirm(
       `Tem certeza de que deseja excluir permanentemente a Árvore #${tempPrevIndData.numeroIndividuo} e todas as suas fotos?`
@@ -318,14 +321,31 @@ export const CollectData = () => {
     if (!confirmDelete) return;
 
     try {
+      // Guardar na lixeira local antes de excluir
+      try {
+        const trash = JSON.parse(localStorage.getItem('leaftag_deleted_trees_trash') || '[]');
+        trash.push({
+          deletedAt: new Date().toISOString(),
+          inventoryId: currentInventory.id,
+          inventoryName: currentInventory.nome,
+          individual: tempPrevIndData
+        });
+        localStorage.setItem('leaftag_deleted_trees_trash', JSON.stringify(trash.slice(-100)));
+      } catch (err) {
+        console.warn("Erro ao salvar lixeira de segurança:", err);
+      }
+
       await deletePhotosForIndividual(tempPrevIndData.id);
       const freshInv = JSON.parse(JSON.stringify(currentInventory));
-      if (freshInv?.dados) {
+      if (freshInv?.dados && reviewIndIndex >= 0 && reviewIndIndex < freshInv.dados.length) {
         freshInv.dados.splice(reviewIndIndex, 1);
         freshInv.dados.forEach((d: any, idx: number) => {
           d.numeroIndividuo = idx + 1;
         });
         setCurrentInventory(freshInv);
+        try {
+          localStorage.setItem(`leaftag_active_collecting_${freshInv.id}`, JSON.stringify(freshInv));
+        } catch {}
         await saveInventory(freshInv);
       }
       setShowPrevIndModal(false);
@@ -437,8 +457,14 @@ export const CollectData = () => {
     }
     freshInv.ultimaColeta = new Date().toLocaleDateString('pt-BR');
     
+    // Ponto de checagem imediato offline no LocalStorage do celular
     setCurrentInventory(freshInv);
-    saveInventory(freshInv);
+    try {
+      localStorage.setItem(`leaftag_active_collecting_${freshInv.id}`, JSON.stringify(freshInv));
+    } catch (e) {
+      console.warn("Aviso ao salvar checkpoint local:", e);
+    }
+    await saveInventory(freshInv);
     
     // reset entire wizard
     setFormData({});

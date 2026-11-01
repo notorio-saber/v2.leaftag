@@ -169,18 +169,57 @@ const seedDefaultVolumeModels = async (uid: string) => {
 
 const InventoryContext = createContext<InventoryContextType | undefined>(undefined);
 
+const LOCAL_STORAGE_INVENTORIES = 'leaftag_local_inventories';
+const LOCAL_STORAGE_CURRENT_INV = 'leaftag_local_current_inventory';
+const LOCAL_STORAGE_SAFETY_PREFIX = 'leaftag_backup_inv_';
+
 export const InventoryProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const { currentUser, uidToUse } = useAuth();
   const [fieldWorks, setFieldWorks] = useState<FieldWork[]>([]);
   const [talhoes, setTalhoes] = useState<Talhao[]>([]);
-  const [inventories, setInventories] = useState<Inventory[]>([]);
+  const [inventories, setInventories] = useState<Inventory[]>(() => {
+    try {
+      const saved = localStorage.getItem(LOCAL_STORAGE_INVENTORIES);
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
   const [strata, setStrata] = useState<Stratum[]>([]);
   const [heightModels, setHeightModels] = useState<HeightModel[]>([]);
   const [volumeModels, setVolumeModels] = useState<VolumeModel[]>([]);
   const [processings, setProcessings] = useState<InventoryProcessing[]>([]);
-  const [currentInventory, setCurrentInventory] = useState<Inventory | null>(null);
+  const [currentInventory, setCurrentInventory] = useState<Inventory | null>(() => {
+    try {
+      const saved = localStorage.getItem(LOCAL_STORAGE_CURRENT_INV);
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
   const [sortimentRules, setSortimentRules] = useState<SortimentRule[]>([]);
   const [sortimentResults, setSortimentResults] = useState<SortimentResult[]>([]);
+
+  // Espelhamento síncrono no LocalStorage do celular para tolerância total a offline e reinicializações do app
+  useEffect(() => {
+    try {
+      if (inventories.length > 0) {
+        localStorage.setItem(LOCAL_STORAGE_INVENTORIES, JSON.stringify(inventories));
+      }
+    } catch (e) {
+      console.warn("Aviso ao salvar inventories no localStorage:", e);
+    }
+  }, [inventories]);
+
+  useEffect(() => {
+    try {
+      if (currentInventory) {
+        localStorage.setItem(LOCAL_STORAGE_CURRENT_INV, JSON.stringify(currentInventory));
+      }
+    } catch (e) {
+      console.warn("Aviso ao salvar currentInventory no localStorage:", e);
+    }
+  }, [currentInventory]);
 
   const [fwPending, setFwPending] = useState(false);
   const [talPending, setTalPending] = useState(false);
@@ -245,12 +284,35 @@ export const InventoryProvider: React.FC<{ children: ReactNode }> = ({ children 
     const invRef = collection(db, `users/${uidToUse}/inventories`);
     const unsubscribeInv = onSnapshot(invRef, { includeMetadataChanges: true }, (snapshot) => {
       setInvPending(snapshot.metadata.hasPendingWrites);
-      const data: Inventory[] = [];
+      const remoteData: Inventory[] = [];
       snapshot.forEach(doc => {
-        data.push(doc.data() as Inventory);
+        remoteData.push(doc.data() as Inventory);
       });
-      data.sort((a,b) => b.id - a.id);
-      setInventories(data);
+      remoteData.sort((a,b) => b.id - a.id);
+
+      setInventories(prev => {
+        // Fusão Segura: Uma versão antiga da nuvem NUNCA pode diminuir a quantidade de árvores salvas localmente
+        const merged = remoteData.map(remoteInv => {
+          const localInv = prev.find(p => p.id === remoteInv.id);
+          if (localInv && localInv.dados && remoteInv.dados) {
+            if (localInv.dados.length > remoteInv.dados.length) {
+              console.warn(`[LeafTag Sync] Preservando versão local de ${localInv.nome} (${localInv.dados.length} árvores) contra versão da nuvem (${remoteInv.dados.length} árvores)`);
+              return localInv;
+            }
+          }
+          return remoteInv;
+        });
+
+        // Preserva parcelas criadas offline que ainda não chegaram no snapshot remoto
+        prev.forEach(localInv => {
+          if (!merged.some(m => m.id === localInv.id)) {
+            merged.push(localInv);
+          }
+        });
+
+        merged.sort((a,b) => b.id - a.id);
+        return merged;
+      });
     }, (error) => {
       console.error("Erro no Sync do Inventário Firestore:", error);
     });
@@ -352,27 +414,73 @@ export const InventoryProvider: React.FC<{ children: ReactNode }> = ({ children 
     };
   }, [currentUser, uidToUse]);
 
-  // Atualizar reativamente a view caso currentInventory seja modificado por outra aba
+  // Atualizar reativamente a view caso currentInventory seja modificado por outra aba, SEM NUNCA REGREDIR ÁRVORES
   useEffect(() => {
     if (currentInventory) {
       const liveInv = inventories.find(i => i.id === currentInventory.id);
-      if (liveInv) setCurrentInventory(liveInv);
+      if (liveInv && liveInv.dados) {
+        // Bloqueio de Segurança: NUNCA permite que uma lista com menos árvores sobrescreva o inventário atual
+        if (!currentInventory.dados || liveInv.dados.length >= currentInventory.dados.length) {
+          setCurrentInventory(liveInv);
+        } else {
+          console.warn(`[LeafTag Guard] Bloqueada redução de currentInventory (${currentInventory.dados?.length} vs ${liveInv.dados.length})`);
+        }
+      }
     }
   }, [inventories]);
 
   const saveInventory = async (newInv: Inventory) => {
+    // 1. Atualização SÍNCRONA e IMEDIATA no estado do React (otimista, zero delay)
+    setInventories(prev => {
+      const idx = prev.findIndex(i => i.id === newInv.id);
+      if (idx >= 0) {
+        const next = [...prev];
+        next[idx] = newInv;
+        return next;
+      }
+      return [newInv, ...prev];
+    });
+
+    if (currentInventory?.id === newInv.id) {
+      setCurrentInventory(newInv);
+    }
+
+    // 2. Gravação IMEDIATA no LocalStorage + Snapshot de Segurança por Parcela
+    try {
+      localStorage.setItem(`${LOCAL_STORAGE_SAFETY_PREFIX}${newInv.id}`, JSON.stringify(newInv));
+    } catch (e) {
+      console.warn("Aviso ao salvar backup de segurança local:", e);
+    }
+
+    // 3. Gravação no Firestore (cache offline IndexedDB do Firestore + Nuvem quando online)
     if (!currentUser || !uidToUse) return;
-    const docRef = doc(db, `users/${uidToUse}/inventories`, newInv.id.toString());
-    await setDoc(docRef, cleanObject(newInv));
+    try {
+      const docRef = doc(db, `users/${uidToUse}/inventories`, newInv.id.toString());
+      await setDoc(docRef, cleanObject(newInv));
+    } catch (err) {
+      console.error("Erro ao sincronizar com Firestore (dados preservados localmente):", err);
+    }
   };
 
   const deleteInventory = async (id: number) => {
-    if (!currentUser || !uidToUse) return;
-    const docRef = doc(db, `users/${uidToUse}/inventories`, id.toString());
-    await deleteDoc(docRef);
-
+    // 1. Atualização síncrona local
+    setInventories(prev => prev.filter(i => i.id !== id));
     if (currentInventory?.id === id) {
       setCurrentInventory(null);
+    }
+
+    // 2. Limpeza local
+    try {
+      localStorage.removeItem(`${LOCAL_STORAGE_SAFETY_PREFIX}${id}`);
+    } catch {}
+
+    // 3. Firestore
+    if (!currentUser || !uidToUse) return;
+    try {
+      const docRef = doc(db, `users/${uidToUse}/inventories`, id.toString());
+      await deleteDoc(docRef);
+    } catch (err) {
+      console.error("Erro ao deletar no Firestore:", err);
     }
   };
 

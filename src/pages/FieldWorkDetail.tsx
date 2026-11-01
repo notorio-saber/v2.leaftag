@@ -10,7 +10,7 @@ const generateId = () => Date.now().toString();
 export const FieldWorkDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { fieldWorks, talhoes, inventories, setCurrentInventory, deleteFieldWork, createTalhao, deleteTalhao, isSynced, strata, createFieldWork, deleteInventory } = useInventory();
+  const { fieldWorks, talhoes, inventories, currentInventory, setCurrentInventory, deleteFieldWork, createTalhao, deleteTalhao, isSynced, strata, createFieldWork, deleteInventory } = useInventory();
   const [showMap, setShowMap] = useState(false);
   const [showDashboard, setShowDashboard] = useState(false);
   const [talhaoDashboardId, setTalhaoDashboardId] = useState<string | null>(null);
@@ -361,34 +361,41 @@ export const FieldWorkDetail = () => {
     XLSX.writeFile(workbook, `Talhão_${talhaoNome.replace(/\s+/g, '_')}.xlsx`);
   };
 
-  const renderParcelCard = (inv: any) => (
-    <div 
-      key={inv.id} 
-      className="inventory-card" 
-      onClick={() => {
-          setCurrentInventory(inv);
-          const urlParams = isPermanente && activeMedicaoId ? `?medicaoId=${activeMedicaoId}` : '';
-          navigate(`/detail/${inv.id}${urlParams}`);
-      }}
-      style={{ cursor: 'pointer', flex: '1 1 240px' }}
-    >
-      <div className="inventory-card-title" style={{ fontSize: '17px' }}>{inv.nome}</div>
-      <div className="inventory-stats" style={{ marginTop: '10px', paddingTop: '10px' }}>
-        <div className="stat-item">
-          <span className="stat-value" style={{ fontSize: '18px' }}>{inv.dados.length}</span>
-          <span className="stat-label" style={{ fontSize: '8px' }}>Árvores</span>
-        </div>
-        <div className="stat-item">
-          <span className="stat-value" style={{ fontSize: '18px' }}>{inv.colunas.length}</span>
-          <span className="stat-label" style={{ fontSize: '8px' }}>Campos</span>
-        </div>
-        <div className="stat-item">
-          <span className="stat-value" style={{ fontSize: '18px' }}>{inv.areaParcela}</span>
-          <span className="stat-label" style={{ fontSize: '8px' }}>Área (m²)</span>
+  const renderParcelCard = (inv: any) => {
+    // Escolhe sempre a versao mais completa (preserva adicoes offline recentes)
+    const chosenInv = (currentInventory && currentInventory.id === inv.id && (currentInventory.dados?.length || 0) > (inv.dados?.length || 0))
+      ? currentInventory
+      : inv;
+
+    return (
+      <div 
+        key={inv.id} 
+        className="inventory-card" 
+        onClick={() => {
+            setCurrentInventory(chosenInv);
+            const urlParams = isPermanente && activeMedicaoId ? `?medicaoId=${activeMedicaoId}` : '';
+            navigate(`/detail/${inv.id}${urlParams}`);
+        }}
+        style={{ cursor: 'pointer', flex: '1 1 240px' }}
+      >
+        <div className="inventory-card-title" style={{ fontSize: '17px' }}>{chosenInv.nome}</div>
+        <div className="inventory-stats" style={{ marginTop: '10px', paddingTop: '10px' }}>
+          <div className="stat-item">
+            <span className="stat-value" style={{ fontSize: '18px' }}>{chosenInv.dados?.length || 0}</span>
+            <span className="stat-label" style={{ fontSize: '8px' }}>Ãrvores</span>
+          </div>
+          <div className="stat-item">
+            <span className="stat-value" style={{ fontSize: '18px' }}>{chosenInv.colunas?.length || 0}</span>
+            <span className="stat-label" style={{ fontSize: '8px' }}>Campos</span>
+          </div>
+          <div className="stat-item">
+            <span className="stat-value" style={{ fontSize: '18px' }}>{chosenInv.areaParcela}</span>
+            <span className="stat-label" style={{ fontSize: '8px' }}>Ãrea (mÂ²)</span>
+          </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div className="container" style={{ marginTop: '20px' }}>
@@ -981,7 +988,7 @@ export const FieldWorkDetail = () => {
                 <div className="inventory-stats" style={{ marginTop: '10px', paddingTop: '10px' }}>
                   <div className="stat-item">
                     <span className="stat-value" style={{ fontSize: '16px' }}>{inv.dados.length}</span>
-                    <span className="stat-label" style={{ fontSize: '8px' }}>Árvores</span>
+            <span className="stat-label" style={{ fontSize: '8px' }}>Ãrvores</span>
                   </div>
                   <div className="stat-item">
                     <span className="stat-value" style={{ fontSize: '16px' }}>{totalVol.toFixed(3)}</span>

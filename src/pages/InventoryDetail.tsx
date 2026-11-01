@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+mport { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useInventory } from '../context/InventoryContext';
 import { useAuth } from '../context/AuthContext';
@@ -189,6 +189,22 @@ export const InventoryDetail = () => {
   };
 
   // Auxiliar para obter a altura máxima do indivíduo (considera fustes se bifurcado)
+  const localSafetyInv = useMemo(() => {
+    if (!inventory) return null;
+    try {
+      const keys = [`leaftag_active_collecting_${inventory.id}`, `leaftag_backup_inv_${inventory.id}`];
+      for (const k of keys) {
+        const raw = localStorage.getItem(k);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && Array.isArray(parsed.dados) && parsed.dados.length > (inventory.dados?.length || 0)) {
+            return parsed;
+          }
+        }
+      }
+    } catch {}
+    return null;
+  }, [inventory]);
   const getTreeMaxHeight = (ind: any) => {
     let maxHt = parseFloat(ind.ht || '0');
     if (isNaN(maxHt)) maxHt = 0;
@@ -428,6 +444,7 @@ export const InventoryDetail = () => {
     if (targetIdx >= 0) {
       freshInv.dados[targetIdx] = editingInd;
       saveInventory(freshInv);
+      setCurrentInventory(freshInv);
       setEditingInd(null);
       showToast("Alterações salvas com sucesso!");
     }
@@ -599,6 +616,26 @@ export const InventoryDetail = () => {
   };
 
   const handleRecoverGhostTrees = async () => {
+    if (!inventory) return;
+    try {
+      const keys = [`leaftag_active_collecting_${inventory.id}`, `leaftag_backup_inv_${inventory.id}`];
+      for (const k of keys) {
+        const raw = localStorage.getItem(k);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed?.dados && parsed.dados.length > (inventory.dados?.length || 0)) {
+            if (confirm(`Encontrado backup no aparelho com ${parsed.dados.length} Ã¡rvores (atualmente sÃ£o ${inventory.dados.length}). Deseja restaurar este backup agora?`)) {
+              await saveInventory(parsed);
+              setCurrentInventory(parsed);
+              alert(`Sucesso! ${parsed.dados.length} Ã¡rvores restauradas do backup local.`);
+              return;
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.warn("Erro ao checar backup local:", e);
+    }
     if (!inventory) return;
     if (!confirm("Esta ferramenta avançada varre o banco local do seu navegador em busca de fotos órfãs (árvores que foram salvas mas se perderam devido a sobrescritas de sincronização). Deseja prosseguir?")) return;
     
@@ -851,11 +888,11 @@ export const InventoryDetail = () => {
               <button className="btn btn-secondary" style={{ flex: '1 1 180px', borderColor: '#ff9800', color: '#ffb74d', background: 'rgba(255, 152, 0, 0.08)' }} onClick={handleUploadPhotos} disabled={isUploading || isZipping}>
                 {isUploading ? `Enviando... ${uploadProgress}%` : "Backup Nuvem"}
               </button>
+            </>
+          )}
               <button className="btn btn-secondary" style={{ flex: '1 1 180px', borderColor: '#e91e63', color: '#f48fb1', background: 'rgba(233, 30, 99, 0.08)' }} onClick={handleRecoverGhostTrees}>
                 🆘 Resgatar Árvores
               </button>
-            </>
-          )}
 
 
           {localPhotosCount === 0 && cloudPhotosCount > 0 && (
@@ -920,6 +957,41 @@ export const InventoryDetail = () => {
         )}
       </div>
 
+      {localSafetyInv && (
+        <div style={{
+          marginTop: '16px',
+          marginBottom: '16px',
+          padding: '16px 20px',
+          background: 'rgba(255, 152, 0, 0.15)',
+          border: '1px solid rgba(255, 152, 0, 0.45)',
+          borderRadius: '16px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '12px'
+        }}>
+          <div>
+            <span style={{ fontSize: '15px', fontWeight: '800', color: '#ffb74d', display: 'block', marginBottom: '4px' }}>
+              ðŸ›¡ï¸ Backup de SeguranÃ§a Encontrado no Celular ({localSafetyInv.dados.length} Ã¡rvores)
+            </span>
+            <span style={{ fontSize: '13px', color: '#ffffff' }}>
+              Identificamos uma cÃ³pia salva na memÃ³ria deste aparelho contendo <strong>{localSafetyInv.dados.length} Ã¡rvores</strong> (a tela atual sÃ³ mostra {inventory.dados.length}). Deseja restaurar essas Ã¡rvores agora?
+            </span>
+          </div>
+          <button 
+            className="btn btn-primary" 
+            style={{ width: 'auto', background: '#ff9800', borderColor: '#ff9800', color: '#000', fontWeight: '800', padding: '10px 18px' }}
+            onClick={async () => {
+              await saveInventory(localSafetyInv);
+              setCurrentInventory(localSafetyInv);
+              showToast("Backup local restaurado com sucesso!");
+            }}
+          >
+            Restaurar {localSafetyInv.dados.length} Ãrvores
+          </button>
+        </div>
+      )}
       {/* Collected Data List */}
       <div className="glass-card" style={{ padding: 0 }}>
         <div style={{ 
@@ -1018,7 +1090,7 @@ export const InventoryDetail = () => {
               </div>
             )}
           </div>
-          <button className="btn btn-primary" style={{ width: 'auto', padding: '8px 16px' }} onClick={() => { setCurrentInventory(inventory); navigate('/collect'); }}>
+          <button className="btn btn-primary" style={{ width: 'auto', padding: '8px 16px' }} onClick={() => { const targetInv = inventories.find(i => i.id === inventory.id) || inventory; const chosen = (currentInventory && currentInventory.id === targetInv.id && (currentInventory.dados?.length || 0) > (targetInv.dados?.length || 0)) ? currentInventory : targetInv; setCurrentInventory(chosen); navigate('/collect'); }}>
             + Coletar Árvores
           </button>
         </div>
