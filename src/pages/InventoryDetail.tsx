@@ -14,7 +14,7 @@ export const InventoryDetail = () => {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
   const urlMedicaoId = searchParams.get('medicaoId');
-  const { inventories, deleteInventory, setCurrentInventory, fieldWorks, saveInventory, talhoes, isSynced } = useInventory();
+  const { inventories, currentInventory, deleteInventory, setCurrentInventory, fieldWorks, saveInventory, talhoes, isSynced } = useInventory();
   const { uidToUse } = useAuth();
   
   const inventory = inventories.find(i => i.id.toString() === id);
@@ -465,6 +465,17 @@ export const InventoryDetail = () => {
     // Switch to next/prev individual
     const nextInd = sortedDados[newIdx];
     setEditingInd(JSON.parse(JSON.stringify(nextInd)));
+  };
+
+  const handleStartCollecting = () => {
+    if (!inventory) return;
+    const targetInv = inventories.find(i => i.id === inventory.id) || inventory;
+    const chosen = (currentInventory && currentInventory.id === targetInv.id && (currentInventory.dados?.length || 0) > (targetInv.dados?.length || 0))
+      ? currentInventory
+      : targetInv;
+    setCurrentInventory(chosen);
+    const urlParams = isPermanente && selectedMedicaoId ? `?medicaoId=${selectedMedicaoId}` : '';
+    navigate(`/collect${urlParams}`);
   };
 
   const [localPhotosCount, setLocalPhotosCount] = useState<number>(0);
@@ -1090,7 +1101,7 @@ export const InventoryDetail = () => {
               </div>
             )}
           </div>
-          <button className="btn btn-primary" style={{ width: 'auto', padding: '8px 16px' }} onClick={() => { const targetInv = inventories.find(i => i.id === inventory.id) || inventory; const chosen = (currentInventory && currentInventory.id === targetInv.id && (currentInventory.dados?.length || 0) > (targetInv.dados?.length || 0)) ? currentInventory : targetInv; setCurrentInventory(chosen); navigate('/collect'); }}>
+          <button className="btn btn-primary" style={{ width: 'auto', padding: '8px 16px' }} onClick={handleStartCollecting}>
             + Coletar Árvores
           </button>
         </div>
