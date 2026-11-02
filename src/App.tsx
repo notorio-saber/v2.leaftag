@@ -135,7 +135,32 @@ const Home = () => {
              stemData['Número'] = `${ind.numeroIndividuo}${String.fromCharCode(65 + i)}`;
              
              const capCol = inv.colunas.find((c: any) => c.id === 'cap');
-             if (capCol) stemData[capCol.nome] = stem.cap || '';
+             const dapCol = inv.colunas.find((c: any) => c.id === 'dap');
+             let stemCapStr = stem.cap !== undefined && stem.cap !== null && stem.cap !== '' ? stem.cap.toString() : '';
+             let stemDapStr = stem.dap !== undefined && stem.dap !== null && stem.dap !== '' ? stem.dap.toString() : '';
+
+             if (stemCapStr && !stemDapStr) {
+               const capNum = parseFloat(stemCapStr.replace(',', '.'));
+               if (!isNaN(capNum) && capNum > 0) {
+                 if (dapCol && !capCol) {
+                   stemDapStr = capNum.toString();
+                 } else {
+                   stemDapStr = (capNum / Math.PI).toFixed(2);
+                 }
+               }
+             } else if (stemDapStr && !stemCapStr) {
+               const dapNum = parseFloat(stemDapStr.replace(',', '.'));
+               if (!isNaN(dapNum) && dapNum > 0) {
+                 if (capCol && !dapCol) {
+                   stemCapStr = dapNum.toString();
+                 } else {
+                   stemCapStr = (dapNum * Math.PI).toFixed(2);
+                 }
+               }
+             }
+
+             if (capCol) stemData[capCol.nome] = stemCapStr;
+             if (dapCol) stemData[dapCol.nome] = stemDapStr;
 
              const hcCol = inv.colunas.find((c: any) => c.id === 'hc');
              if (hcCol) stemData[hcCol.nome] = stem.alturaComercial || stem.altura || '';

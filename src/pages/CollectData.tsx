@@ -417,7 +417,26 @@ export const CollectData = () => {
       }
     }
     
-    const processedStems = multiStems ? stems.map((s: any) => ({id: s.id, cap: parseFloat((s.cap||'0').toString().replace(',', '.')), alturaComercial: parseFloat((s.alturaComercial||'0').toString().replace(',', '.')), alturaTotal: parseFloat((s.alturaTotal||'0').toString().replace(',', '.'))})) : undefined;
+    const isDapCol = columns.some((c: any) => c.id === 'dap') && !columns.some((c: any) => c.id === 'cap');
+    const processedStems = multiStems ? stems.map((s: any) => {
+      const rawNum = parseFloat((s.dap || s.cap || '0').toString().replace(',', '.'));
+      let capVal = s.cap !== undefined && s.cap !== '' ? parseFloat(s.cap.toString().replace(',', '.')) : 0;
+      let dapVal = s.dap !== undefined && s.dap !== '' ? parseFloat(s.dap.toString().replace(',', '.')) : 0;
+      if (isDapCol) {
+        if (!dapVal && rawNum > 0) dapVal = rawNum;
+        if (!capVal && rawNum > 0) capVal = parseFloat((rawNum * Math.PI).toFixed(2));
+      } else {
+        if (!capVal && rawNum > 0) capVal = rawNum;
+        if (!dapVal && rawNum > 0) dapVal = parseFloat((rawNum / Math.PI).toFixed(2));
+      }
+      return {
+        id: s.id,
+        cap: capVal,
+        dap: dapVal,
+        alturaComercial: parseFloat((s.alturaComercial||'0').toString().replace(',', '.')),
+        alturaTotal: parseFloat((s.alturaTotal||'0').toString().replace(',', '.'))
+      };
+    }) : undefined;
     const mergedData = { ...prevData, ...processedFormData };
     if (multiStems && isPermanente) {
       mergedData.stems = processedStems;
@@ -897,19 +916,31 @@ export const CollectData = () => {
                   }}>
                     <h4 style={{ marginBottom: '12px', color: 'var(--primary-hover)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 'bold' }}>Medições de Fustes</h4>
                     {stems.map((stem: any, i) => {
-                      const isCapActive = activeNumField !== null && activeNumField.title === `CAP do Fuste #${i+1}`;
+                      const isDapMode = currentCol.id === 'dap';
+                      const colLabel = isDapMode ? 'DAP' : 'CAP';
+                      const fieldTitle = `${colLabel} do Fuste #${i+1}`;
+                      const isCapActive = activeNumField !== null && activeNumField.title === fieldTitle;
                       const isAltComercialActive = activeNumField !== null && activeNumField.title === `Altura Comercial Fuste #${i+1}`;
                       const isAltTotalActive = activeNumField !== null && activeNumField.title === `Altura Total Fuste #${i+1}`;
                       
+                      const stemDisplayVal = (stem.dap || stem.cap || '').toString();
+
                       return (
                         <div key={stem.id} style={{ display: 'flex', gap: '4px', marginBottom: '10px', alignItems: 'center' }}>
                           <div 
                             onClick={() => setActiveNumField({
-                              title: `CAP do Fuste #${i+1}`,
-                              value: stem.cap.toString(),
+                              title: fieldTitle,
+                              value: stemDisplayVal,
                               onSave: (val) => {
                                 const s = [...stems];
-                                s[i].cap = val;
+                                const num = parseFloat(val.toString().replace(',', '.'));
+                                if (isDapMode) {
+                                  s[i].dap = val;
+                                  s[i].cap = !isNaN(num) && num > 0 ? (num * Math.PI).toFixed(2) : val;
+                                } else {
+                                  s[i].cap = val;
+                                  s[i].dap = !isNaN(num) && num > 0 ? (num / Math.PI).toFixed(2) : val;
+                                }
                                 setStems(s);
                               }
                             })}
@@ -933,16 +964,16 @@ export const CollectData = () => {
                             }}
                           >
                             {isCapActive ? (
-                              stem.cap ? (
+                              stemDisplayVal ? (
                                 <>
-                                  {stem.cap.toString()}
+                                  {stemDisplayVal}
                                   <span className="blinking-cursor" />
                                 </>
                               ) : (
                                 <span className="blinking-cursor" />
                               )
                             ) : (
-                              stem.cap ? stem.cap.toString() : <span style={{ color: 'rgba(255,255,255,0.15)' }}>CAP</span>
+                              stemDisplayVal ? stemDisplayVal : <span style={{ color: 'rgba(255,255,255,0.15)' }}>{colLabel}</span>
                             )}
                           </div>
 
@@ -1310,15 +1341,24 @@ export const CollectData = () => {
                       {editingPrevInd ? (
                         <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
                           <div style={{ flex: 1 }}>
-                            <label className="input-label" style={{ fontSize: '9px' }}>CAP</label>
+                            <label className="input-label" style={{ fontSize: '9px' }}>{columns.some((c: any) => c.id === 'dap') && !columns.some((c: any) => c.id === 'cap') ? 'DAP' : 'CAP'}</label>
                             <input 
                               type="number" 
                               className="input-field" 
-                              placeholder="CAP" 
-                              value={stem.cap || ''} 
+                              placeholder={columns.some((c: any) => c.id === 'dap') && !columns.some((c: any) => c.id === 'cap') ? 'DAP' : 'CAP'} 
+                              value={stem.dap || stem.cap || ''} 
                               onChange={e => {
                                 const s = [...tempPrevIndData.stems]; 
-                                s[i].cap = e.target.value; 
+                                const val = e.target.value;
+                                const num = parseFloat(val.replace(',', '.'));
+                                const isDapOnly = columns.some((c: any) => c.id === 'dap') && !columns.some((c: any) => c.id === 'cap');
+                                if (isDapOnly) {
+                                  s[i].dap = val;
+                                  s[i].cap = !isNaN(num) && num > 0 ? (num * Math.PI).toFixed(2) : val;
+                                } else {
+                                  s[i].cap = val;
+                                  s[i].dap = !isNaN(num) && num > 0 ? (num / Math.PI).toFixed(2) : val;
+                                }
                                 setTempPrevIndData({ ...tempPrevIndData, stems: s });
                               }} 
                               style={{ marginBottom: 0 }} 

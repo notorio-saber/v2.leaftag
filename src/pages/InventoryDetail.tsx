@@ -304,13 +304,38 @@ export const InventoryDetail = () => {
            const stemData = { ...baseData };
            stemData['Número'] = `${ind.numeroIndividuo}${String.fromCharCode(65 + i)}`;
            
-           const capCol = inventory.colunas.find(c => c.id === 'cap');
-           if (capCol) stemData[capCol.nome] = stem.cap || '';
+           const capCol = inventory.colunas.find((c: any) => c.id === 'cap');
+           const dapCol = inventory.colunas.find((c: any) => c.id === 'dap');
+           let stemCapStr = stem.cap !== undefined && stem.cap !== null && stem.cap !== '' ? stem.cap.toString() : '';
+           let stemDapStr = stem.dap !== undefined && stem.dap !== null && stem.dap !== '' ? stem.dap.toString() : '';
 
-           const hcCol = inventory.colunas.find(c => c.id === 'hc');
+           if (stemCapStr && !stemDapStr) {
+             const capNum = parseFloat(stemCapStr.replace(',', '.'));
+             if (!isNaN(capNum) && capNum > 0) {
+               if (dapCol && !capCol) {
+                 stemDapStr = capNum.toString();
+               } else {
+                 stemDapStr = (capNum / Math.PI).toFixed(2);
+               }
+             }
+           } else if (stemDapStr && !stemCapStr) {
+             const dapNum = parseFloat(stemDapStr.replace(',', '.'));
+             if (!isNaN(dapNum) && dapNum > 0) {
+               if (capCol && !dapCol) {
+                 stemCapStr = dapNum.toString();
+               } else {
+                 stemCapStr = (dapNum * Math.PI).toFixed(2);
+               }
+             }
+           }
+
+           if (capCol) stemData[capCol.nome] = stemCapStr;
+           if (dapCol) stemData[dapCol.nome] = stemDapStr;
+
+           const hcCol = inventory.colunas.find((c: any) => c.id === 'hc');
            if (hcCol) stemData[hcCol.nome] = stem.alturaComercial || stem.altura || '';
            
-           const htCol = inventory.colunas.find(c => c.id === 'ht');
+           const htCol = inventory.colunas.find((c: any) => c.id === 'ht');
            if (htCol) stemData[htCol.nome] = stem.alturaTotal || stem.altura || '';
            
            return stemData;
@@ -353,13 +378,38 @@ export const InventoryDetail = () => {
            const stemData = { ...baseData };
            stemData['Número'] = `${ind.numeroIndividuo}${String.fromCharCode(65 + i)}`;
 
-           const capCol = inventory.colunas.find(c => c.id === 'cap');
-           if (capCol) stemData[capCol.nome] = stem.cap || '';
+           const capCol = inventory.colunas.find((c: any) => c.id === 'cap');
+           const dapCol = inventory.colunas.find((c: any) => c.id === 'dap');
+           let stemCapStr = stem.cap !== undefined && stem.cap !== null && stem.cap !== '' ? stem.cap.toString() : '';
+           let stemDapStr = stem.dap !== undefined && stem.dap !== null && stem.dap !== '' ? stem.dap.toString() : '';
 
-           const hcCol = inventory.colunas.find(c => c.id === 'hc');
+           if (stemCapStr && !stemDapStr) {
+             const capNum = parseFloat(stemCapStr.replace(',', '.'));
+             if (!isNaN(capNum) && capNum > 0) {
+               if (dapCol && !capCol) {
+                 stemDapStr = capNum.toString();
+               } else {
+                 stemDapStr = (capNum / Math.PI).toFixed(2);
+               }
+             }
+           } else if (stemDapStr && !stemCapStr) {
+             const dapNum = parseFloat(stemDapStr.replace(',', '.'));
+             if (!isNaN(dapNum) && dapNum > 0) {
+               if (capCol && !dapCol) {
+                 stemCapStr = dapNum.toString();
+               } else {
+                 stemCapStr = (dapNum * Math.PI).toFixed(2);
+               }
+             }
+           }
+
+           if (capCol) stemData[capCol.nome] = stemCapStr;
+           if (dapCol) stemData[dapCol.nome] = stemDapStr;
+
+           const hcCol = inventory.colunas.find((c: any) => c.id === 'hc');
            if (hcCol) stemData[hcCol.nome] = stem.alturaComercial || stem.altura || '';
            
-           const htCol = inventory.colunas.find(c => c.id === 'ht');
+           const htCol = inventory.colunas.find((c: any) => c.id === 'ht');
            if (htCol) stemData[htCol.nome] = stem.alturaTotal || stem.altura || '';
 
            if (stem.alturaProcessada !== undefined) {
@@ -367,9 +417,10 @@ export const InventoryDetail = () => {
              stemData['Altura Medida/Estimada'] = stem.alturaMedidaOuEstimada === 'medida' ? 'Medida' : 'Estimada';
            }
 
+           const stemDapNum = parseFloat(stemDapStr.replace(',', '.')) || (parseFloat(stemCapStr.replace(',', '.')) / Math.PI) || 0;
+
            if (selectedCalcs.areaBasal) {
-             const capNum = parseFloat(stem.cap || '0');
-             const g = calculateBasalArea(capNum);
+             const g = calculateBasalArea(stemDapNum, true);
              stemData['Area_Basal (m2)'] = g.toFixed(4);
            }
 
@@ -377,16 +428,15 @@ export const InventoryDetail = () => {
              if (stem.volumeProcessado !== undefined) {
                stemData['Volume (m3)'] = stem.volumeProcessado;
              } else {
-               const capNum = parseFloat(stem.cap || '0');
-               const g = calculateBasalArea(capNum);
-               const stemVol = calculateVolume(g, parseFloat(stem.altura || '0'), parseFloat(fatorForma));
+               const g = calculateBasalArea(stemDapNum, true);
+               const stemHeight = parseFloat((stem.alturaTotal || stem.alturaComercial || stem.altura || '0').toString().replace(',', '.'));
+               const stemVol = calculateVolume(g, stemHeight, parseFloat(fatorForma));
                stemData['Volume (m3)'] = stemVol.toFixed(4);
              }
            }
 
            if (selectedCalcs.dapEquivalente) {
-             const capNum = parseFloat(stem.cap || '0');
-             stemData['DAP_Equivalente (cm)'] = (capNum / Math.PI).toFixed(2);
+             stemData['DAP_Equivalente (cm)'] = stemDapNum.toFixed(2);
            }
 
            if (ind.modeloUtilizado) {

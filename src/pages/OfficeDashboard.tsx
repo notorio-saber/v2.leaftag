@@ -280,7 +280,32 @@ export const OfficeDashboard = () => {
              stemData['Número'] = `${ind.numeroIndividuo}${String.fromCharCode(65 + i)}`;
              
              const capCol = inv.colunas.find((c: any) => c.id === 'cap');
-             if (capCol) stemData[capCol.nome] = stem.cap || '';
+             const dapCol = inv.colunas.find((c: any) => c.id === 'dap');
+             let stemCapStr = stem.cap !== undefined && stem.cap !== null && stem.cap !== '' ? stem.cap.toString() : '';
+             let stemDapStr = stem.dap !== undefined && stem.dap !== null && stem.dap !== '' ? stem.dap.toString() : '';
+
+             if (stemCapStr && !stemDapStr) {
+               const capNum = parseFloat(stemCapStr.replace(',', '.'));
+               if (!isNaN(capNum) && capNum > 0) {
+                 if (dapCol && !capCol) {
+                   stemDapStr = capNum.toString();
+                 } else {
+                   stemDapStr = (capNum / Math.PI).toFixed(2);
+                 }
+               }
+             } else if (stemDapStr && !stemCapStr) {
+               const dapNum = parseFloat(stemDapStr.replace(',', '.'));
+               if (!isNaN(dapNum) && dapNum > 0) {
+                 if (capCol && !dapCol) {
+                   stemCapStr = dapNum.toString();
+                 } else {
+                   stemCapStr = (dapNum * Math.PI).toFixed(2);
+                 }
+               }
+             }
+
+             if (capCol) stemData[capCol.nome] = stemCapStr;
+             if (dapCol) stemData[dapCol.nome] = stemDapStr;
 
              const hcCol = inv.colunas.find((c: any) => c.id === 'hc');
              if (hcCol) stemData[hcCol.nome] = stem.alturaComercial || stem.altura || '';
@@ -2007,7 +2032,32 @@ export const OfficeDashboard = () => {
              stemData['Número'] = `${ind.numeroIndividuo}${String.fromCharCode(65 + i)}`;
              
              const capCol = inv.colunas.find((c: any) => c.id === 'cap');
-             if (capCol) stemData[capCol.nome] = stem.cap || '';
+             const dapCol = inv.colunas.find((c: any) => c.id === 'dap');
+             let stemCapStr = stem.cap !== undefined && stem.cap !== null && stem.cap !== '' ? stem.cap.toString() : '';
+             let stemDapStr = stem.dap !== undefined && stem.dap !== null && stem.dap !== '' ? stem.dap.toString() : '';
+
+             if (stemCapStr && !stemDapStr) {
+               const capNum = parseFloat(stemCapStr.replace(',', '.'));
+               if (!isNaN(capNum) && capNum > 0) {
+                 if (dapCol && !capCol) {
+                   stemDapStr = capNum.toString();
+                 } else {
+                   stemDapStr = (capNum / Math.PI).toFixed(2);
+                 }
+               }
+             } else if (stemDapStr && !stemCapStr) {
+               const dapNum = parseFloat(stemDapStr.replace(',', '.'));
+               if (!isNaN(dapNum) && dapNum > 0) {
+                 if (capCol && !dapCol) {
+                   stemCapStr = dapNum.toString();
+                 } else {
+                   stemCapStr = (dapNum * Math.PI).toFixed(2);
+                 }
+               }
+             }
+
+             if (capCol) stemData[capCol.nome] = stemCapStr;
+             if (dapCol) stemData[dapCol.nome] = stemDapStr;
 
              const hcCol = inv.colunas.find((c: any) => c.id === 'hc');
              if (hcCol) stemData[hcCol.nome] = stem.alturaComercial || stem.altura || '';
@@ -2088,7 +2138,32 @@ export const OfficeDashboard = () => {
              stemData['Número'] = `${ind.numeroIndividuo}${String.fromCharCode(65 + i)}`;
              
              const capCol = inv.colunas.find((c: any) => c.id === 'cap');
-             if (capCol) stemData[capCol.nome] = stem.cap || '';
+             const dapCol = inv.colunas.find((c: any) => c.id === 'dap');
+             let stemCapStr = stem.cap !== undefined && stem.cap !== null && stem.cap !== '' ? stem.cap.toString() : '';
+             let stemDapStr = stem.dap !== undefined && stem.dap !== null && stem.dap !== '' ? stem.dap.toString() : '';
+
+             if (stemCapStr && !stemDapStr) {
+               const capNum = parseFloat(stemCapStr.replace(',', '.'));
+               if (!isNaN(capNum) && capNum > 0) {
+                 if (dapCol && !capCol) {
+                   stemDapStr = capNum.toString();
+                 } else {
+                   stemDapStr = (capNum / Math.PI).toFixed(2);
+                 }
+               }
+             } else if (stemDapStr && !stemCapStr) {
+               const dapNum = parseFloat(stemDapStr.replace(',', '.'));
+               if (!isNaN(dapNum) && dapNum > 0) {
+                 if (capCol && !dapCol) {
+                   stemCapStr = dapNum.toString();
+                 } else {
+                   stemCapStr = (dapNum * Math.PI).toFixed(2);
+                 }
+               }
+             }
+
+             if (capCol) stemData[capCol.nome] = stemCapStr;
+             if (dapCol) stemData[dapCol.nome] = stemDapStr;
 
              const hcCol = inv.colunas.find((c: any) => c.id === 'hc');
              if (hcCol) stemData[hcCol.nome] = stem.alturaComercial || stem.altura || '';
@@ -2096,16 +2171,17 @@ export const OfficeDashboard = () => {
              const htCol = inv.colunas.find((c: any) => c.id === 'ht');
              if (htCol) stemData[htCol.nome] = stem.alturaTotal || stem.altura || '';
 
-             stemData['DAP_Equivalente (cm)'] = stem.cap ? (parseFloat(stem.cap) / Math.PI).toFixed(2) : '0';
+             const stemDapNum = parseFloat(stemDapStr.replace(',', '.')) || (parseFloat(stemCapStr.replace(',', '.')) / Math.PI) || 0;
+             stemData['DAP_Equivalente (cm)'] = stemDapNum > 0 ? stemDapNum.toFixed(2) : '0';
              
-             const g = calculateBasalArea(parseFloat(stem.cap || 0));
+             const g = calculateBasalArea(stemDapNum, true);
              stemData['Area_Basal (m2)'] = g.toFixed(4);
 
              if (stem.alturaProcessada !== undefined) {
                stemData['Altura Utilizada (m)'] = stem.alturaProcessada;
                stemData['Altura Medida/Estimada'] = stem.alturaMedidaOuEstimada === 'medida' ? 'Medida' : 'Estimada';
              } else {
-               stemData['Altura Utilizada (m)'] = parseFloat((stem.altura || 0).toString());
+               stemData['Altura Utilizada (m)'] = parseFloat((stem.alturaTotal || stem.alturaComercial || stem.altura || 0).toString());
                stemData['Altura Medida/Estimada'] = 'Medida';
              }
 
@@ -2156,7 +2232,32 @@ export const OfficeDashboard = () => {
              stemData['Número'] = `${ind.numeroIndividuo}${String.fromCharCode(65 + i)}`;
              
              const capCol = inv.colunas.find((c: any) => c.id === 'cap');
-             if (capCol) stemData[capCol.nome] = stem.cap || '';
+             const dapCol = inv.colunas.find((c: any) => c.id === 'dap');
+             let stemCapStr = stem.cap !== undefined && stem.cap !== null && stem.cap !== '' ? stem.cap.toString() : '';
+             let stemDapStr = stem.dap !== undefined && stem.dap !== null && stem.dap !== '' ? stem.dap.toString() : '';
+
+             if (stemCapStr && !stemDapStr) {
+               const capNum = parseFloat(stemCapStr.replace(',', '.'));
+               if (!isNaN(capNum) && capNum > 0) {
+                 if (dapCol && !capCol) {
+                   stemDapStr = capNum.toString();
+                 } else {
+                   stemDapStr = (capNum / Math.PI).toFixed(2);
+                 }
+               }
+             } else if (stemDapStr && !stemCapStr) {
+               const dapNum = parseFloat(stemDapStr.replace(',', '.'));
+               if (!isNaN(dapNum) && dapNum > 0) {
+                 if (capCol && !dapCol) {
+                   stemCapStr = dapNum.toString();
+                 } else {
+                   stemCapStr = (dapNum * Math.PI).toFixed(2);
+                 }
+               }
+             }
+
+             if (capCol) stemData[capCol.nome] = stemCapStr;
+             if (dapCol) stemData[dapCol.nome] = stemDapStr;
 
              const hcCol = inv.colunas.find((c: any) => c.id === 'hc');
              if (hcCol) stemData[hcCol.nome] = stem.alturaComercial || stem.altura || '';
@@ -2234,7 +2335,32 @@ export const OfficeDashboard = () => {
              stemData['Número'] = `${ind.numeroIndividuo}${String.fromCharCode(65 + i)}`;
              
              const capCol = inv.colunas.find((c: any) => c.id === 'cap');
-             if (capCol) stemData[capCol.nome] = stem.cap || '';
+             const dapCol = inv.colunas.find((c: any) => c.id === 'dap');
+             let stemCapStr = stem.cap !== undefined && stem.cap !== null && stem.cap !== '' ? stem.cap.toString() : '';
+             let stemDapStr = stem.dap !== undefined && stem.dap !== null && stem.dap !== '' ? stem.dap.toString() : '';
+
+             if (stemCapStr && !stemDapStr) {
+               const capNum = parseFloat(stemCapStr.replace(',', '.'));
+               if (!isNaN(capNum) && capNum > 0) {
+                 if (dapCol && !capCol) {
+                   stemDapStr = capNum.toString();
+                 } else {
+                   stemDapStr = (capNum / Math.PI).toFixed(2);
+                 }
+               }
+             } else if (stemDapStr && !stemCapStr) {
+               const dapNum = parseFloat(stemDapStr.replace(',', '.'));
+               if (!isNaN(dapNum) && dapNum > 0) {
+                 if (capCol && !dapCol) {
+                   stemCapStr = dapNum.toString();
+                 } else {
+                   stemCapStr = (dapNum * Math.PI).toFixed(2);
+                 }
+               }
+             }
+
+             if (capCol) stemData[capCol.nome] = stemCapStr;
+             if (dapCol) stemData[dapCol.nome] = stemDapStr;
 
              const hcCol = inv.colunas.find((c: any) => c.id === 'hc');
              if (hcCol) stemData[hcCol.nome] = stem.alturaComercial || stem.altura || '';

@@ -10,6 +10,7 @@ export interface InventoryColumn {
 export interface StemData {
   id: string;
   cap?: number;
+  dap?: number;
   altura?: number;
   alturaComercial?: number;
   alturaTotal?: number;

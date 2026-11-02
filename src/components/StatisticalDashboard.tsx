@@ -127,7 +127,7 @@ export const StatisticalDashboard: React.FC<DashboardProps> = ({ inventories, on
 
     if (ind.multipleStems && ind.stems && Array.isArray(ind.stems)) {
       ind.stems.forEach((s: any) => {
-        const stemDap = processCapDap(s.cap, undefined);
+        const stemDap = processCapDap(s.cap, s.dap);
         const stemHt = s.alturaProcessada !== undefined ? s.alturaProcessada : parseFloat((s.altura||'0').toString());
         const finalHt = stemHt > 0 ? stemHt : actualHt;
         const g = calculateBasalArea(stemDap, true);
@@ -590,7 +590,7 @@ export const StatisticalDashboard: React.FC<DashboardProps> = ({ inventories, on
       if (ind.multipleStems && ind.stems) {
          ind.stems.forEach(s => {
            stemsProps.push({ 
-             dap: processCapDap(s.cap, undefined), 
+             dap: processCapDap(s.cap, s.dap), 
              cap: parseFloat((s.cap||'0').toString()), 
              ht: parseFloat((s.altura||'0').toString()),
              volumeProcessado: s.volumeProcessado
